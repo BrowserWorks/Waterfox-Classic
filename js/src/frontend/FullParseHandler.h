@@ -251,26 +251,37 @@ class FullParseHandler
     }
 
     MOZ_MUST_USE bool addElision(ParseNode* literal, const TokenPos& pos) {
+        MOZ_ASSERT(literal->isKind(ParseNodeKind::Array));
+        MOZ_ASSERT(literal->isArity(PN_LIST));
+
         ParseNode* elision = new_<NullaryNode>(ParseNodeKind::Elision, pos);
         if (!elision)
             return false;
+
         literal->append(elision);
         literal->pn_xflags |= PNX_ARRAYHOLESPREAD | PNX_NONCONST;
         return true;
     }
 
     MOZ_MUST_USE bool addSpreadElement(ParseNode* literal, uint32_t begin, ParseNode* inner) {
+        MOZ_ASSERT(literal->isKind(ParseNodeKind::Array));
+        MOZ_ASSERT(literal->isArity(PN_LIST));
+
         ParseNode* spread = newSpread(begin, inner);
         if (!spread)
             return false;
+
         literal->append(spread);
         literal->pn_xflags |= PNX_ARRAYHOLESPREAD | PNX_NONCONST;
         return true;
     }
 
     void addArrayElement(ParseNode* literal, ParseNode* element) {
+        MOZ_ASSERT(literal->isArity(PN_LIST));
+
         if (!element->isConstant())
             literal->pn_xflags |= PNX_NONCONST;
+
         literal->append(element);
     }
 
@@ -312,6 +323,9 @@ class FullParseHandler
     }
 
     MOZ_MUST_USE bool addPrototypeMutation(ParseNode* literal, uint32_t begin, ParseNode* expr) {
+        MOZ_ASSERT(literal->isKind(ParseNodeKind::Object));
+        MOZ_ASSERT(literal->isArity(PN_LIST));
+
         // Object literals with mutated [[Prototype]] are non-constant so that
         // singleton objects will have Object.prototype as their [[Prototype]].
         setListFlag(literal, PNX_NONCONST);
@@ -368,17 +382,19 @@ class FullParseHandler
     MOZ_MUST_USE bool addObjectMethodDefinition(ParseNode* literal, ParseNode* key, ParseNode* fn,
                                                 AccessorType atype)
     {
+        MOZ_ASSERT(literal->isKind(ParseNodeKind::Object));
         MOZ_ASSERT(literal->isArity(PN_LIST));
         MOZ_ASSERT(key->isKind(ParseNodeKind::Number) ||
                    key->isKind(ParseNodeKind::ObjectPropertyName) ||
                    key->isKind(ParseNodeKind::String) ||
                    key->isKind(ParseNodeKind::ComputedName));
-        literal->pn_xflags |= PNX_NONCONST;
 
         ParseNode* propdef = newBinary(ParseNodeKind::Colon, key, fn, AccessorTypeToJSOp(atype));
         if (!propdef)
             return false;
+
         literal->append(propdef);
+        literal->pn_xflags |= PNX_NONCONST;
         return true;
     }
 
@@ -461,6 +477,7 @@ class FullParseHandler
 
     MOZ_MUST_USE bool prependInitialYield(ParseNode* stmtList, ParseNode* genName) {
         MOZ_ASSERT(stmtList->isKind(ParseNodeKind::StatementList));
+        MOZ_ASSERT(stmtList->isArity(PN_LIST));
 
         TokenPos yieldPos(stmtList->pn_pos.begin, stmtList->pn_pos.begin + 1);
         ParseNode* makeGen = new_<NullaryNode>(ParseNodeKind::Generator, yieldPos);
@@ -469,6 +486,7 @@ class FullParseHandler
 
         MOZ_ASSERT(genName->getOp() == JSOP_GETNAME);
         genName->setOp(JSOP_SETNAME);
+
         ParseNode* genInit = newBinary(ParseNodeKind::Assign, genName, makeGen);
         if (!genInit)
             return false;
@@ -936,6 +954,9 @@ inline bool
 FullParseHandler::setLastFunctionFormalParameterDefault(ParseNode* funcpn,
                                                         ParseNode* defaultValue)
 {
+    MOZ_ASSERT(funcpn->isKind(ParseNodeKind::Function));
+    MOZ_ASSERT(funcpn->isArity(PN_CODE));
+
     ParseNode* arg = funcpn->pn_body->last();
     ParseNode* pn = newBinary(ParseNodeKind::Assign, arg, defaultValue);
     if (!pn)
