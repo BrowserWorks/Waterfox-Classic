@@ -66,6 +66,7 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     enterCompartmentDepth(0),
     performanceMonitoring(runtime_),
     data(nullptr),
+    realmData(nullptr),
     allocationMetadataBuilder(nullptr),
     lastAnimationTime(0),
     regExps(zone),
