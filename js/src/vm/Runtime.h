@@ -382,6 +382,9 @@ struct JSRuntime : public js::MallocProvider<JSRuntime>
     /* Call this to get the name of a compartment. */
     js::MainThreadData<JSCompartmentNameCallback> compartmentNameCallback;
 
+    /* Call this to get the name of a realm. */
+    js::MainThreadData<JSRealmNameCallback> realmNameCallback;
+
     /* Callback for doing memory reporting on external strings. */
     js::MainThreadData<JSExternalStringSizeofCallback> externalStringSizeofCallback;
 
