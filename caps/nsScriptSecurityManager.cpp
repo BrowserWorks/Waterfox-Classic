@@ -1263,8 +1263,9 @@ nsScriptSecurityManager::CanCreateWrapper(JSContext *cx,
     }
 
     // We give remote-XUL whitelisted domains a free pass here. See bug 932906.
-    JSCompartment* contextCompartment = js::GetContextCompartment(cx);
-    if (!xpc::AllowContentXBLScope(contextCompartment))
+    JS::Rooted<JS::Realm*> contextRealm(cx, JS::GetCurrentRealmOrNull(cx));
+    MOZ_RELEASE_ASSERT(contextRealm);
+    if (!xpc::AllowContentXBLScope(contextRealm))
     {
         return NS_OK;
     }
@@ -1276,7 +1277,7 @@ nsScriptSecurityManager::CanCreateWrapper(JSContext *cx,
 
     // We want to expose nsIDOMXULCommandDispatcher and nsITreeSelection implementations
     // in XBL scopes.
-    if (xpc::IsContentXBLCompartment(contextCompartment)) {
+    if (xpc::IsContentXBLScope(contextRealm)) {
       nsCOMPtr<nsIDOMXULCommandDispatcher> dispatcher = do_QueryInterface(aObj);
       if (dispatcher) {
         return NS_OK;
