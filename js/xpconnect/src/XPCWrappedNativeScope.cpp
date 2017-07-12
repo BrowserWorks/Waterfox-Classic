@@ -96,7 +96,6 @@ XPCWrappedNativeScope::XPCWrappedNativeScope(JSContext* cx,
         mComponents(nullptr),
         mNext(nullptr),
         mGlobalJSObject(aGlobal),
-        mIsContentXBLScope(false),
         mIsAddonScope(false)
 {
     // add ourselves to the scopes list
@@ -263,7 +262,7 @@ XPCWrappedNativeScope::EnsureContentXBLScope(JSContext* cx)
 {
     JS::RootedObject global(cx, GetGlobalJSObject());
     MOZ_ASSERT(js::IsObjectInContextCompartment(global, cx));
-    MOZ_ASSERT(!mIsContentXBLScope);
+    MOZ_ASSERT(!IsContentXBLScope());
     MOZ_ASSERT(strcmp(js::GetObjectClass(global)->name,
                       "nsXBLPrototypeScript compilation scope"));
 
@@ -291,6 +290,7 @@ XPCWrappedNativeScope::EnsureContentXBLScope(JSContext* cx)
     options.wantComponents = true;
     options.proto = global;
     options.sameZoneAs = global;
+    options.isContentXBLScope = true;
 
     // Use an ExpandedPrincipal to create asymmetric security.
     nsIPrincipal* principal = GetPrincipal();
@@ -309,8 +309,7 @@ XPCWrappedNativeScope::EnsureContentXBLScope(JSContext* cx)
     NS_ENSURE_SUCCESS(rv, nullptr);
     mContentXBLScope = &v.toObject();
 
-    // Tag it.
-    CompartmentPrivate::Get(js::UncheckedUnwrap(mContentXBLScope))->scope->mIsContentXBLScope = true;
+    MOZ_ASSERT(xpc::IsInContentXBLScope(js::UncheckedUnwrap(mContentXBLScope)));
 
     // Good to go!
     return mContentXBLScope;
@@ -394,7 +393,7 @@ XPCWrappedNativeScope::EnsureAddonScope(JSContext* cx, JSAddonId* addonId)
 {
     JS::RootedObject global(cx, GetGlobalJSObject());
     MOZ_ASSERT(js::IsObjectInContextCompartment(global, cx));
-    MOZ_ASSERT(!mIsContentXBLScope);
+    MOZ_ASSERT(!IsContentXBLScope());
     MOZ_ASSERT(!mIsAddonScope);
     MOZ_ASSERT(addonId);
     MOZ_ASSERT(nsContentUtils::IsSystemPrincipal(GetPrincipal()));
