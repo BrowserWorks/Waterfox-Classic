@@ -718,7 +718,7 @@ IonBuilder::inlineArrayPopShift(CallInfo& callInfo, MArrayPopShift::Mode mode)
     bool needsHoleCheck = thisTypes->hasObjectFlags(constraints(), OBJECT_FLAG_NON_PACKED);
     bool maybeUndefined = returnTypes->hasType(TypeSet::UndefinedType());
 
-    BarrierKind barrier = PropertyReadNeedsTypeBarrier(analysisContext, constraints(),
+    BarrierKind barrier = PropertyReadNeedsTypeBarrier(analysisContext, alloc(), constraints(),
                                                        obj, nullptr, returnTypes);
     if (barrier != BarrierKind::NoBarrier)
         returnType = MIRType::Value;
@@ -820,7 +820,7 @@ IonBuilder::inlineArrayPush(CallInfo& callInfo)
 
     obj = addMaybeCopyElementsForWrite(obj, /* checkNative = */ false);
 
-    if (NeedsPostBarrier(value))
+    if (needsPostBarrier(value))
         current->add(MPostWriteBarrier::New(alloc(), obj, value));
 
     MArrayPush* ins = MArrayPush::New(alloc(), obj, value);
@@ -1608,7 +1608,7 @@ IonBuilder::inlineStringSplitString(CallInfo& callInfo)
     if (resultConstStringSplit != InliningStatus_NotInlined)
         return resultConstStringSplit;
 
-    JSContext* cx = GetJitContext()->cx;
+    JSContext* cx = TlsContext.get();
     ObjectGroup* group = ObjectGroupCompartment::getStringSplitStringGroup(cx);
     if (!group)
         return InliningStatus_NotInlined;
@@ -2023,7 +2023,7 @@ IonBuilder::inlineRegExpMatcher(CallInfo& callInfo)
     if (lastIndexArg->type() != MIRType::Int32)
         return InliningStatus_NotInlined;
 
-    JSContext* cx = GetJitContext()->cx;
+    JSContext* cx = TlsContext.get();
     if (!cx->compartment()->jitCompartment()->ensureRegExpMatcherStubExists(cx)) {
         cx->clearPendingException(); // OOM or overrecursion.
         return InliningStatus_NotInlined;
@@ -2069,7 +2069,7 @@ IonBuilder::inlineRegExpSearcher(CallInfo& callInfo)
     if (lastIndexArg->type() != MIRType::Int32)
         return InliningStatus_NotInlined;
 
-    JSContext* cx = GetJitContext()->cx;
+    JSContext* cx = TlsContext.get();
     if (!cx->compartment()->jitCompartment()->ensureRegExpSearcherStubExists(cx)) {
         cx->clearPendingException(); // OOM or overrecursion.
         return abort(AbortReason::Error);
@@ -2115,7 +2115,7 @@ IonBuilder::inlineRegExpTester(CallInfo& callInfo)
     if (lastIndexArg->type() != MIRType::Int32)
         return InliningStatus_NotInlined;
 
-    JSContext* cx = GetJitContext()->cx;
+    JSContext* cx = TlsContext.get();
     if (!cx->compartment()->jitCompartment()->ensureRegExpTesterStubExists(cx)) {
         cx->clearPendingException(); // OOM or overrecursion.
         return InliningStatus_NotInlined;
@@ -2900,7 +2900,7 @@ IonBuilder::inlineUnsafeSetReservedSlot(CallInfo& callInfo)
     current->add(store);
     current->push(store);
 
-    if (NeedsPostBarrier(callInfo.getArg(2)))
+    if (needsPostBarrier(callInfo.getArg(2)))
         current->add(MPostWriteBarrier::New(alloc(), obj, callInfo.getArg(2)));
 
     return InliningStatus_Inlined;

@@ -1180,7 +1180,8 @@ MacroAssembler::typeOfObject(Register obj, Register scratch, Label* slow,
 void
 MacroAssembler::loadJSContext(Register dest)
 {
-    movePtr(ImmPtr(GetJitContext()->runtime->mainContextPtr()), dest);
+    JitContext* jcx = GetJitContext();
+    movePtr(ImmPtr(jcx->runtime->mainContextPtr()), dest);
 }
 
 void

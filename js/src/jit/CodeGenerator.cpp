@@ -965,7 +965,7 @@ CodeGenerator::visitBooleanToString(LBooleanToString* lir)
 {
     Register input = ToRegister(lir->input());
     Register output = ToRegister(lir->output());
-    const JSAtomState& names = GetJitContext()->runtime->names();
+    const JSAtomState& names = gen->runtime->names();
     Label true_, done;
 
     masm.branchTest32(Assembler::NonZero, input, input, &true_);
@@ -984,7 +984,7 @@ CodeGenerator::emitIntToString(Register input, Register output, Label* ool)
     masm.branch32(Assembler::AboveOrEqual, input, Imm32(StaticStrings::INT_STATIC_LIMIT), ool);
 
     // Fast path for small integers.
-    masm.movePtr(ImmPtr(&GetJitContext()->runtime->staticStrings().intStaticTable), output);
+    masm.movePtr(ImmPtr(&gen->runtime->staticStrings().intStaticTable), output);
     masm.loadPtr(BaseIndex(output, input, ScalePointer), output);
 }
 
@@ -1042,7 +1042,7 @@ CodeGenerator::visitValueToString(LValueToString* lir)
 
     Label done;
     Register tag = masm.splitTagForTest(input);
-    const JSAtomState& names = GetJitContext()->runtime->names();
+    const JSAtomState& names = gen->runtime->names();
 
     // String
     if (lir->mir()->input()->mightBeType(MIRType::String)) {
@@ -3750,8 +3750,8 @@ EmitStoreBufferCheckForConstant(MacroAssembler& masm, JSObject* object,
 }
 
 static void
-EmitPostWriteBarrier(MacroAssembler& masm, Register objreg, JSObject* maybeConstant, bool isGlobal,
-                     AllocatableGeneralRegisterSet& regs)
+EmitPostWriteBarrier(MacroAssembler& masm, CompileRuntime* runtime, Register objreg,
+                     JSObject* maybeConstant, bool isGlobal, AllocatableGeneralRegisterSet& regs)
 {
     MOZ_ASSERT_IF(isGlobal, maybeConstant);
 
@@ -3767,7 +3767,7 @@ EmitPostWriteBarrier(MacroAssembler& masm, Register objreg, JSObject* maybeConst
     masm.bind(&callVM);
 
     Register runtimereg = regs.takeAny();
-    masm.mov(ImmPtr(GetJitContext()->runtime), runtimereg);
+    masm.mov(ImmPtr(runtime), runtimereg);
 
     void (*fun)(JSRuntime*, JSObject*) = isGlobal ? PostGlobalWriteBarrier : PostWriteBarrier;
     masm.setupUnalignedABICall(regs.takeAny());
@@ -3796,7 +3796,7 @@ CodeGenerator::emitPostWriteBarrier(const LAllocation* obj)
         regs.takeUnchecked(objreg);
     }
 
-    EmitPostWriteBarrier(masm, objreg, object, isGlobal, regs);
+    EmitPostWriteBarrier(masm, gen->runtime, objreg, object, isGlobal, regs);
 }
 
 void
@@ -3804,7 +3804,7 @@ CodeGenerator::emitPostWriteBarrier(Register objreg)
 {
     AllocatableGeneralRegisterSet regs(GeneralRegisterSet::Volatile());
     regs.takeUnchecked(objreg);
-    EmitPostWriteBarrier(masm, objreg, nullptr, false, regs);
+    EmitPostWriteBarrier(masm, gen->runtime, objreg, nullptr, false, regs);
 }
 
 void
@@ -3957,7 +3957,7 @@ CodeGenerator::visitOutOfLineCallPostWriteElementBarrier(OutOfLineCallPostWriteE
 
     Register runtimereg = regs.takeAny();
     masm.setupUnalignedABICall(runtimereg);
-    masm.mov(ImmPtr(GetJitContext()->runtime), runtimereg);
+    masm.mov(ImmPtr(gen->runtime), runtimereg);
     masm.passABIArg(runtimereg);
     masm.passABIArg(objreg);
     masm.passABIArg(indexreg);
@@ -4967,7 +4967,7 @@ CodeGenerator::visitCheckOverRecursed(LCheckOverRecursed* lir)
     addOutOfLineCode(ool, lir->mir());
 
     // Conditional forward (unlikely) branch to failure.
-    const void* limitAddr = GetJitContext()->runtime->addressOfJitStackLimit();
+    const void* limitAddr = gen->runtime->addressOfJitStackLimit();
     masm.branchStackPtrRhs(Assembler::AboveOrEqual, AbsoluteAddress(limitAddr), ool->entry());
     masm.bind(ool->rejoin());
 }
@@ -5044,7 +5044,7 @@ CodeGenerator::maybeCreateScriptCounts()
     // If scripts are being profiled, create a new IonScriptCounts for the
     // profiling data, which will be attached to the associated JSScript or
     // wasm module after code generation finishes.
-    if (!GetJitContext()->hasProfilingScripts())
+    if (!gen->hasProfilingScripts())
         return nullptr;
 
     // This test inhibits IonScriptCount creation for wasm code which is
@@ -5347,7 +5347,7 @@ CodeGenerator::emitDebugForceBailing(LInstruction* lir)
         return;
 
     masm.comment("emitDebugForceBailing");
-    const void* bailAfterAddr = GetJitContext()->compartment->zone()->addressOfIonBailAfter();
+    const void* bailAfterAddr = gen->compartment->zone()->addressOfIonBailAfter();
 
     AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
 
@@ -7744,7 +7744,7 @@ CodeGenerator::visitSubstr(LSubstr* lir)
 
     // Zero length, return emptystring.
     masm.branchTest32(Assembler::NonZero, length, length, &nonZero);
-    const JSAtomState& names = GetJitContext()->runtime->names();
+    const JSAtomState& names = gen->runtime->names();
     masm.movePtr(ImmGCPtr(names.empty), output);
     masm.jump(done);
 
@@ -8125,7 +8125,7 @@ CodeGenerator::visitFromCharCode(LFromCharCode* lir)
     masm.branch32(Assembler::AboveOrEqual, code, Imm32(StaticStrings::UNIT_STATIC_LIMIT),
                   ool->entry());
 
-    masm.movePtr(ImmPtr(&GetJitContext()->runtime->staticStrings().unitStaticTable), output);
+    masm.movePtr(ImmPtr(&gen->runtime->staticStrings().unitStaticTable), output);
     masm.loadPtr(BaseIndex(output, code, ScalePointer), output);
 
     masm.bind(ool->rejoin());
@@ -8156,7 +8156,7 @@ CodeGenerator::visitFromCodePoint(LFromCodePoint* lir)
     masm.branch32(Assembler::AboveOrEqual, codePoint, Imm32(StaticStrings::UNIT_STATIC_LIMIT),
                   &isTwoByte);
     {
-        masm.movePtr(ImmPtr(&GetJitContext()->runtime->staticStrings().unitStaticTable), output);
+        masm.movePtr(ImmPtr(&gen->runtime->staticStrings().unitStaticTable), output);
         masm.loadPtr(BaseIndex(output, codePoint, ScalePointer), output);
         masm.jump(done);
     }
@@ -10441,7 +10441,7 @@ CodeGenerator::visitTypeOfV(LTypeOfV* lir)
     Register output = ToRegister(lir->output());
     Register tag = masm.splitTagForTest(value);
 
-    const JSAtomState& names = GetJitContext()->runtime->names();
+    const JSAtomState& names = gen->runtime->names();
     Label done;
 
     MDefinition* input = lir->mir()->input();
@@ -10562,7 +10562,7 @@ void
 CodeGenerator::visitOutOfLineTypeOfV(OutOfLineTypeOfV* ool)
 {
     LTypeOfV* ins = ool->ins();
-    const JSAtomState& names = GetJitContext()->runtime->names();
+    const JSAtomState& names = gen->runtime->names();
 
     ValueOperand input = ToValue(ins, LTypeOfV::Input);
     Register temp = ToTempUnboxRegister(ins->tempToUnbox());
@@ -10590,7 +10590,7 @@ CodeGenerator::visitOutOfLineTypeOfV(OutOfLineTypeOfV* ool)
     saveVolatile(output);
     masm.setupUnalignedABICall(output);
     masm.passABIArg(obj);
-    masm.movePtr(ImmPtr(GetJitContext()->runtime), output);
+    masm.movePtr(ImmPtr(gen->runtime), output);
     masm.passABIArg(output);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, jit::TypeOfObject));
     masm.storeCallPointerResult(output);
@@ -12241,7 +12241,7 @@ CodeGenerator::visitInterruptCheck(LInterruptCheck* lir)
 
     OutOfLineCode* ool = oolCallVM(InterruptCheckInfo, lir, ArgList(), StoreNothing());
 
-    const void* interruptAddr = GetJitContext()->runtime->addressOfInterrupt();
+    const void* interruptAddr = gen->runtime->addressOfInterrupt();
     masm.branch32(Assembler::NotEqual, AbsoluteAddress(interruptAddr), Imm32(0), ool->entry());
     masm.bind(ool->rejoin());
 }
@@ -12705,7 +12705,7 @@ CodeGenerator::visitFinishBoundFunctionInit(LFinishBoundFunctionInit* lir)
                                 slowPath);
 
         // An absent name property defaults to the empty string.
-        const JSAtomState& names = GetJitContext()->runtime->names();
+        const JSAtomState& names = gen->runtime->names();
         masm.movePtr(ImmGCPtr(names.empty), temp2);
     }
     masm.bind(&hasName);

@@ -3959,7 +3959,7 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, HandleFunction fun,
     if (!inlineScriptTree)
         return false;
 
-    CompileInfo info(script, fun,
+    CompileInfo info(CompileRuntime::get(cx->runtime()), script, fun,
                      /* osrPc = */ nullptr,
                      Analysis_DefiniteProperties,
                      script->needsArgsObj(),
@@ -4206,7 +4206,7 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
         return false;
     }
 
-    CompileInfo info(script, script->functionNonDelazifying(),
+    CompileInfo info(CompileRuntime::get(cx->runtime()), script, script->functionNonDelazifying(),
                      /* osrPc = */ nullptr,
                      Analysis_ArgumentsUsage,
                      /* needsArgsObj = */ true,
