@@ -19,7 +19,6 @@ UNIFIED_SOURCES += [
     'Iteration.cpp',
     'Marking.cpp',
     'Memory.cpp',
-    'MemoryProfiler.cpp',
     'Nursery.cpp',
     'RootMarking.cpp',
     'Statistics.cpp',
