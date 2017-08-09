@@ -1040,8 +1040,8 @@ Parser<ParseHandler, CharT>::parse()
 }
 
 /*
- * Strict mode forbids introducing new definitions for 'eval', 'arguments', or
- * for any strict mode reserved word.
+ * Strict mode forbids introducing new definitions for 'eval', 'arguments',
+ * 'let', 'static', 'yield', or for any strict mode reserved word.
  */
 bool
 ParserBase::isValidStrictBinding(PropertyName* name)
@@ -2287,7 +2287,7 @@ Parser<FullParseHandler, char16_t>::moduleBody(ModuleSharedContext* modulesc)
         return null();
 
     AutoAwaitIsKeyword<Parser> awaitIsKeyword(this, AwaitIsModuleKeyword);
-    ParseNode* pn = statementList(YieldIsKeyword);
+    ParseNode* pn = statementList(YieldIsName);
     if (!pn)
         return null();
 
@@ -5658,7 +5658,7 @@ Parser<ParseHandler, CharT>::exportFunctionDeclaration(uint32_t begin, uint32_t 
 
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_FUNCTION));
 
-    Node kid = functionStmt(toStringStart, YieldIsKeyword, NameRequired, asyncKind);
+    Node kid = functionStmt(toStringStart, YieldIsName, NameRequired, asyncKind);
     if (!kid)
         return null();
 
@@ -5684,7 +5684,7 @@ Parser<ParseHandler, CharT>::exportClassDeclaration(uint32_t begin)
 
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_CLASS));
 
-    Node kid = classDefinition(YieldIsKeyword, ClassStatement, NameRequired);
+    Node kid = classDefinition(YieldIsName, ClassStatement, NameRequired);
     if (!kid)
         return null();
 
@@ -5739,7 +5739,7 @@ Parser<ParseHandler, CharT>::exportDefaultFunctionDeclaration(uint32_t begin,
 
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_FUNCTION));
 
-    Node kid = functionStmt(toStringStart, YieldIsKeyword, AllowDefaultName, asyncKind);
+    Node kid = functionStmt(toStringStart, YieldIsName, AllowDefaultName, asyncKind);
     if (!kid)
         return null();
 
@@ -5762,7 +5762,7 @@ Parser<ParseHandler, CharT>::exportDefaultClassDeclaration(uint32_t begin)
 
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_CLASS));
 
-    Node kid = classDefinition(YieldIsKeyword, ClassStatement, AllowDefaultName);
+    Node kid = classDefinition(YieldIsName, ClassStatement, AllowDefaultName);
     if (!kid)
         return null();
 
@@ -5790,7 +5790,7 @@ Parser<ParseHandler, CharT>::exportDefaultAssignExpr(uint32_t begin)
     if (!noteDeclaredName(name, DeclarationKind::Const, pos()))
         return null();
 
-    Node kid = assignExpr(InAllowed, YieldIsKeyword, TripledotProhibited);
+    Node kid = assignExpr(InAllowed, YieldIsName, TripledotProhibited);
     if (!kid)
         return null();
     if (!matchOrInsertSemicolonAfterExpression())
