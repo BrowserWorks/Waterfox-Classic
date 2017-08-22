@@ -342,6 +342,16 @@ public:
    */
   void LoadEventFired();
 
+  /**
+   * Destroy and prevent the ScriptLoader or the ScriptLoadRequests from owning
+   * any references to the JSScript or to the Request which might be used for
+   * caching the encoded bytecode.
+   */
+  void Destroy()
+  {
+    GiveUpBytecodeEncoding();
+  }
+
   /*
    * Clear the map of loaded modules. Called when a Document object is reused
    * for a different global.
@@ -588,6 +598,7 @@ public:
   bool mDocumentParsingDone;
   bool mBlockingDOMContentLoaded;
   bool mLoadEventFired;
+  bool mGiveUpEncoding;
 
   // Module map
   nsRefPtrHashtable<nsURIHashKey, mozilla::GenericPromise::Private> mFetchingModules;
