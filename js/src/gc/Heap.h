@@ -31,6 +31,8 @@
 #include "js/TracingAPI.h"
 #include "js/TraceKind.h"
 
+#include "vm/Printer.h"
+
 struct JSRuntime;
 
 namespace js {
@@ -296,7 +298,7 @@ struct Cell
 
 #ifdef DEBUG
     inline bool isAligned() const;
-    void dump(FILE* fp) const;
+    void dump(js::GenericPrinter& out) const;
     void dump() const;
 #endif
 
