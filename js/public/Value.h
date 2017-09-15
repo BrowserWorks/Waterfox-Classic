@@ -218,10 +218,13 @@ typedef enum JSWhyMagic
     JS_WHY_MAGIC_COUNT
 } JSWhyMagic;
 
+namespace js {
+static inline JS::Value PoisonedObjectValue(uintptr_t poison);
+} // namespace js
+
 namespace JS {
 
 static inline constexpr JS::Value UndefinedValue();
-static inline JS::Value PoisonedObjectValue(JSObject* obj);
 
 namespace detail {
 
@@ -365,7 +368,7 @@ class MOZ_NON_PARAM alignas(8) Value
     }
 
     void setObject(JSObject& obj) {
-        MOZ_ASSERT(uintptr_t(&obj) > 0x1000 || uintptr_t(&obj) == 0x48);
+        MOZ_ASSERT(uintptr_t(&obj) >= 0x1000);
 #if defined(JS_PUNBOX64)
         // VisualStudio cannot contain parenthesized C++ style cast and shift
         // inside decltype in template parameter:
@@ -381,7 +384,7 @@ class MOZ_NON_PARAM alignas(8) Value
         data.asBits = bitsFromTagAndPayload(JSVAL_TAG_OBJECT, PayloadType(obj));
     }
 
-    friend inline Value PoisonedObjectValue(JSObject* obj);
+    friend inline Value js::PoisonedObjectValue(uintptr_t poison);
 
   public:
     void setBoolean(bool b) {
@@ -1134,14 +1137,6 @@ ObjectValue(JSObject& obj)
 }
 
 static inline Value
-ObjectValueCrashOnTouch()
-{
-    Value v;
-    v.setObject(*reinterpret_cast<JSObject*>(0x48));
-    return v;
-}
-
-static inline Value
 MagicValue(JSWhyMagic why)
 {
     Value v;
@@ -1284,14 +1279,6 @@ PrivateGCThingValue(js::gc::Cell* cell)
 {
     Value v;
     v.setPrivateGCThing(cell);
-    return v;
-}
-
-static inline Value
-PoisonedObjectValue(JSObject* obj)
-{
-    Value v;
-    v.setObjectNoCheck(obj);
     return v;
 }
 
@@ -1505,6 +1492,14 @@ DispatchTyped(F f, const JS::Value& val, Args&&... args)
 template <class S> struct VoidDefaultAdaptor { static void defaultValue(const S&) {} };
 template <class S> struct IdentityDefaultAdaptor { static S defaultValue(const S& v) {return v;} };
 template <class S, bool v> struct BoolDefaultAdaptor { static bool defaultValue(const S&) { return v; } };
+
+static inline JS::Value
+PoisonedObjectValue(uintptr_t poison)
+{
+    JS::Value v;
+    v.setObjectNoCheck(reinterpret_cast<JSObject*>(poison));
+    return v;
+}
 
 } // namespace js
 
