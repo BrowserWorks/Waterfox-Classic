@@ -1125,6 +1125,9 @@ static_assert(js::gc::ChunkRuntimeOffset == offsetof(Chunk, trailer) +
 static_assert(js::gc::ChunkLocationOffset == offsetof(Chunk, trailer) +
                                              offsetof(ChunkTrailer, location),
               "The hardcoded API location offset must match the actual offset.");
+static_assert(js::gc::ChunkStoreBufferOffset == offsetof(Chunk, trailer) +
+                                                offsetof(ChunkTrailer, storeBuffer),
+              "The hardcoded API storeBuffer offset must match the actual offset.");
 
 /*
  * Tracks the used sizes for owned heap data and automatically maintains the
