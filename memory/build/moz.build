@@ -37,9 +37,4 @@ if CONFIG['OS_TARGET'] == 'Darwin' and (CONFIG['MOZ_REPLACE_MALLOC'] or
 
 Library('memory')
 
-if CONFIG['MOZ_GLUE_IN_PROGRAM']:
-    DIST_INSTALL = True
-
-# Keep jemalloc separated when mozglue is statically linked
-if CONFIG['MOZ_MEMORY'] and CONFIG['OS_TARGET'] in ('WINNT', 'Darwin', 'Android'):
-    FINAL_LIBRARY = 'mozglue'
+FINAL_LIBRARY = 'mozglue'
