@@ -8900,13 +8900,7 @@ Parser<ParseHandler, CharT>::generatorComprehension(uint32_t begin)
     if (!genfn)
         return null();
 
-    Node result = handler.newList(PNK_GENEXP, genfn, JSOP_CALL);
-    if (!result)
-        return null();
-    handler.setBeginPosition(result, begin);
-    handler.setEndPosition(result, pos().end);
-
-    return result;
+    return handler.newGeneratorComprehension(genfn, TokenPos(begin, pos().end));
 }
 
 template <class ParseHandler, typename CharT>
@@ -9111,7 +9105,7 @@ Parser<ParseHandler, CharT>::memberExpr(YieldHandling yieldHandling,
                     return null();
                 }
 
-                nextMember = handler.newList(PNK_SUPERCALL, lhs, JSOP_SUPERCALL);
+                nextMember = handler.newSuperCall(lhs);
                 if (!nextMember)
                     return null();
 
