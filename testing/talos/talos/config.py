@@ -41,6 +41,7 @@ DEFAULTS = dict(
         tpmozafterpaint=False,
         fnbpaint=False,
         firstpaint=False,
+        format_pagename=True,
         userready=False,
         testeventmap=[],
         base_vs_ref=False,
