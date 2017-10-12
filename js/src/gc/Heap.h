@@ -38,6 +38,7 @@ struct JSRuntime;
 namespace js {
 
 class AutoLockGC;
+class AutoLockGCBgAlloc;
 class FreeOp;
 
 extern bool

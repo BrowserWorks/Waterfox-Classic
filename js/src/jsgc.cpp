@@ -1087,7 +1087,7 @@ GCRuntime::init(uint32_t maxbytes, uint32_t maxNurseryBytes)
         return false;
 
     {
-        AutoLockGC lock(rt);
+        AutoLockGCBgAlloc lock(rt);
 
         /*
          * Separate gcMaxMallocBytes from gcMaxBytes but initialize to maxbytes

@@ -138,7 +138,7 @@ class Nursery
     explicit Nursery(JSRuntime* rt);
     ~Nursery();
 
-    MOZ_MUST_USE bool init(uint32_t maxNurseryBytes, AutoLockGC& lock);
+    MOZ_MUST_USE bool init(uint32_t maxNurseryBytes, AutoLockGCBgAlloc& lock);
 
     unsigned maxChunks() const { return maxNurseryChunks_; }
     unsigned numChunks() const { return chunks_.length(); }
@@ -415,7 +415,7 @@ class Nursery
 
     void updateNumChunks(unsigned newCount);
     void updateNumChunksLocked(unsigned newCount,
-                               AutoLockGC& lock);
+                               AutoLockGCBgAlloc& lock);
 
     MOZ_ALWAYS_INLINE uintptr_t allocationEnd() const {
         MOZ_ASSERT(numChunks() > 0);
