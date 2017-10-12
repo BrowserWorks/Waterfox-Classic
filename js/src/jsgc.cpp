@@ -869,6 +869,7 @@ GCRuntime::GCRuntime(JSRuntime* rt) :
     incrementalLimit(0),
 #endif
     fullCompartmentChecks(false),
+    gcBeginCallbackDepth(0),
     alwaysPreserveCode(false),
 #ifdef DEBUG
     arenasEmptyAtShutdown(true),
@@ -1426,25 +1427,6 @@ GCRuntime::callObjectsTenuredCallback()
     if (tenuredCallback.op)
         tenuredCallback.op(rt->mainContextFromOwnThread(), tenuredCallback.data);
 }
-
-namespace {
-
-class AutoNotifyGCActivity {
-  public:
-    explicit AutoNotifyGCActivity(GCRuntime& gc) : gc_(gc) {
-        if (!gc_.isIncrementalGCInProgress())
-            gc_.callGCCallback(JSGC_BEGIN);
-    }
-    ~AutoNotifyGCActivity() {
-        if (!gc_.isIncrementalGCInProgress())
-            gc_.callGCCallback(JSGC_END);
-    }
-
-  private:
-    GCRuntime& gc_;
-};
-
-} // (anon)
 
 bool
 GCRuntime::addFinalizeCallback(JSFinalizeCallback callback, void* data)
@@ -6842,6 +6824,53 @@ class AutoScheduleZonesForGC
 
 } /* anonymous namespace */
 
+class js::gc::AutoCallGCCallbacks {
+    GCRuntime& gc_;
+
+  public:
+    explicit AutoCallGCCallbacks(GCRuntime& gc) : gc_(gc) {
+        gc_.maybeCallBeginCallback();
+    }
+    ~AutoCallGCCallbacks() {
+        gc_.maybeCallEndCallback();
+    }
+};
+
+void
+GCRuntime::maybeCallBeginCallback()
+{
+    if (isIncrementalGCInProgress())
+        return;
+
+    if (gcBeginCallbackDepth == 0) {
+        // Save scheduled zone information in case the callback changes it.
+        for (ZonesIter zone(rt, WithAtoms); !zone.done(); zone.next())
+            zone->gcScheduledSaved_ = zone->gcScheduled_;
+    }
+
+    gcBeginCallbackDepth++;
+
+    callGCCallback(JSGC_BEGIN);
+
+    MOZ_ASSERT(gcBeginCallbackDepth != 0);
+    gcBeginCallbackDepth--;
+
+    if (gcBeginCallbackDepth == 0) {
+        // Restore scheduled zone information again.
+        for (ZonesIter zone(rt, WithAtoms); !zone.done(); zone.next())
+            zone->gcScheduled_ = zone->gcScheduledSaved_;
+    }
+}
+
+void
+GCRuntime::maybeCallEndCallback()
+{
+    if (isIncrementalGCInProgress())
+        return;
+
+    callGCCallback(JSGC_END);
+}
+
 /*
  * Run one GC "cycle" (either a slice of incremental GC or an entire
  * non-incremental GC. We disable inlining to ensure that the bottom of the
@@ -6854,8 +6883,8 @@ class AutoScheduleZonesForGC
 MOZ_NEVER_INLINE GCRuntime::IncrementalResult
 GCRuntime::gcCycle(bool nonincrementalByAPI, SliceBudget& budget, JS::gcreason::Reason reason)
 {
-    // Note that the following is allowed to re-enter GC in the finalizer.
-    AutoNotifyGCActivity notify(*this);
+    // Note that GC callbacks are allowed to re-enter GC.
+    AutoCallGCCallbacks callCallbacks(*this);
 
     gcstats::AutoGCSlice agc(stats(), scanZonesBeforeGC(), invocationKind, budget, reason);
 

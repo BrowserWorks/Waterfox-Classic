@@ -34,6 +34,7 @@ namespace gc {
 using BlackGrayEdgeVector = Vector<TenuredCell*, 0, SystemAllocPolicy>;
 using ZoneVector = Vector<JS::Zone*, 4, SystemAllocPolicy>;
 
+class AutoCallGCCallbacks;
 class AutoMaybeStartBackgroundAllocation;
 class AutoRunParallelTask;
 class AutoTraceSession;
@@ -1005,6 +1006,10 @@ class GCRuntime
     void incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason reason,
                                  AutoLockForExclusiveAccess& lock);
 
+    friend class AutoCallGCCallbacks;
+    void maybeCallBeginCallback();
+    void maybeCallEndCallback();
+
     void pushZealSelectedObjects();
     void purgeRuntime(AutoLockForExclusiveAccess& lock);
     MOZ_MUST_USE bool beginMarkPhase(JS::gcreason::Reason reason, AutoLockForExclusiveAccess& lock);
@@ -1347,6 +1352,8 @@ class GCRuntime
 #endif
 
     MainThreadData<bool> fullCompartmentChecks;
+
+    MainThreadData<uint32_t> gcBeginCallbackDepth;
 
     Callback<JSGCCallback> gcCallback;
     Callback<JS::DoCycleCollectionCallback> gcDoCycleCollectionCallback;
