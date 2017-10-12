@@ -133,8 +133,7 @@ js::Nursery::init(uint32_t maxNurseryBytes, AutoLockGC& lock)
     if (maxNurseryChunks_ == 0)
         return true;
 
-    AutoMaybeStartBackgroundAllocation maybeBgAlloc;
-    updateNumChunksLocked(1, maybeBgAlloc, lock);
+    updateNumChunksLocked(1, lock);
     if (numChunks() == 0)
         return false;
 
@@ -996,15 +995,13 @@ void
 js::Nursery::updateNumChunks(unsigned newCount)
 {
     if (numChunks() != newCount) {
-        AutoMaybeStartBackgroundAllocation maybeBgAlloc;
         AutoLockGC lock(runtime());
-        updateNumChunksLocked(newCount, maybeBgAlloc, lock);
+        updateNumChunksLocked(newCount, lock);
     }
 }
 
 void
 js::Nursery::updateNumChunksLocked(unsigned newCount,
-                                   AutoMaybeStartBackgroundAllocation& maybeBgAlloc,
                                    AutoLockGC& lock)
 {
     // The GC nursery is an optimization and so if we fail to allocate nursery
@@ -1028,7 +1025,7 @@ js::Nursery::updateNumChunksLocked(unsigned newCount,
         return;
 
     for (unsigned i = priorCount; i < newCount; i++) {
-        auto newChunk = runtime()->gc.getOrAllocChunk(lock, maybeBgAlloc);
+        auto newChunk = runtime()->gc.getOrAllocChunk(lock);
         if (!newChunk) {
             chunks_.shrinkTo(i);
             return;
