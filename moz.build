@@ -69,7 +69,7 @@ DIRS += [
     'third_party/python',
 ]
 
-if CONFIG['MOZ_WIDGET_TOOLKIT']:
+if CONFIG['MOZ_WIDGET_TOOLKIT'] or not CONFIG['MOZ_BUILD_APP']:
     # These python manifests are included here so they get picked up without an objdir
     PYTHON_UNITTEST_MANIFESTS += [
         'testing/marionette/harness/marionette_harness/tests/harness_unit/python.ini',
