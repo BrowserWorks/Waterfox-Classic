@@ -688,6 +688,7 @@ class NameResolver
           case PNK_DIV:
           case PNK_MOD:
           case PNK_POW:
+          case PNK_PIPELINE:
           case PNK_COMMA:
           case PNK_NEW:
           case PNK_CALL:
