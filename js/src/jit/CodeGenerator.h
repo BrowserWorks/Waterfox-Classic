@@ -290,6 +290,8 @@ class CodeGenerator final : public CodeGeneratorSpecific
     void visitSinCos(LSinCos *lir);
     void visitStringSplit(LStringSplit* lir);
     void visitFunctionEnvironment(LFunctionEnvironment* lir);
+    void visitHomeObject(LHomeObject* lir);
+    void visitHomeObjectSuperBase(LHomeObjectSuperBase* lir);
     void visitNewLexicalEnvironmentObject(LNewLexicalEnvironmentObject* lir);
     void visitCopyLexicalEnvironmentObject(LCopyLexicalEnvironmentObject* lir);
     void visitCallGetProperty(LCallGetProperty* lir);
@@ -427,6 +429,7 @@ class CodeGenerator final : public CodeGeneratorSpecific
 
     void visitGetPropertyCacheV(LGetPropertyCacheV* ins);
     void visitGetPropertyCacheT(LGetPropertyCacheT* ins);
+    void visitGetPropSuperCacheV(LGetPropSuperCacheV* ins);
     void visitBindNameCache(LBindNameCache* ins);
     void visitCallSetProperty(LInstruction* ins);
     void visitSetPropertyCache(LSetPropertyCache* ins);
