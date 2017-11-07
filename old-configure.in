@@ -4877,7 +4877,6 @@ AC_SUBST(HAVE_X86_AVX2)
 AC_SUBST(HAVE_ALTIVEC)
 AC_SUBST(GCC_USE_GNU_LD)
 
-AC_SUBST(WRAP_LDFLAGS)
 AC_SUBST(MKSHLIB)
 AC_SUBST(MKCSHLIB)
 AC_SUBST_LIST(DSO_CFLAGS)
@@ -5081,7 +5080,6 @@ fi
 
 if test "$COMPILE_ENVIRONMENT" -a "$MOZ_WIDGET_TOOLKIT"; then
 
-export WRAP_LDFLAGS
 
 dnl ========================================================
 dnl = Setup a nice relatively clean build environment for
