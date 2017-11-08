@@ -4485,8 +4485,10 @@ Parser<ParseHandler, CharT>::objectBindingPattern(DeclarationKind kind,
         TokenKind tt;
         if (!tokenStream.peekToken(&tt))
             return null();
-        if (tt == TOK_RC)
+        if (tt == TOK_RC) {
+            tokenStream.addModifierException(TokenStream::OperandIsNone);
             break;
+        }
 
         if (tt == TOK_TRIPLEDOT) {
             tokenStream.consumeKnownToken(TOK_TRIPLEDOT);
@@ -4526,7 +4528,7 @@ Parser<ParseHandler, CharT>::objectBindingPattern(DeclarationKind kind,
                     return null();
 
                 bool hasInitializer;
-                if (!tokenStream.matchToken(&hasInitializer, TOK_ASSIGN))
+                if (!tokenStream.matchToken(&hasInitializer, TOK_ASSIGN, TokenStream::Operand))
                     return null();
 
                 Node bindingExpr = hasInitializer
@@ -4572,7 +4574,7 @@ Parser<ParseHandler, CharT>::objectBindingPattern(DeclarationKind kind,
         }
 
         bool matched;
-        if (!tokenStream.matchToken(&matched, TOK_COMMA))
+        if (!tokenStream.matchToken(&matched, TOK_COMMA, TokenStream::Operand))
             return null();
         if (!matched)
             break;
@@ -4582,7 +4584,7 @@ Parser<ParseHandler, CharT>::objectBindingPattern(DeclarationKind kind,
         }
     }
 
-    MUST_MATCH_TOKEN_MOD_WITH_REPORT(TOK_RC, TokenStream::None,
+    MUST_MATCH_TOKEN_MOD_WITH_REPORT(TOK_RC, TokenStream::Operand,
                                      reportMissingClosing(JSMSG_CURLY_AFTER_LIST,
                                                           JSMSG_CURLY_OPENED, begin));
 
@@ -4617,6 +4619,7 @@ Parser<ParseHandler, CharT>::arrayBindingPattern(DeclarationKind kind, YieldHand
 
          if (tt == TOK_RB) {
              tokenStream.ungetToken();
+             tokenStream.addModifierException(TokenStream::OperandIsNone);
              break;
          }
 
@@ -4642,7 +4645,7 @@ Parser<ParseHandler, CharT>::arrayBindingPattern(DeclarationKind kind, YieldHand
                  return null();
 
              bool hasInitializer;
-             if (!tokenStream.matchToken(&hasInitializer, TOK_ASSIGN))
+             if (!tokenStream.matchToken(&hasInitializer, TOK_ASSIGN, TokenStream::Operand))
                  return null();
 
              Node element = hasInitializer
@@ -4657,7 +4660,7 @@ Parser<ParseHandler, CharT>::arrayBindingPattern(DeclarationKind kind, YieldHand
          if (tt != TOK_COMMA) {
              // If we didn't already match TOK_COMMA in above case.
              bool matched;
-             if (!tokenStream.matchToken(&matched, TOK_COMMA))
+             if (!tokenStream.matchToken(&matched, TOK_COMMA, TokenStream::Operand))
                  return null();
              if (!matched)
                  break;
@@ -4669,7 +4672,7 @@ Parser<ParseHandler, CharT>::arrayBindingPattern(DeclarationKind kind, YieldHand
          }
      }
 
-     MUST_MATCH_TOKEN_MOD_WITH_REPORT(TOK_RB, TokenStream::None,
+     MUST_MATCH_TOKEN_MOD_WITH_REPORT(TOK_RB, TokenStream::Operand,
                                       reportMissingClosing(JSMSG_BRACKET_AFTER_LIST,
                                                            JSMSG_BRACKET_OPENED, begin));
 
@@ -8169,6 +8172,7 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
     PossibleError possibleErrorInner(*this);
     Node lhs;
     TokenKind tokenAfterLHS;
+    bool isArrow;
     if (maybeAsyncArrow) {
         tokenStream.consumeKnownToken(TOK_ASYNC, TokenStream::Operand);
 
@@ -8182,54 +8186,33 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
         if (!name)
             return null();
 
-        if (!tokenStream.getToken(&tokenAfterLHS))
+        if (!tokenStream.peekTokenSameLine(&tokenAfterLHS))
             return null();
         if (tokenAfterLHS != TOK_ARROW) {
             error(JSMSG_UNEXPECTED_TOKEN,
-                  "'=>' after argument list", TokenKindToDesc(tokenAfterLHS));
+                  "'=>' on the same line after an argument list", TokenKindToDesc(tokenAfterLHS));
             return null();
         }
+
+        isArrow = true;
     } else {
         lhs = condExpr(inHandling, yieldHandling, tripledotHandling, &possibleErrorInner, invoked);
         if (!lhs)
             return null();
 
-        if (!tokenStream.getToken(&tokenAfterLHS))
+        // Use Operand here because the ConditionalExpression parsed above
+        // could be the entirety of this AssignmentExpression, and then ASI
+        // permits this token to be a regular expression.
+        if (!tokenStream.peekTokenSameLine(&tokenAfterLHS, TokenStream::Operand))
             return null();
+
+        isArrow = tokenAfterLHS == TOK_ARROW;
     }
 
-    ParseNodeKind kind;
-    switch (tokenAfterLHS) {
-      case TOK_ASSIGN:       kind = PNK_ASSIGN;       break;
-      case TOK_ADDASSIGN:    kind = PNK_ADDASSIGN;    break;
-      case TOK_SUBASSIGN:    kind = PNK_SUBASSIGN;    break;
-      case TOK_BITORASSIGN:  kind = PNK_BITORASSIGN;  break;
-      case TOK_BITXORASSIGN: kind = PNK_BITXORASSIGN; break;
-      case TOK_BITANDASSIGN: kind = PNK_BITANDASSIGN; break;
-      case TOK_LSHASSIGN:    kind = PNK_LSHASSIGN;    break;
-      case TOK_RSHASSIGN:    kind = PNK_RSHASSIGN;    break;
-      case TOK_URSHASSIGN:   kind = PNK_URSHASSIGN;   break;
-      case TOK_MULASSIGN:    kind = PNK_MULASSIGN;    break;
-      case TOK_DIVASSIGN:    kind = PNK_DIVASSIGN;    break;
-      case TOK_MODASSIGN:    kind = PNK_MODASSIGN;    break;
-      case TOK_POWASSIGN:    kind = PNK_POWASSIGN;    break;
-
-      case TOK_ARROW: {
-
-        // A line terminator between ArrowParameters and the => should trigger a SyntaxError.
-        tokenStream.ungetToken();
-        TokenKind next;
-        if (!tokenStream.peekTokenSameLine(&next))
-            return null();
-        MOZ_ASSERT(next == TOK_ARROW || next == TOK_EOL);
-
-        if (next != TOK_ARROW) {
-            error(JSMSG_LINE_BREAK_BEFORE_ARROW);
-            return null();
-        }
-
+    if (isArrow) {
         tokenStream.seek(start);
 
+        TokenKind next;
         if (!tokenStream.getToken(&next, TokenStream::Operand))
             return null();
         uint32_t toStringStart = pos().begin;
@@ -8259,7 +8242,25 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
 
         return functionDefinition(pn, toStringStart, inHandling, yieldHandling, nullptr,
                                   Arrow, NotGenerator, asyncKind);
-      }
+    }
+
+    MOZ_ALWAYS_TRUE(tokenStream.getToken(&tokenAfterLHS, TokenStream::Operand));
+
+    ParseNodeKind kind;
+    switch (tokenAfterLHS) {
+      case TOK_ASSIGN:       kind = PNK_ASSIGN;       break;
+      case TOK_ADDASSIGN:    kind = PNK_ADDASSIGN;    break;
+      case TOK_SUBASSIGN:    kind = PNK_SUBASSIGN;    break;
+      case TOK_BITORASSIGN:  kind = PNK_BITORASSIGN;  break;
+      case TOK_BITXORASSIGN: kind = PNK_BITXORASSIGN; break;
+      case TOK_BITANDASSIGN: kind = PNK_BITANDASSIGN; break;
+      case TOK_LSHASSIGN:    kind = PNK_LSHASSIGN;    break;
+      case TOK_RSHASSIGN:    kind = PNK_RSHASSIGN;    break;
+      case TOK_URSHASSIGN:   kind = PNK_URSHASSIGN;   break;
+      case TOK_MULASSIGN:    kind = PNK_MULASSIGN;    break;
+      case TOK_DIVASSIGN:    kind = PNK_DIVASSIGN;    break;
+      case TOK_MODASSIGN:    kind = PNK_MODASSIGN;    break;
+      case TOK_POWASSIGN:    kind = PNK_POWASSIGN;    break;
 
       default:
         MOZ_ASSERT(!tokenStream.isCurrentTokenAssignment());
@@ -8271,7 +8272,6 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
         }
 
         tokenStream.ungetToken();
-        tokenStream.addModifierException(TokenStream::OperandIsNone);
         return lhs;
     }
 
@@ -8859,7 +8859,7 @@ Parser<ParseHandler, CharT>::argumentList(YieldHandling yieldHandling, Node list
         handler.addList(listNode, argNode);
 
         bool matched;
-        if (!tokenStream.matchToken(&matched, TOK_COMMA))
+        if (!tokenStream.matchToken(&matched, TOK_COMMA, TokenStream::Operand))
             return false;
         if (!matched)
             break;
@@ -8867,13 +8867,11 @@ Parser<ParseHandler, CharT>::argumentList(YieldHandling yieldHandling, Node list
         TokenKind tt;
         if (!tokenStream.peekToken(&tt, TokenStream::Operand))
             return null();
-        if (tt == TOK_RP) {
-            tokenStream.addModifierException(TokenStream::NoneIsOperand);
+        if (tt == TOK_RP)
             break;
-        }
     }
 
-    MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_AFTER_ARGS);
+    MUST_MATCH_TOKEN_MOD(TOK_RP, TokenStream::Operand, JSMSG_PAREN_AFTER_ARGS);
 
     handler.setEndPosition(listNode, pos().end);
     return true;
@@ -9741,15 +9739,18 @@ Parser<ParseHandler, CharT>::propertyName(YieldHandling yieldHandling,
             error(JSMSG_BAD_PROP_ID);
             return null();
         }
+
         tokenStream.ungetToken();
-        *propType = tt == TOK_ASSIGN ?
-                          PropertyType::CoverInitializedName :
-                          PropertyType::Shorthand;
+        tokenStream.addModifierException(TokenStream::OperandIsNone);
+        *propType = tt == TOK_ASSIGN
+                    ? PropertyType::CoverInitializedName
+                    : PropertyType::Shorthand;
         return propName;
     }
 
     if (tt == TOK_LP) {
         tokenStream.ungetToken();
+
         if (isGenerator && isAsync)
             *propType = PropertyType::AsyncGeneratorMethod;
         else if (isGenerator)
@@ -9786,7 +9787,7 @@ Parser<ParseHandler, CharT>::computedPropertyName(YieldHandling yieldHandling,
     if (!assignNode)
         return null();
 
-    MUST_MATCH_TOKEN(TOK_RB, JSMSG_COMP_PROP_UNTERM_EXPR);
+    MUST_MATCH_TOKEN_MOD(TOK_RB, TokenStream::Operand, JSMSG_COMP_PROP_UNTERM_EXPR);
     return handler.newComputedName(assignNode, begin, pos().end);
 }
 
@@ -9811,8 +9812,10 @@ Parser<ParseHandler, CharT>::objectLiteral(YieldHandling yieldHandling,
         TokenKind tt;
         if (!tokenStream.peekToken(&tt))
             return null();
-        if (tt == TOK_RC)
+        if (tt == TOK_RC) {
+            tokenStream.addModifierException(TokenStream::OperandIsNone);
             break;
+        }
 
         if (tt == TOK_TRIPLEDOT) {
             tokenStream.consumeKnownToken(TOK_TRIPLEDOT);
@@ -9998,7 +10001,7 @@ Parser<ParseHandler, CharT>::objectLiteral(YieldHandling yieldHandling,
         }
 
         bool matched;
-        if (!tokenStream.matchToken(&matched, TOK_COMMA))
+        if (!tokenStream.matchToken(&matched, TOK_COMMA, TokenStream::Operand))
             return null();
         if (!matched)
             break;
@@ -10006,7 +10009,7 @@ Parser<ParseHandler, CharT>::objectLiteral(YieldHandling yieldHandling,
             possibleError->setPendingDestructuringErrorAt(pos(), JSMSG_REST_WITH_COMMA);
     }
 
-    MUST_MATCH_TOKEN_MOD_WITH_REPORT(TOK_RC, TokenStream::None,
+    MUST_MATCH_TOKEN_MOD_WITH_REPORT(TOK_RC, TokenStream::Operand,
                                      reportMissingClosing(JSMSG_CURLY_AFTER_LIST,
                                                           JSMSG_CURLY_OPENED, openedPos));
 
