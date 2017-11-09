@@ -392,7 +392,7 @@ class Build(MachCommandBase):
             resolve_target_to_make,
         )
 
-        self.log_manager.register_structured_logger(logging.getLogger('mozbuild'))
+        self.log_manager.enable_all_structured_loggers()
 
         warnings_path = self._get_state_filename('warnings.json')
         monitor = self._spawn(BuildMonitor)
@@ -688,6 +688,8 @@ class Build(MachCommandBase):
     @CommandArgument('options', default=None, nargs=argparse.REMAINDER,
                      help='Configure options')
     def configure(self, options=None, buildstatus_messages=False, line_handler=None):
+        self.log_manager.enable_all_structured_loggers()
+
         def on_line(line):
             self.log(logging.INFO, 'build_output', {'line': line}, '{line}')
 
