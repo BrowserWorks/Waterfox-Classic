@@ -8,22 +8,15 @@ DIRS += ['profile/extensions']
 
 GeckoProgram(CONFIG['MOZ_APP_NAME'])
 
-JS_PREFERENCE_PP_FILES += [
-    'profile/firefox.js',
-]
-
 SOURCES += [
     'nsBrowserApp.cpp',
 ]
 
-FINAL_TARGET_FILES += ['blocklist.xml']
-FINAL_TARGET_FILES.defaults += ['permissions']
+# Neither channel-prefs.js nor firefox.exe want to end up in dist/bin/browser.
+DIST_SUBDIR = ""
 
-FINAL_TARGET_PP_FILES += [
-  'ua-update.json.in',
-]
-
-DEFINES['APP_VERSION'] = CONFIG['MOZ_APP_VERSION']
+# channel-prefs.js is handled separate from other prefs due to bug 756325
+JS_PREFERENCE_PP_FILES += ['profile/channel-prefs.js']
 
 LOCAL_INCLUDES += [
     '!/build',
@@ -46,9 +39,6 @@ if CONFIG['_MSC_VER']:
 if CONFIG['OS_ARCH'] == 'WINNT':
     RCINCLUDE = 'splash.rc'
     DEFINES['MOZ_PHOENIX'] = True
-
-for cdm in CONFIG['MOZ_EME_MODULES']:
-    DEFINES['MOZ_%s_EME' % cdm.upper()] = True
 
 if CONFIG['MOZ_SANDBOX'] and CONFIG['OS_ARCH'] == 'WINNT':
     # For sandbox includes and the include dependencies those have
@@ -84,9 +74,6 @@ if CONFIG['MOZ_LINKER']:
 
 if CONFIG['HAVE_CLOCK_MONOTONIC']:
     OS_LIBS += CONFIG['REALTIME_LIBS']
-
-if CONFIG['MOZ_GPSD']:
-    DEFINES['MOZ_GPSD'] = True
 
 if CONFIG['MOZ_LINUX_32_SSE2_STARTUP_ERROR']:
     DEFINES['MOZ_LINUX_32_SSE2_STARTUP_ERROR'] = True
