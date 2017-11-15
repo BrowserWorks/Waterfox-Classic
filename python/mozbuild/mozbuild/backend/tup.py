@@ -441,8 +441,8 @@ class TupOnly(CommonBackend, PartialBackend):
             outputs=[output],
         )
 
-    def _handle_ipdl_sources(self, ipdl_dir, sorted_ipdl_sources,
-                             unified_ipdl_cppsrcs_mapping):
+    def _handle_ipdl_sources(self, ipdl_dir, sorted_ipdl_sources, sorted_nonstatic_ipdl_sources,
+                             sorted_static_ipdl_sources, unified_ipdl_cppsrcs_mapping):
         # TODO: This isn't implemented yet in the tup backend, but it is called
         # by the CommonBackend.
         pass
