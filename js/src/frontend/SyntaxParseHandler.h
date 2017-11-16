@@ -163,11 +163,6 @@ class SyntaxParseHandler
         return node == NodeParenthesizedArray || node == NodeParenthesizedObject;
     }
 
-    static bool isDestructuringPatternAnyParentheses(Node node) {
-        return isUnparenthesizedDestructuringPattern(node) ||
-                isParenthesizedDestructuringPattern(node);
-    }
-
   public:
     SyntaxParseHandler(JSContext* cx, LifoAlloc& alloc, LazyScript* lazyOuterFunction)
       : lastAtom(nullptr)
@@ -177,8 +172,6 @@ class SyntaxParseHandler
 
     void prepareNodeForMutation(Node node) {}
     void freeTree(Node node) {}
-
-    void trace(JSTracer* trc) {}
 
     Node newName(PropertyName* name, const TokenPos& pos, JSContext* cx) {
         lastAtom = name;
@@ -377,7 +370,7 @@ class SyntaxParseHandler
         // Careful: we're asking this well after the name was parsed, so the
         // value returned may not correspond to |kid|'s actual name.  But it
         // *will* be truthy iff |kid| was a name, so we're safe.
-        MOZ_ASSERT(isUnparenthesizedName(kid));
+        MOZ_ASSERT(isNameAnyParentheses(kid));
         return NodeGeneric;
     }
 
@@ -540,17 +533,12 @@ class SyntaxParseHandler
 
     bool isConstant(Node pn) { return false; }
 
-    bool isUnparenthesizedName(Node node) {
+    bool isNameAnyParentheses(Node node) {
         return node == NodeUnparenthesizedArgumentsName ||
                node == NodeUnparenthesizedEvalName ||
                node == NodeUnparenthesizedName ||
-               node == NodePotentialAsyncKeyword;
-    }
-
-    bool isNameAnyParentheses(Node node) {
-        if (isUnparenthesizedName(node))
-            return true;
-        return node == NodeParenthesizedArgumentsName ||
+               node == NodePotentialAsyncKeyword ||
+               node == NodeParenthesizedArgumentsName ||
                node == NodeParenthesizedEvalName ||
                node == NodeParenthesizedName;
     }
