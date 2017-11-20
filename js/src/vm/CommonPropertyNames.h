@@ -374,7 +374,6 @@
     macro(SpeciesConstructor, SpeciesConstructor, "SpeciesConstructor") \
     macro(stack, stack, "stack") \
     macro(star, star, "*") \
-    macro(starDefaultStar, starDefaultStar, "*default*") \
     macro(StarGeneratorNext, StarGeneratorNext, "StarGeneratorNext") \
     macro(StarGeneratorReturn, StarGeneratorReturn, "StarGeneratorReturn") \
     macro(StarGeneratorThrow, StarGeneratorThrow, "StarGeneratorThrow") \

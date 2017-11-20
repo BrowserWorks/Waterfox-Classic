@@ -3908,7 +3908,7 @@ Parser<ParseHandler, CharT>::functionStmt(uint32_t toStringStart, YieldHandling 
         if (!name)
             return null();
     } else if (defaultHandling == AllowDefaultName) {
-        name = context->names().starDefaultStar;
+        name = context->names().default_;
         tokenStream.ungetToken();
     } else {
         /* Unnamed function expressions are forbidden in statement context. */
@@ -5738,7 +5738,7 @@ Parser<ParseHandler, CharT>::exportDefaultAssignExpr(uint32_t begin)
     if (!abortIfSyntaxParser())
         return null();
 
-    RootedPropertyName name(context, context->names().starDefaultStar);
+    HandlePropertyName name = context->names().default_;
     Node nameNode = newName(name);
     if (!nameNode)
         return null();
@@ -5748,6 +5748,9 @@ Parser<ParseHandler, CharT>::exportDefaultAssignExpr(uint32_t begin)
     Node kid = assignExpr(InAllowed, YieldIsName, TripledotProhibited);
     if (!kid)
         return null();
+
+    handler.checkAndSetIsDirectRHSAnonFunction(kid);
+
     if (!matchOrInsertSemicolon())
         return null();
 
@@ -7204,7 +7207,7 @@ Parser<ParseHandler, CharT>::classDefinition(YieldHandling yieldHandling,
             return null();
     } else if (classContext == ClassStatement) {
         if (defaultHandling == AllowDefaultName) {
-            name = context->names().starDefaultStar;
+            name = context->names().default_;
             tokenStream.ungetToken();
         } else {
             // Class statements must have a bound name
