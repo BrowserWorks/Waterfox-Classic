@@ -9770,6 +9770,32 @@ BytecodeEmitter::emitSelfHostedHasOwn(ParseNode* pn)
 }
 
 bool
+BytecodeEmitter::emitSelfHostedGetPropertySuper(ParseNode* pn)
+{
+    ParseNode* pn_args = pn->pn_right;
+
+    if (pn_args->pn_count != 3) {
+        reportError(pn, JSMSG_MORE_ARGS_NEEDED, "getPropertySuper", "3", "");
+        return false;
+    }
+
+    ParseNode* objNode = pn_args->pn_head;
+    ParseNode* idNode = objNode->pn_next;
+    ParseNode* receiverNode = idNode->pn_next;
+
+    if (!emitTree(idNode))
+        return false;
+
+    if (!emitTree(receiverNode))
+        return false;
+
+    if (!emitTree(objNode))
+        return false;
+
+    return emitElemOpBase(JSOP_GETELEM_SUPER);
+}
+
+bool
 BytecodeEmitter::isRestParameter(ParseNode* pn)
 {
     if (!sc->isFunctionBox())
@@ -10249,6 +10275,8 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn, ValueUsage valueUsage /* = ValueUs
             return emitSelfHostedDefineDataProperty(pn);
         if (pn_callee->name() == cx->names().hasOwn)
             return emitSelfHostedHasOwn(pn);
+        if (pn_callee->name() == cx->names().getPropertySuper)
+            return emitSelfHostedGetPropertySuper(pn);
         // Fall through
     }
 
