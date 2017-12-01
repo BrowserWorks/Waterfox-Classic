@@ -587,7 +587,7 @@ class MOZ_RAII CacheIRCompiler
     }
 
     void emitLoadTypedObjectResultShared(const Address& fieldAddr, Register scratch,
-                                         TypedThingLayout layout, uint32_t typeDescr,
+                                         uint32_t typeDescr,
                                          const AutoOutputRegister& output);
 
     void emitStoreTypedObjectReferenceProp(ValueOperand val, ReferenceTypeDescr::Type type,

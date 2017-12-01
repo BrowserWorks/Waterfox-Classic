@@ -430,7 +430,7 @@ class FunctionBox : public ObjectBox, public SharedContext
 
     FunctionContextFlags funCxFlags;
 
-    FunctionBox(JSContext* cx, LifoAlloc& alloc, ObjectBox* traceListHead, JSFunction* fun,
+    FunctionBox(JSContext* cx, ObjectBox* traceListHead, JSFunction* fun,
                 uint32_t toStringStart, Directives directives, bool extraWarnings,
                 GeneratorKind generatorKind, FunctionAsyncKind asyncKind);
 

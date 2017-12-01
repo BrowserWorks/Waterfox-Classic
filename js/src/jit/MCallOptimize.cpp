@@ -910,7 +910,7 @@ IonBuilder::inlineArraySlice(CallInfo& callInfo)
         current->add(end->toInstruction());
     }
 
-    MArraySlice* ins = MArraySlice::New(alloc(), constraints(),
+    MArraySlice* ins = MArraySlice::New(alloc(),
                                         obj, begin, end,
                                         templateObj,
                                         templateObj->group()->initialHeap(constraints()));

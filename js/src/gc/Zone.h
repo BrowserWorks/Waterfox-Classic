@@ -734,10 +734,6 @@ class ZonesIter
             skipHelperThreadZones();
     }
 
-    bool atAtomsZone(JSRuntime* rt) const {
-        return !!atomsZone;
-    }
-
     bool done() const { return !atomsZone && it == end; }
 
     void next() {
