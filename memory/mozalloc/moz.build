@@ -41,9 +41,6 @@ DisableStlWrapping()
 
 DEFINES['IMPL_MFBT'] = True
 
-if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
-    DIRS += ['staticruntime']
-
 LOCAL_INCLUDES += [
     '!/xpcom',
     '/memory/build',
