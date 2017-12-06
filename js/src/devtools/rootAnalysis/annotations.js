@@ -337,7 +337,6 @@ function isRootedGCPointerTypeName(name)
         name == "binding_detail::FastErrorResult" ||
         name == "IgnoredErrorResult" ||
         name == "frontend::TokenStream" ||
-        name == "frontend::TokenStream::Position" ||
         name == "ModuleValidator")
     {
         return true;
