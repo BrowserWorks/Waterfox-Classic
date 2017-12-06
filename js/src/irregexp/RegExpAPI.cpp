@@ -35,6 +35,7 @@ namespace irregexp {
 using namespace mozilla;
 
 using frontend::TokenStream;
+using frontend::TokenStreamAnyChars;
 
 using v8::internal::DisallowGarbageCollection;
 using v8::internal::FlatStringReader;
@@ -161,7 +162,7 @@ static size_t ComputeColumn(const char16_t* begin, const char16_t* end) {
 // This function is varargs purely so it can call ReportCompileErrorLatin1.
 // We never call it with additional arguments.
 template <typename CharT>
-static void ReportSyntaxError(TokenStream& ts, RegExpCompileData& result,
+static void ReportSyntaxError(TokenStreamAnyChars& ts, RegExpCompileData& result,
                               CharT* start, size_t length, ...) {
   gc::AutoSuppressGC suppressGC(ts.context());
   uint32_t errorNumber = ErrorNumber(result.error);
@@ -238,7 +239,7 @@ static void ReportSyntaxError(TokenStream& ts, RegExpCompileData& result,
   va_end(args);
 }
 
-static void ReportSyntaxError(TokenStream& ts, RegExpCompileData& result,
+static void ReportSyntaxError(TokenStreamAnyChars& ts, RegExpCompileData& result,
                               HandleAtom pattern) {
   JS::AutoCheckCannotGC nogc_;
   if (pattern->hasLatin1Chars()) {
@@ -262,7 +263,7 @@ static bool CheckPatternSyntaxImpl(JSContext* cx, FlatStringReader* pattern,
                                           result, no_gc);
 }
 
-bool CheckPatternSyntax(JSContext* cx, TokenStream& ts,
+bool CheckPatternSyntax(JSContext* cx, TokenStreamAnyChars& ts,
                         const mozilla::Range<const char16_t> chars,
                         JS::RegExpFlags flags) {
   FlatStringReader reader(chars);
@@ -274,7 +275,7 @@ bool CheckPatternSyntax(JSContext* cx, TokenStream& ts,
   return true;
 }
 
-bool CheckPatternSyntax(JSContext* cx, TokenStream& ts, HandleAtom pattern,
+bool CheckPatternSyntax(JSContext* cx, TokenStreamAnyChars& ts, HandleAtom pattern,
                         JS::RegExpFlags flags) {
   FlatStringReader reader(cx, pattern);
   RegExpCompileData result;

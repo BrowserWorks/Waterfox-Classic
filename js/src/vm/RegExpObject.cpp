@@ -239,46 +239,93 @@ const Class RegExpObject::protoClass_ = {
     &RegExpObjectClassSpec
 };
 
+template<typename CharT>
 RegExpObject*
 RegExpObject::create(JSContext* cx,
-                     const char16_t* chars,
+                     const CharT* chars,
                      size_t length,
                      RegExpFlags flags,
-                     const ReadOnlyCompileOptions* options,
-                     TokenStream* tokenStream,
+                     frontend::TokenStreamAnyChars& tokenStream,
                      LifoAlloc& alloc,
                      NewObjectKind newKind)
 {
+    static_assert(mozilla::IsSame<CharT, char16_t>::value,
+                  "this code may need updating if/when CharT encodes UTF-8");
+
     RootedAtom source(cx, AtomizeChars(cx, chars, length));
     if (!source)
         return nullptr;
 
-    return create(cx, source, flags, options, tokenStream, alloc, newKind);
+    return create(cx, source, flags, tokenStream, alloc, newKind);
+}
+
+template RegExpObject*
+RegExpObject::create(JSContext* cx,
+                     const char16_t* chars,
+                     size_t length,
+                     RegExpFlags flags,
+                     frontend::TokenStreamAnyChars& tokenStream,
+                     LifoAlloc& alloc,
+                     NewObjectKind newKind);
+
+template<typename CharT>
+RegExpObject*
+RegExpObject::create(JSContext* cx,
+                     const CharT* chars,
+                     size_t length,
+                     RegExpFlags flags,
+                     LifoAlloc& alloc,
+                     NewObjectKind newKind)
+{
+    static_assert(mozilla::IsSame<CharT, char16_t>::value,
+                  "this code may need updating if/when CharT encodes UTF-8");
+
+    RootedAtom source(cx, AtomizeChars(cx, chars, length));
+    if (!source)
+        return nullptr;
+
+    return create(cx, source, flags, alloc, newKind);
+}
+
+template RegExpObject*
+RegExpObject::create(JSContext* cx,
+                     const char16_t* chars,
+                     size_t length,
+                     RegExpFlags flags,
+                     LifoAlloc& alloc,
+                     NewObjectKind newKind);
+
+RegExpObject*
+RegExpObject::create(JSContext* cx,
+                     HandleAtom source,
+                     RegExpFlags flags,
+                     frontend::TokenStreamAnyChars& tokenStream,
+                     LifoAlloc& alloc,
+                     NewObjectKind newKind)
+{
+    if (!irregexp::CheckPatternSyntax(cx, tokenStream, source, flags)) {
+        return nullptr;
+    }
+    Rooted<RegExpObject*> regexp(cx, RegExpAlloc(cx, newKind));
+    if (!regexp)
+        return nullptr;
+
+    regexp->initAndZeroLastIndex(source, flags, cx);
+
+    return regexp;
 }
 
 RegExpObject*
 RegExpObject::create(JSContext* cx,
                      HandleAtom source,
                      RegExpFlags flags,
-                     const ReadOnlyCompileOptions* options,
-                     TokenStream* tokenStream,
                      LifoAlloc& alloc,
                      NewObjectKind newKind)
 {
-    Maybe<CompileOptions> dummyOptions;
-    if (!tokenStream && !options) {
-        dummyOptions.emplace(cx, JSVERSION_DEFAULT);
-        options = dummyOptions.ptr();
-    }
-    Maybe<TokenStream> dummyTokenStream;
-    if (!tokenStream) {
-        dummyTokenStream.emplace(cx, *options,
-                                   (const char16_t*) nullptr, 0,
-                                   (frontend::StrictModeGetter*) nullptr);
-        tokenStream = dummyTokenStream.ptr();
-    }
+    CompileOptions dummyOptions(cx, JSVERSION_DEFAULT);
+    TokenStream dummyTokenStream(cx, dummyOptions, (const char16_t*) nullptr, 0, nullptr);
 
-    if (!irregexp::CheckPatternSyntax(cx, *tokenStream, source, flags)) {
+    if (!irregexp::CheckPatternSyntax(cx, dummyTokenStream, source, flags)) {
         return nullptr;
     }
     Rooted<RegExpObject*> regexp(cx, RegExpAlloc(cx, newKind));
@@ -1163,12 +1210,8 @@ js::XDRScriptRegExpObject(XDRState<mode>* xdr, MutableHandle<RegExpObject*> objp
     if (!XDRAtom(xdr, &source) || !xdr->codeUint8(&flags))
         return false;
     if (mode == XDR_DECODE) {
-        const ReadOnlyCompileOptions* options = nullptr;
-        if (xdr->hasOptions())
-            options = &xdr->options();
         RegExpObject* reobj = RegExpObject::create(xdr->cx(), source, RegExpFlags(flags),
-                                                   options, nullptr, xdr->lifoAlloc(),
-                                                   TenuredObject);
+                                                   xdr->lifoAlloc(), TenuredObject);
         if (!reobj)
             return false;
 
@@ -1191,9 +1234,7 @@ js::CloneScriptRegExpObject(JSContext* cx, RegExpObject& reobj)
     RootedAtom source(cx, reobj.getSource());
     cx->markAtom(source);
 
-    return RegExpObject::create(cx, source, reobj.getFlags(),
-                                nullptr, nullptr, cx->tempLifoAlloc(),
-                                TenuredObject);
+    return RegExpObject::create(cx, source, reobj.getFlags(), cx->tempLifoAlloc(), TenuredObject);
 }
 
 JS_FRIEND_API(RegExpShared*)
@@ -1223,7 +1264,7 @@ JS::NewRegExpObject(JSContext* cx, const char* bytes, size_t length, RegExpFlags
     }
 
     return RegExpObject::create(
-      cx, chars, length, flags, nullptr, nullptr, cx->tempLifoAlloc(), GenericObject);
+      cx, chars.get(), length, flags, cx->tempLifoAlloc(), GenericObject);
 }
 
 JS_PUBLIC_API(JSObject*)
@@ -1232,7 +1273,7 @@ JS::NewUCRegExpObject(JSContext* cx, const char16_t* chars, size_t length, RegEx
     AssertHeapIsIdle();
     CHECK_REQUEST(cx);
     return RegExpObject::create(
-      cx, chars, length, flags, nullptr, nullptr, cx->tempLifoAlloc(), GenericObject);
+      cx, chars, length, flags, cx->tempLifoAlloc(), GenericObject);
 }
 
 JS_PUBLIC_API(bool) JS::SetRegExpInput(JSContext* cx, HandleObject obj, HandleString input)
