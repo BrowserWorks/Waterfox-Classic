@@ -33,16 +33,6 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/Types.h"
 
-#define MOZALLOC_HAVE_XMALLOC
-
-#if defined(MOZ_ALWAYS_INLINE_EVEN_DEBUG)
-#  define MOZALLOC_INLINE MOZ_ALWAYS_INLINE_EVEN_DEBUG
-#elif defined(HAVE_FORCEINLINE)
-#  define MOZALLOC_INLINE __forceinline
-#else
-#  define MOZALLOC_INLINE inline
-#endif
-
 /* Workaround build problem with Sun Studio 12 */
 #if defined(__SUNPRO_C) || defined(__SUNPRO_CC)
 #  undef MOZ_MUST_USE
@@ -200,50 +190,50 @@ MOZALLOC_EXPORT_NEW
 /* gcc's asan somehow doesn't like always_inline on this function. */
 __attribute__((gnu_inline)) inline
 #else
-MOZALLOC_INLINE
+MOZ_ALWAYS_INLINE_EVEN_DEBUG
 #endif
 void* operator new(size_t size) MOZALLOC_THROW_BAD_ALLOC
 {
     return moz_xmalloc(size);
 }
 
-MOZALLOC_EXPORT_NEW MOZALLOC_INLINE
+MOZALLOC_EXPORT_NEW MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void* operator new(size_t size, const std::nothrow_t&) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     return malloc_impl(size);
 }
 
-MOZALLOC_EXPORT_NEW MOZALLOC_INLINE
+MOZALLOC_EXPORT_NEW MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void* operator new[](size_t size) MOZALLOC_THROW_BAD_ALLOC
 {
     return moz_xmalloc(size);
 }
 
-MOZALLOC_EXPORT_NEW MOZALLOC_INLINE
+MOZALLOC_EXPORT_NEW MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void* operator new[](size_t size, const std::nothrow_t&) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     return malloc_impl(size);
 }
 
-MOZALLOC_EXPORT_NEW MOZALLOC_INLINE
+MOZALLOC_EXPORT_NEW MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void operator delete(void* ptr) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     return free_impl(ptr);
 }
 
-MOZALLOC_EXPORT_NEW MOZALLOC_INLINE
+MOZALLOC_EXPORT_NEW MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void operator delete(void* ptr, const std::nothrow_t&) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     return free_impl(ptr);
 }
 
-MOZALLOC_EXPORT_NEW MOZALLOC_INLINE
+MOZALLOC_EXPORT_NEW MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void operator delete[](void* ptr) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     return free_impl(ptr);
 }
 
-MOZALLOC_EXPORT_NEW MOZALLOC_INLINE
+MOZALLOC_EXPORT_NEW MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void operator delete[](void* ptr, const std::nothrow_t&) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     return free_impl(ptr);
@@ -284,25 +274,25 @@ void operator delete[](void* ptr, size_t /*size*/) MOZALLOC_THROW_IF_HAS_EXCEPTI
  *   (4) the matching system |operator delete(void*) throw(std::bad_alloc)|
  */
 
-MOZALLOC_INLINE
+MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void* operator new(size_t size, const mozilla::fallible_t&) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     return malloc_impl(size);
 }
 
-MOZALLOC_INLINE
+MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void* operator new[](size_t size, const mozilla::fallible_t&) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     return malloc_impl(size);
 }
 
-MOZALLOC_INLINE
+MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void operator delete(void* ptr, const mozilla::fallible_t&) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     free_impl(ptr);
 }
 
-MOZALLOC_INLINE
+MOZ_ALWAYS_INLINE_EVEN_DEBUG
 void operator delete[](void* ptr, const mozilla::fallible_t&) MOZALLOC_THROW_IF_HAS_EXCEPTIONS
 {
     free_impl(ptr);
