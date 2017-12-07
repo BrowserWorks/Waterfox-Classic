@@ -133,7 +133,7 @@ if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     SOURCES['/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
     CXXFLAGS += ['-Wno-error=shadow']
 
-if CONFIG['CLANG_CXX']:
+if CONFIG['CC_TYPE'] == 'clang':
     # Suppress warnings from third-party V8 Decimal code.
     SOURCES['/mfbt/decimal/Decimal.cpp'].flags += ['-Wno-implicit-fallthrough']
 

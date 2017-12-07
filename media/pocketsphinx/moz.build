@@ -55,7 +55,7 @@ if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     CFLAGS += [
         '-Wno-sign-compare',
     ]
-    if CONFIG['CLANG_CXX']:
+    if CONFIG['CC_TYPE'] == 'clang':
         CFLAGS += ['-Wno-incompatible-pointer-types-discards-qualifiers']
 
 # We allow warnings for third-party code that can be updated from upstream.

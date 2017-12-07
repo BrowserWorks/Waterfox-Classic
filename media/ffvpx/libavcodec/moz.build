@@ -68,7 +68,7 @@ if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
         'dummy_funcs.c'
     ]
 	
-if CONFIG['CLANG_CL']:
+if CONFIG['CC_TYPE'] == 'clang-cl':
     LDFLAGS += ['-FORCE:MULTIPLE']
 
 if CONFIG['MOZ_LIBAV_FFT']:

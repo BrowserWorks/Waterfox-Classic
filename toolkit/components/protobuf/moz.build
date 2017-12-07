@@ -125,7 +125,7 @@ if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
         '-Wno-unused-function',
         '-Wno-unused-local-typedef',
     ]
-    if CONFIG['CLANG_CXX']:
+    if CONFIG['CC_TYPE'] == 'clang':
         CXXFLAGS += [
             '-Wno-comma',
             '-Wno-null-conversion',

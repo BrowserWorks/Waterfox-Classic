@@ -119,7 +119,7 @@ if CONFIG['MOZ_ENABLE_SKIA']:
         'PathSkia.cpp',
         'SourceSurfaceSkia.cpp',
     ]
-    if CONFIG['CLANG_CXX']:
+    if CONFIG['CC_TYPE'] == 'clang':
         # Suppress warnings from Skia header files.
         SOURCES['DrawTargetSkia.cpp'].flags += ['-Wno-implicit-fallthrough']
         SOURCES['PathSkia.cpp'].flags += ['-Wno-implicit-fallthrough']
@@ -189,7 +189,7 @@ SOURCES += [
     'Swizzle.cpp',
 ]
 
-if CONFIG['CLANG_CXX']:
+if CONFIG['CC_TYPE'] == 'clang':
     SOURCES['Factory.cpp'].flags += ['-Wno-implicit-fallthrough']
 
 if CONFIG['CC_TYPE'] in ('clang', 'gcc'):

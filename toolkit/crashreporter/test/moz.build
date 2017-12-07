@@ -24,7 +24,7 @@ SOURCES += [
   'ExceptionThrower.cpp',
 ]
 
-if CONFIG['CLANG_CL']:
+if CONFIG['CC_TYPE'] == 'clang-cl':
     SOURCES['ExceptionThrower.cpp'].flags += [
         '-Xclang',
         '-fcxx-exceptions',
