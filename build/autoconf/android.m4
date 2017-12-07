@@ -105,7 +105,7 @@ if test "$OS_TARGET" = "Android"; then
     fi
     CXXFLAGS="$CXXFLAGS $STLPORT_CPPFLAGS"
 fi
-AC_SUBST([STLPORT_LIBS])
+AC_SUBST_LIST([STLPORT_LIBS])
 
 ])
 
