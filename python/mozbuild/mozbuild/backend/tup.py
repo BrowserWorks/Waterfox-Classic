@@ -143,8 +143,8 @@ class TupOnly(CommonBackend, PartialBackend):
         # will be built before any rules that list this as an input.
         self._installed_files = '$(MOZ_OBJ_ROOT)/<installed-files>'
 
-    def _get_backend_file(self, relativedir):
-        objdir = mozpath.join(self.environment.topobjdir, relativedir)
+    def _get_backend_file(self, relobjdir):
+        objdir = mozpath.join(self.environment.topobjdir, relobjdir)
         if objdir not in self._backend_files:
             self._backend_files[objdir] = \
                     BackendTupfile(objdir, self.environment,
