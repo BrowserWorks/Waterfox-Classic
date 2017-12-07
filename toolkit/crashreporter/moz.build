@@ -111,5 +111,5 @@ include('/toolkit/crashreporter/crashreporter.mozbuild')
 with Files('**'):
     BUG_COMPONENT = ('Toolkit', 'Crash Reporting')
 
-if CONFIG['GNU_CXX']:
+if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     CXXFLAGS += ['-Wno-shadow']

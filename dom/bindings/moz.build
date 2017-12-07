@@ -155,7 +155,7 @@ PYTHON_UNITTEST_MANIFESTS += [
     'mozwebidlcodegen/test/python.ini',
 ]
 
-if CONFIG['GNU_CXX']:
+if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     CXXFLAGS += ['-Wno-error=shadow']
 
 if CONFIG['COMPILE_ENVIRONMENT']:

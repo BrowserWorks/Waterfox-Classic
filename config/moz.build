@@ -35,7 +35,7 @@ PYTHON_UNITTEST_MANIFESTS += [
     'tests/python.ini',
 ]
 
-if CONFIG['GNU_CC'] and CONFIG['MOZ_OPTIMIZE']:
+if CONFIG['CC_TYPE'] in ('clang', 'gcc') and CONFIG['MOZ_OPTIMIZE']:
     CFLAGS += ['-O3']
 
 HOST_DEFINES = {

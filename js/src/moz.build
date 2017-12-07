@@ -173,8 +173,7 @@ SOURCES += [
 ]
 
 # Suppress warnings in third-party code.
-# We are keeping this in the main moz.build because it is file specific
-if CONFIG['CLANG_CXX']:
+if CONFIG['CLANG_CXX'] or CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     SOURCES['jsdtoa.cpp'].flags += ['-Wno-implicit-fallthrough']
 
 SOURCES += [

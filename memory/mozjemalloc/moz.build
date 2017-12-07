@@ -19,7 +19,7 @@ LOCAL_INCLUDES += [
     '/memory/build',
 ]
 
-if CONFIG['GNU_CXX']:
+if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     # too many warnings from functions generated through rb_wrab from rb.h.
     CXXFLAGS += ['-Wno-unused-function']
 

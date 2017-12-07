@@ -21,7 +21,7 @@ DisableStlWrapping()
 # Suppress warnings in third-party LZ4 code.
 # TODO: Remove these suppressions after bug 993267 is fixed.
 
-if CONFIG['GNU_CXX']:
+if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     SOURCES['/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
 
 if CONFIG['_MSC_VER']:

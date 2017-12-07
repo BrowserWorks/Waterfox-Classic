@@ -104,7 +104,7 @@ if CONFIG['CPU_ARCH'] == 'aarch64':
     DEFINES['SQLITE_BYTEORDER'] = 1234
 
 # Suppress warnings in third-party code.
-if CONFIG['GNU_CC']:
+if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     CFLAGS += [
         '-Wno-sign-compare',
         '-Wno-type-limits',
