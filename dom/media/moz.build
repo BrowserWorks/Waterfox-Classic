@@ -333,7 +333,7 @@ if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
         '-Wno-error=shadow',
     ]
 
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
     # This is intended as a temporary workaround to unblock compilation
     # on VS2015 in warnings as errors mode.
     CXXFLAGS += ['-wd4312']

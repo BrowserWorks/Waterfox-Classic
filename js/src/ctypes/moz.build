@@ -22,5 +22,5 @@ if not CONFIG['MOZ_SYSTEM_FFI']:
         'libffi/src/%s' % CONFIG['FFI_TARGET_DIR'],
     ]
 
-if CONFIG['_MSC_VER'] and CONFIG['CPU_ARCH'] == 'x86_64':
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl') and CONFIG['CPU_ARCH'] == 'x86_64':
     SOURCES['CTypes.cpp'].no_pgo = True # Bug 810661

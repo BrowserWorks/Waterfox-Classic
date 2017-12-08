@@ -137,7 +137,7 @@ if CONFIG['CLANG_CXX']:
     # Suppress warnings from third-party V8 Decimal code.
     SOURCES['/mfbt/decimal/Decimal.cpp'].flags += ['-Wno-implicit-fallthrough']
 
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
     # Error 4804 is "'>' : unsafe use of type 'bool' in operation"
     SOURCES['/mfbt/Compression.cpp'].flags += ['-wd4804']
 

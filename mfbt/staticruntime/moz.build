@@ -24,6 +24,6 @@ DisableStlWrapping()
 if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     SOURCES['/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
 
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
     # Error 4804 is "'>' : unsafe use of type 'bool' in operation"
     SOURCES['/mfbt/Compression.cpp'].flags += ['-wd4804']

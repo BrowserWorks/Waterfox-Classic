@@ -45,7 +45,7 @@ SOURCES += [
     'RegExp.cpp',
 ]
 
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
     if CONFIG['CPU_ARCH'] == 'x86':
         SOURCES['RegExp.cpp'].no_pgo = True # Bug 772303
 

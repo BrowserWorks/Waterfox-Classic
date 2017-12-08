@@ -14,7 +14,7 @@ SOURCES += [
     'fallible.cpp',
 ]
 
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
     # MSVC normally adds linker directives relative to the CRT in a .drectve
     # section in .obj files. Then, when linking objects, it adds those
     # directives as if they were given as command line arguments. This can

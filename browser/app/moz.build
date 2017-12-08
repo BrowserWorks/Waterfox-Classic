@@ -31,7 +31,7 @@ if CONFIG['LIBFUZZER']:
         '/tools/fuzzing/libfuzzer',
     ]
 
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
     # Always enter a Windows program through wmain, whether or not we're
     # a console application.
     WIN32_EXE_LDFLAGS += ['-ENTRY:wmainCRTStartup']
