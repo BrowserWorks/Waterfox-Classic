@@ -231,6 +231,7 @@ class CodeGenerator final : public CodeGeneratorSpecific
     void visitSetArgumentsObjectArg(LSetArgumentsObjectArg* lir);
     void visitReturnFromCtor(LReturnFromCtor* lir);
     void visitComputeThis(LComputeThis* lir);
+    void visitImplicitThis(LImplicitThis* lir);
     void visitArrayLength(LArrayLength* lir);
     void visitSetArrayLength(LSetArrayLength* lir);
     void visitGetNextEntryForIterator(LGetNextEntryForIterator* lir);

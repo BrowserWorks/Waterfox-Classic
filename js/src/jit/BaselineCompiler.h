@@ -382,6 +382,7 @@ class BaselineCompiler : public BaselineCompilerSpecific
 };
 
 extern const VMFunction NewArrayCopyOnWriteInfo;
+extern const VMFunction ImplicitThisInfo;
 
 } // namespace jit
 } // namespace js
