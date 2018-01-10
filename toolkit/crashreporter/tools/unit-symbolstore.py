@@ -469,8 +469,7 @@ class TestFunctional(HelperMixin, unittest.TestCase):
                                               'win32',
                                               'dump_syms_vc{_MSC_VER}.exe'.format(**buildconfig.substs))
             self.target_bin = os.path.join(buildconfig.topobjdir,
-                                           'browser',
-                                           'app',
+                                           'dist', 'bin',
                                            'firefox.exe')
         else:
             self.dump_syms = os.path.join(buildconfig.topobjdir,
@@ -489,6 +488,7 @@ class TestFunctional(HelperMixin, unittest.TestCase):
         dist_include_manifest = os.path.join(buildconfig.topobjdir,
                                              '_build_manifests/install/dist_include')
         dist_include = os.path.join(buildconfig.topobjdir, 'dist/include')
+        browser_app = os.path.join(buildconfig.topobjdir, 'browser/app')
         output = subprocess.check_output([sys.executable,
                                           self.script_path,
                                           '--vcs-info',
@@ -498,7 +498,8 @@ class TestFunctional(HelperMixin, unittest.TestCase):
                                           self.dump_syms,
                                           self.test_dir,
                                           self.target_bin],
-                                         stderr=open(os.devnull, 'w'))
+                                         stderr=open(os.devnull, 'w'),
+                                         cwd=browser_app)
         lines = filter(lambda x: x.strip(), output.splitlines())
         self.assertEqual(1, len(lines),
                          'should have one filename in the output')
