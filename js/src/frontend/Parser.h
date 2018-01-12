@@ -824,7 +824,7 @@ class Parser final
     bool checkLabelOrIdentifierReference(PropertyName* ident,
                                          uint32_t offset,
                                          YieldHandling yieldHandling,
-                                         TokenKind hint = TOK_LIMIT);
+                                         TokenKind hint = TokenKind::TOK_LIMIT);
 
     bool checkLocalExportName(PropertyName* ident, uint32_t offset) {
         return checkLabelOrIdentifierReference(ident, offset, YieldIsName);
@@ -833,7 +833,7 @@ class Parser final
     bool checkBindingIdentifier(PropertyName* ident,
                                 uint32_t offset,
                                 YieldHandling yieldHandling,
-                                TokenKind hint = TOK_LIMIT);
+                                TokenKind hint = TokenKind::TOK_LIMIT);
 
     PropertyName* labelOrIdentifierReference(YieldHandling yieldHandling);
 
