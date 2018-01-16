@@ -102,7 +102,6 @@ ContainsHoistedDeclaration(JSContext* cx, ParseNode* node, bool* result)
         return true;
 
       // Statements with no sub-components at all.
-      case ParseNodeKind::Nop: // induced by function f() {} function f() {}
       case ParseNodeKind::EmptyStatement:
       case ParseNodeKind::Debugger:
         MOZ_ASSERT(node->isArity(PN_NULLARY));
@@ -1651,7 +1650,6 @@ Fold(JSContext* cx, ParseNode** pnp, Parser<FullParseHandler, char16_t>& parser,
     ParseNode* pn = *pnp;
 
     switch (pn->getKind()) {
-      case ParseNodeKind::Nop:
       case ParseNodeKind::EmptyStatement:
       case ParseNodeKind::RegExp:
       case ParseNodeKind::String:

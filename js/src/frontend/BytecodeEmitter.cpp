@@ -3132,7 +3132,6 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
 
     switch (pn->getKind()) {
       // Trivial cases with no side effects.
-      case ParseNodeKind::Nop:
       case ParseNodeKind::EmptyStatement:
       case ParseNodeKind::String:
       case ParseNodeKind::TemplateString:
@@ -11469,10 +11468,6 @@ BytecodeEmitter::emitTree(ParseNode* pn, ValueUsage valueUsage /* = ValueUsage::
             return false;
         if (!emit1(JSOP_DEBUGGER))
             return false;
-        break;
-
-      case ParseNodeKind::Nop:
-        MOZ_ASSERT(pn->getArity() == PN_NULLARY);
         break;
 
       case ParseNodeKind::Class:

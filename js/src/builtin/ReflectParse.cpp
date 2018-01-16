@@ -2402,7 +2402,6 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
       case ParseNodeKind::ExportFrom:
         return exportDeclaration(pn, dst);
 
-      case ParseNodeKind::Nop:
       case ParseNodeKind::EmptyStatement:
         return builder.emptyStatement(&pn->pn_pos, dst);
 
