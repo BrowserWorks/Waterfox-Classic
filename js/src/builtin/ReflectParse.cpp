@@ -2402,13 +2402,16 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
       case ParseNodeKind::ExportFrom:
         return exportDeclaration(pn, dst);
 
-      case ParseNodeKind::Semi:
-        if (pn->pn_kid) {
-            RootedValue expr(cx);
-            return expression(pn->pn_kid, &expr) &&
-                   builder.expressionStatement(expr, &pn->pn_pos, dst);
-        }
+      case ParseNodeKind::Nop:
+      case ParseNodeKind::EmptyStatement:
         return builder.emptyStatement(&pn->pn_pos, dst);
+
+      case ParseNodeKind::ExpressionStatement:
+      {
+        RootedValue expr(cx);
+        return expression(pn->pn_kid, &expr) &&
+            builder.expressionStatement(expr, &pn->pn_pos, dst);
+      }
 
       case ParseNodeKind::LexicalScope:
         pn = pn->pn_expr;
@@ -2580,9 +2583,6 @@ ASTSerializer::statement(ParseNode* pn, MutableHandleValue dst)
 
         return builder.classMethods(methods, dst);
       }
-
-      case ParseNodeKind::Nop:
-        return builder.emptyStatement(&pn->pn_pos, dst);
 
       default:
         LOCAL_NOT_REACHED("unexpected statement type");
@@ -2810,7 +2810,7 @@ ASTSerializer::generatorExpression(ParseNode* pn, MutableHandleValue dst)
         }
     }
 
-    LOCAL_ASSERT(next->isKind(ParseNodeKind::Semi) &&
+    LOCAL_ASSERT(next->isKind(ParseNodeKind::ExpressionStatement) &&
                  next->pn_kid->isKind(ParseNodeKind::Yield) &&
                  next->pn_kid->pn_kid);
 
