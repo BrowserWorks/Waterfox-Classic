@@ -766,7 +766,7 @@ GetToken(AsmJSParser& parser, TokenKind* tkp)
     while (true) {
         if (!ts.getToken(&tk, TokenStream::Operand))
             return false;
-        if (tk != TokenKind::TOK_SEMI)
+        if (tk != TokenKind::Semi)
             break;
     }
     *tkp = tk;
@@ -781,9 +781,9 @@ PeekToken(AsmJSParser& parser, TokenKind* tkp)
     while (true) {
         if (!ts.peekToken(&tk, TokenStream::Operand))
             return false;
-        if (tk != TokenKind::TOK_SEMI)
+        if (tk != TokenKind::Semi)
             break;
-        ts.consumeKnownToken(TokenKind::TOK_SEMI, TokenStream::Operand);
+        ts.consumeKnownToken(TokenKind::Semi, TokenStream::Operand);
     }
     *tkp = tk;
     return true;
@@ -795,7 +795,7 @@ ParseVarOrConstStatement(AsmJSParser& parser, ParseNode** var)
     TokenKind tk;
     if (!PeekToken(parser, &tk))
         return false;
-    if (tk != TokenKind::TOK_VAR && tk != TokenKind::TOK_CONST) {
+    if (tk != TokenKind::Var && tk != TokenKind::Const) {
         *var = nullptr;
         return true;
     }
@@ -3788,7 +3788,7 @@ CheckModuleProcessingDirectives(ModuleValidator& m)
     auto& ts = m.parser().tokenStream;
     while (true) {
         bool matched;
-        if (!ts.matchToken(&matched, TokenKind::TOK_STRING, TokenStream::Operand))
+        if (!ts.matchToken(&matched, TokenKind::String, TokenStream::Operand))
             return false;
         if (!matched)
             return true;
@@ -3799,7 +3799,7 @@ CheckModuleProcessingDirectives(ModuleValidator& m)
         TokenKind tt;
         if (!ts.getToken(&tt))
             return false;
-        if (tt != TokenKind::TOK_SEMI)
+        if (tt != TokenKind::Semi)
             return m.failCurrentOffset("expected semicolon after string literal");
     }
 }
@@ -7139,7 +7139,7 @@ ParseFunction(ModuleValidator& m, ParseNode** fnOut, unsigned* line)
 {
     auto& tokenStream = m.tokenStream();
 
-    tokenStream.consumeKnownToken(TokenKind::TOK_FUNCTION, TokenStream::Operand);
+    tokenStream.consumeKnownToken(TokenKind::Function, TokenStream::Operand);
 
     auto& anyChars = tokenStream.anyCharsAccess();
     uint32_t toStringStart = anyChars.currentToken().pos.begin;
@@ -7268,7 +7268,7 @@ CheckFunctions(ModuleValidator& m)
         if (!PeekToken(m.parser(), &tk))
             return false;
 
-        if (tk != TokenKind::TOK_FUNCTION)
+        if (tk != TokenKind::Function)
             break;
 
         if (!CheckFunction(m))
@@ -7402,8 +7402,8 @@ CheckModuleReturn(ModuleValidator& m)
     if (!GetToken(m.parser(), &tk))
         return false;
     auto& ts = m.parser().tokenStream;
-    if (tk != TokenKind::TOK_RETURN) {
-        return m.failCurrentOffset((tk == TokenKind::TOK_RC || tk == TokenKind::TOK_EOF)
+    if (tk != TokenKind::Return) {
+        return m.failCurrentOffset((tk == TokenKind::Rc || tk == TokenKind::Eof)
                                    ? "expecting return statement"
                                    : "invalid asm.js. statement");
     }
@@ -7435,7 +7435,7 @@ CheckModuleEnd(ModuleValidator &m)
     if (!GetToken(m.parser(), &tk))
         return false;
 
-    if (tk != TokenKind::TOK_EOF && tk != TokenKind::TOK_RC)
+    if (tk != TokenKind::Eof && tk != TokenKind::Rc)
         return m.failCurrentOffset("top-level export (return) must be the last statement");
 
     m.parser().tokenStream.anyCharsAccess().ungetToken();

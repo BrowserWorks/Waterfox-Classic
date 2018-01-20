@@ -152,7 +152,7 @@ class ParserBase : public StrictModeGetter
     bool checkOptionsCalled:1;
 #endif
 
-    /* Unexpected end of input, i.e. TOK_EOF not at top-level. */
+    /* Unexpected end of input, i.e. Eof not at top-level. */
     bool isUnexpectedEOF_:1;
 
     /* AwaitHandling */ uint8_t awaitHandling_:2;
@@ -656,7 +656,7 @@ class Parser final
     Node ifStatement(YieldHandling yieldHandling);
     Node consequentOrAlternative(YieldHandling yieldHandling);
 
-    // While on a |let| TOK_NAME token, examine |next|.  Indicate whether
+    // While on a |let| Name token, examine |next|.  Indicate whether
     // |next|, the next token already gotten with modifier TokenStream::None,
     // continues a LexicalDeclaration.
     bool nextTokenContinuesLetDeclaration(TokenKind next);
@@ -824,7 +824,7 @@ class Parser final
     bool checkLabelOrIdentifierReference(PropertyName* ident,
                                          uint32_t offset,
                                          YieldHandling yieldHandling,
-                                         TokenKind hint = TokenKind::TOK_LIMIT);
+                                         TokenKind hint = TokenKind::Limit);
 
     bool checkLocalExportName(PropertyName* ident, uint32_t offset) {
         return checkLabelOrIdentifierReference(ident, offset, YieldIsName);
@@ -833,7 +833,7 @@ class Parser final
     bool checkBindingIdentifier(PropertyName* ident,
                                 uint32_t offset,
                                 YieldHandling yieldHandling,
-                                TokenKind hint = TokenKind::TOK_LIMIT);
+                                TokenKind hint = TokenKind::Limit);
 
     PropertyName* labelOrIdentifierReference(YieldHandling yieldHandling);
 
