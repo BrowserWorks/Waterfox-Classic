@@ -1133,6 +1133,7 @@ ScriptLoader::StartLoad(ScriptLoadRequest* aRequest)
     // We successfully started fetching a module so put its URL in the module
     // map and mark it as fetching.
     SetModuleFetchStarted(aRequest->AsModuleRequest());
+    LOG(("ScriptLoadRequest (%p): Start fetching module", aRequest));
   }
 
   return NS_OK;
@@ -1306,6 +1307,9 @@ ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
                                     nsAutoString aTypeAttr,
                                     nsIContent* aScriptContent)
 {
+  LOG(("ScriptLoader (%p): Process external script for element %p",
+       this, aElement));
+
   nsCOMPtr<nsIURI> scriptURI = aElement->GetScriptURI();
   if (!scriptURI) {
     // Asynchronously report the failure to create a URI object
@@ -1320,6 +1324,8 @@ ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
 
     if (request && NS_FAILED(CheckContentPolicy(mDocument, aElement, request->mURI,
                                                 aTypeAttr, false))) {
+      LOG(("ScriptLoader (%p): content policy check failed for preload", this));
+
       // Probably plans have changed; even though the preload was allowed seems
       // like the actual load is not; let's cancel the preload request.
       request->Cancel();
@@ -1328,6 +1334,8 @@ ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
 
     if (request) {
       // Use the preload request.
+
+      LOG(("ScriptLoadRequest (%p): Using preload request", request.get()));
 
       // It's possible these attributes changed since we started the preload so
       // update them here.
@@ -1355,6 +1363,10 @@ ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
                              aElement->GetScriptAsync());
       // keep request->mScriptFromHead to false so we don't treat non preloaded
       // scripts as blockers for full page load. See bug 792438.
+
+      LOG(("ScriptLoadRequest (%p): Created request for external script",
+          request.get()));
+
       nsresult rv = StartLoad(request);
       if (NS_FAILED(rv)) {
         ReportErrorToConsole(request, rv);
@@ -1564,6 +1576,8 @@ ScriptLoadRequest*
 ScriptLoader::LookupPreloadRequest(nsIScriptElement* aElement,
                                    ScriptKind aScriptKind)
 {
+  MOZ_ASSERT(aElement);
+
   nsTArray<PreloadInfo>::index_type i =
     mPreloads.IndexOf(aElement->GetScriptURI(), 0, PreloadURIComparator());
   if (i == nsTArray<PreloadInfo>::NoIndex) {
@@ -2205,6 +2219,12 @@ ScriptLoader::EvaluateScript(ScriptLoadRequest* aRequest)
 
       JS::Rooted<JSObject*> module(cx, moduleScript->ModuleRecord());
       MOZ_ASSERT(module);
+
+      if (!moduleScript->SourceElementAssociated()) {
+        rv = nsJSUtils::InitModuleSourceElement(cx, module, aRequest->mElement);
+        NS_ENSURE_SUCCESS(rv, rv);
+        moduleScript->SetSourceElementAssociated();
+      }
 
       rv = nsJSUtils::ModuleEvaluate(cx, module);
       MOZ_ASSERT(NS_FAILED(rv) == aes.HasException());
@@ -3227,6 +3247,13 @@ ScriptLoader::PreloadURI(nsIURI* aURI,
   request->mIsInline = false;
   request->mScriptFromHead = aScriptFromHead;
   request->SetScriptMode(aDefer, aAsync);
+
+  if (LOG_ENABLED()) {
+    nsAutoCString url;
+    aURI->GetAsciiSpec(url);
+    LOG(("ScriptLoadRequest (%p): Created preload request for %s",
+         request.get(), url.get()));
+  }
 
   nsresult rv = StartLoad(request);
   if (NS_FAILED(rv)) {
