@@ -56,11 +56,6 @@ class XDRBuffer<XDR_ENCODE> : public XDRBufferBase
         return ptr;
     }
 
-    const char* readCString() {
-        MOZ_CRASH("Should never read in encode mode");
-        return nullptr;
-    }
-
     const uint8_t* read(size_t n) {
         MOZ_CRASH("Should never read in encode mode");
         return nullptr;
@@ -82,19 +77,15 @@ class XDRBuffer<XDR_DECODE> : public XDRBufferBase
       : XDRBufferBase(cx, cursor),
         buffer_(buffer.begin(), buffer.length()) { }
 
-    const char* readCString() {
-        char* ptr = reinterpret_cast<char*>(&buffer_[cursor_]);
-        uint8_t* end = reinterpret_cast<uint8_t*>(strchr(ptr, '\0')) + 1;
-        MOZ_ASSERT(buffer_.begin().get() < end);
-        MOZ_ASSERT(end <= buffer_.end().get());
-        cursor_ = end - buffer_.begin().get();
-        return ptr;
-    }
-
     const uint8_t* read(size_t n) {
         MOZ_ASSERT(cursor_ < buffer_.length());
         uint8_t* ptr = &buffer_[cursor_];
         cursor_ += n;
+
+        // Don't let buggy code read past our buffer
+        if (cursor_ > buffer_.length())
+            return nullptr;
+
         return ptr;
     }
 
@@ -169,7 +160,7 @@ class XDRCoderBase
 template <XDRMode mode>
 class XDRState : public XDRCoderBase
 {
-  public:
+  protected:
     XDRBuffer<mode> buf;
   private:
     JS::TranscodeResult resultCode_;
@@ -215,6 +206,14 @@ class XDRState : public XDRCoderBase
         return false;
     }
 
+    bool peekData(const uint8_t** pptr, size_t length) {
+        const uint8_t* ptr = buf.read(length);
+        if (!ptr)
+            return fail(JS::TranscodeResult_Failure_BadDecode);
+        *pptr = ptr;
+        return true;
+    }
+
     bool codeUint8(uint8_t* n) {
         if (mode == XDR_ENCODE) {
             uint8_t* ptr = buf.write(sizeof(*n));
@@ -222,7 +221,10 @@ class XDRState : public XDRCoderBase
                 return fail(JS::TranscodeResult_Throw);
             *ptr = *n;
         } else {
-            *n = *buf.read(sizeof(*n));
+            const uint8_t* ptr = buf.read(sizeof(*n));
+            if (!ptr)
+                return fail(JS::TranscodeResult_Failure_BadDecode);
+            *n = *ptr;
         }
         return true;
     }
@@ -235,6 +237,8 @@ class XDRState : public XDRCoderBase
             mozilla::LittleEndian::writeUint16(ptr, *n);
         } else {
             const uint8_t* ptr = buf.read(sizeof(*n));
+            if (!ptr)
+                return fail(JS::TranscodeResult_Failure_BadDecode);
             *n = mozilla::LittleEndian::readUint16(ptr);
         }
         return true;
@@ -248,6 +252,8 @@ class XDRState : public XDRCoderBase
             mozilla::LittleEndian::writeUint32(ptr, *n);
         } else {
             const uint8_t* ptr = buf.read(sizeof(*n));
+            if (!ptr)
+                return fail(JS::TranscodeResult_Failure_BadDecode);
             *n = mozilla::LittleEndian::readUint32(ptr);
         }
         return true;
@@ -261,6 +267,8 @@ class XDRState : public XDRCoderBase
             mozilla::LittleEndian::writeUint64(ptr, *n);
         } else {
             const uint8_t* ptr = buf.read(sizeof(*n));
+            if (!ptr)
+                return fail(JS::TranscodeResult_Failure_BadDecode);
             *n = mozilla::LittleEndian::readUint64(ptr);
         }
         return true;
@@ -323,7 +331,10 @@ class XDRState : public XDRCoderBase
                 return fail(JS::TranscodeResult_Throw);
             memcpy(ptr, bytes, len);
         } else {
-            memcpy(bytes, buf.read(len), len);
+            const uint8_t* ptr = buf.read(len);
+            if (!ptr)
+                return fail(JS::TranscodeResult_Failure_BadDecode);
+            memcpy(bytes, ptr, len);
         }
         return true;
     }
@@ -335,14 +346,23 @@ class XDRState : public XDRCoderBase
      * the decoding buffer.
      */
     bool codeCString(const char** sp) {
+        uint64_t len64;
+        if (mode == XDR_ENCODE)
+            len64 = (uint64_t)(strlen(*sp) + 1);
+        if (!codeUint64(&len64))
+            return false;
+        size_t len = (size_t) len64;
+
         if (mode == XDR_ENCODE) {
-            size_t n = strlen(*sp) + 1;
-            uint8_t* ptr = buf.write(n);
+            uint8_t* ptr = buf.write(len);
             if (!ptr)
                 return fail(JS::TranscodeResult_Throw);
-            memcpy(ptr, *sp, n);
+            memcpy(ptr, *sp, len);
         } else {
-            *sp = buf.readCString();
+            const uint8_t* ptr = buf.read(len);
+            if (!ptr || ptr[len] != '\0')
+                return fail(JS::TranscodeResult_Failure_BadDecode);
+            *sp = reinterpret_cast<const char*>(ptr);
         }
         return true;
     }
