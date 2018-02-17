@@ -26,7 +26,6 @@
 #include "jsapi.h"
 #include "jsarray.h"
 #include "jscntxt.h"
-#include "jscpucfg.h"
 #include "jsfriendapi.h"
 #include "jsnum.h"
 #include "jsobj.h"
