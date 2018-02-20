@@ -9,6 +9,8 @@
 
 #include "jsopcode.h"
 
+#include "mozilla/EndianUtils.h"
+
 #include "jit/IonCaches.h"
 #include "jit/JitFrames.h"
 #include "jit/mips-shared/MacroAssembler-mips-shared.h"

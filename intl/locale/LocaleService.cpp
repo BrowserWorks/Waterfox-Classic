@@ -7,6 +7,7 @@
 
 #include <algorithm>  // find_if()
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/Services.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/intl/OSPreferences.h"
