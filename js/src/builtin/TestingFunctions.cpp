@@ -37,6 +37,8 @@
 #include "js/UbiNodeShortestPaths.h"
 #include "js/UniquePtr.h"
 #include "js/Vector.h"
+#include "vm/AsyncFunction.h"
+#include "vm/AsyncIteration.h"
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
 #include "vm/ProxyObject.h"
@@ -4037,6 +4039,63 @@ IsConstructor(JSContext* cx, unsigned argc, Value* vp)
     else
         args.rval().setBoolean(IsConstructor(args[0]));
     return true;
+}
+
+JSScript*
+js::TestingFunctionArgumentToScript(JSContext* cx,
+                                    HandleValue v,
+                                    JSFunction** funp /* = nullptr */)
+{
+    if (v.isString()) {
+        // To convert a string to a script, compile it. Parse it as an ES6 Program.
+        RootedLinearString linearStr(cx, StringToLinearString(cx, v.toString()));
+        if (!linearStr)
+            return nullptr;
+        size_t len = GetLinearStringLength(linearStr);
+        AutoStableStringChars linearChars(cx);
+        if (!linearChars.initTwoByte(cx, linearStr))
+            return nullptr;
+        const char16_t* chars = linearChars.twoByteRange().begin().get();
+
+        RootedScript script(cx);
+        CompileOptions options(cx);
+        if (!JS::Compile(cx, options, chars, len, &script))
+            return nullptr;
+        return script;
+    }
+
+    RootedFunction fun(cx, JS_ValueToFunction(cx, v));
+    if (!fun)
+        return nullptr;
+
+    // Unwrap bound functions.
+    while (fun->isBoundFunction()) {
+        JSObject* target = fun->getBoundFunctionTarget();
+        if (target && target->is<JSFunction>())
+            fun = &target->as<JSFunction>();
+        else
+            break;
+    }
+
+    // Get unwrapped async function.
+    if (IsWrappedAsyncFunction(fun))
+        fun = GetUnwrappedAsyncFunction(fun);
+    if (IsWrappedAsyncGenerator(fun))
+        fun = GetUnwrappedAsyncGenerator(fun);
+
+    if (!fun->isInterpreted()) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_TESTING_SCRIPTS_ONLY);
+        return nullptr;
+    }
+
+    JSScript* script = JSFunction::getOrCreateScript(cx, fun);
+    if (!script)
+        return nullptr;
+
+    if (funp)
+        *funp = fun;
+
+    return script;
 }
 
 static const JSFunctionSpecWithHelp TestingFunctions[] = {
