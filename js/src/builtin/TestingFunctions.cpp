@@ -280,6 +280,17 @@ GetBuildConfiguration(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
+ReturnStringCopy(JSContext* cx, CallArgs& args, const char* message)
+{
+    JSString* str = JS_NewStringCopyZ(cx, message);
+    if (!str)
+        return false;
+
+    args.rval().setString(str);
+    return true;
+}
+
+static bool
 GC(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -328,11 +339,7 @@ GC(JSContext* cx, unsigned argc, Value* vp)
     SprintfLiteral(buf, "before %zu, after %zu\n",
                    preBytes, cx->runtime()->gc.usage.gcBytes());
 #endif
-    JSString* str = JS_NewStringCopyZ(cx, buf);
-    if (!str)
-        return false;
-    args.rval().setString(str);
-    return true;
+    return ReturnStringCopy(cx, args, buf);
 }
 
 static bool
@@ -892,11 +899,7 @@ GCState(JSContext* cx, unsigned argc, Value* vp)
     }
 
     const char* state = StateName(cx->runtime()->gc.state());
-    JSString* str = JS_NewStringCopyZ(cx, state);
-    if (!str)
-        return false;
-    args.rval().setString(str);
-    return true;
+    return ReturnStringCopy(cx, args, state);
 }
 
 static bool
@@ -2121,24 +2124,12 @@ testingFunc_inJit(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    if (!jit::IsBaselineEnabled(cx)) {
-        JSString* error = JS_NewStringCopyZ(cx, "Baseline is disabled.");
-        if(!error)
-            return false;
-
-        args.rval().setString(error);
-        return true;
-    }
+    if (!jit::IsBaselineEnabled(cx))
+        return ReturnStringCopy(cx, args, "Baseline is disabled.");
 
     JSScript* script = cx->currentScript();
-    if (script && script->getWarmUpResetCount() >= 20) {
-        JSString* error = JS_NewStringCopyZ(cx, "Compilation is being repeatedly prevented. Giving up.");
-        if (!error)
-            return false;
-
-        args.rval().setString(error);
-        return true;
-    }
+    if (script && script->getWarmUpResetCount() >= 20)
+        return ReturnStringCopy(cx, args, "Compilation is being repeatedly prevented. Giving up.");
 
     args.rval().setBoolean(cx->currentlyRunningInJit());
     return true;
@@ -2149,14 +2140,8 @@ testingFunc_inIon(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    if (!jit::IsIonEnabled(cx)) {
-        JSString* error = JS_NewStringCopyZ(cx, "Ion is disabled.");
-        if (!error)
-            return false;
-
-        args.rval().setString(error);
-        return true;
-    }
+    if (!jit::IsIonEnabled(cx))
+        return ReturnStringCopy(cx, args, "Ion is disabled.");
 
     ScriptFrameIter iter(cx);
     if (!iter.done() && iter.isIon()) {
@@ -2167,14 +2152,8 @@ testingFunc_inIon(JSContext* cx, unsigned argc, Value* vp)
     } else {
         // Check if we missed multiple attempts at compiling the innermost script.
         JSScript* script = cx->currentScript();
-        if (script && script->getWarmUpResetCount() >= 20) {
-            JSString* error = JS_NewStringCopyZ(cx, "Compilation is being repeatedly prevented. Giving up.");
-            if (!error)
-                return false;
-
-            args.rval().setString(error);
-            return true;
-        }
+        if (script && script->getWarmUpResetCount() >= 20)
+            return ReturnStringCopy(cx, args, "Compilation is being repeatedly prevented. Giving up.");
     }
 
     args.rval().setBoolean(!iter.done() && iter.isIon());
@@ -2765,19 +2744,14 @@ ObjectAddress(JSContext* cx, unsigned argc, Value* vp)
 
 #ifdef JS_MORE_DETERMINISTIC
     args.rval().setInt32(0);
+    return true;
 #else
     void* ptr = js::UncheckedUnwrap(&args[0].toObject(), true);
     char buffer[64];
     SprintfLiteral(buffer, "%p", ptr);
 
-    JSString* str = JS_NewStringCopyZ(cx, buffer);
-    if (!str)
-        return false;
-
-    args.rval().setString(str);
+    return ReturnStringCopy(cx, args, buffer);
 #endif
-
-    return true;
 }
 
 static bool
@@ -2870,12 +2844,7 @@ GetBacktrace(JSContext* cx, unsigned argc, Value* vp)
     if (!buf)
         return false;
 
-    RootedString str(cx);
-    if (!(str = JS_NewStringCopyZ(cx, buf.get())))
-        return false;
-
-    args.rval().setString(str);
-    return true;
+    return ReturnStringCopy(cx, args, buf.get());
 }
 
 static bool
