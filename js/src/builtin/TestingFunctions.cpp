@@ -27,6 +27,7 @@
 #ifdef DEBUG
 #include "frontend/TokenStream.h"
 #endif
+#include "jit/BaselineJIT.h"
 #include "jit/InlinableNatives.h"
 #include "js/Debug.h"
 #include "js/HashTable.h"
@@ -4067,6 +4068,72 @@ js::TestingFunctionArgumentToScript(JSContext* cx,
     return script;
 }
 
+static bool
+BaselineCompile(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    RootedObject callee(cx, &args.callee());
+
+    RootedScript script(cx);
+    if (args.length() == 0) {
+        NonBuiltinScriptFrameIter iter(cx);
+        if (iter.done()) {
+            ReportUsageErrorASCII(cx, callee, "no script argument and no script caller");
+            return false;
+        }
+        script = iter.script();
+    } else {
+        script = TestingFunctionArgumentToScript(cx, args[0]);
+        if (!script)
+            return false;
+    }
+
+    bool forceDebug = false;
+    if (args.length() > 1) {
+        if (args.length() > 2) {
+            ReportUsageErrorASCII(cx, callee, "too many arguments");
+            return false;
+        }
+        if (!args[1].isBoolean() && !args[1].isUndefined()) {
+            ReportUsageErrorASCII(cx, callee, "forceDebugInstrumentation argument should be boolean");
+            return false;
+        }
+        forceDebug = ToBoolean(args[1]);
+    }
+
+    if (script->hasBaselineScript()) {
+        if (forceDebug && !script->baselineScript()->hasDebugInstrumentation()) {
+            // There isn't an easy way to do this for a script that might be on
+            // stack right now. See js::jit::RecompileOnStackBaselineScriptsForDebugMode.
+            ReportUsageErrorASCII(cx, callee,
+                                  "unsupported case: recompiling script for debug mode");
+            return false;
+        }
+
+        args.rval().setUndefined();
+        return true;
+    }
+
+    if (!jit::IsBaselineEnabled(cx))
+        return ReturnStringCopy(cx, args, "baseline disabled");
+    if (!script->canBaselineCompile())
+        return ReturnStringCopy(cx, args, "can't compile");
+
+    jit::MethodStatus status = jit::BaselineCompile(cx, script, forceDebug);
+    switch (status) {
+      case jit::Method_Error:
+        return false;
+      case jit::Method_CantCompile:
+        return ReturnStringCopy(cx, args, "can't compile");
+      case jit::Method_Skipped:
+        return ReturnStringCopy(cx, args, "skipped");
+      case jit::Method_Compiled:
+        args.rval().setUndefined();
+    }
+
+    return true;
+}
+
 static const JSFunctionSpecWithHelp TestingFunctions[] = {
     JS_FN_HELP("gc", ::GC, 0, 0,
 "gc([obj] | 'zone' [, 'shrinking'])",
@@ -4644,6 +4711,15 @@ gc::ZealModeHelpText),
     JS_FN_HELP("isConstructor", IsConstructor, 1, 0,
 "isConstructor(value)",
 "  Returns whether the value is considered IsConstructor.\n"),
+
+    JS_FN_HELP("baselineCompile", BaselineCompile, 2, 0,
+"baselineCompile([fun/code], forceDebugInstrumentation=false)",
+"  Baseline-compiles the given JS function or script.\n"
+"  Without arguments, baseline-compiles the caller's script; but note\n"
+"  that extra boilerplate is needed afterwards to cause the VM to start\n"
+"  running the jitcode rather than staying in the interpreter:\n"
+"    baselineCompile();  for (var i=0; i<1; i++) {} ...\n"
+"  The interpreter will enter the new jitcode at the loop header.\n"),
 
     JS_FS_HELP_END
 };
