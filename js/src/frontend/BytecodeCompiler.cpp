@@ -347,7 +347,6 @@ BytecodeCompiler::compileScript(HandleObject environment, SharedContext* sc)
                 return nullptr;
             if (!NameFunctions(cx, pn))
                 return nullptr;
-            parser->handler.freeTree(pn);
 
             break;
         }
@@ -420,8 +419,6 @@ BytecodeCompiler::compileModule()
 
     if (!NameFunctions(cx, pn))
         return nullptr;
-
-    parser->handler.freeTree(pn);
 
     if (!builder.initModule())
         return nullptr;

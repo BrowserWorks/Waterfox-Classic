@@ -444,9 +444,6 @@ class Parser final
     /* State specific to the kind of parse being performed. */
     ParseHandler handler;
 
-    void prepareNodeForMutation(Node node) { handler.prepareNodeForMutation(node); }
-    void freeTree(Node node) { handler.freeTree(node); }
-
   public:
     Parser(JSContext* cx, LifoAlloc& alloc, const ReadOnlyCompileOptions& options,
            const CharT* chars, size_t length, bool foldConstants, UsedNameTracker& usedNames,
