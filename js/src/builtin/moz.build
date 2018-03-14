@@ -39,15 +39,11 @@ UNIFIED_SOURCES += [
     'WeakSetObject.cpp',
 ]
 
-# builtin/RegExp.cpp cannot be built in unified mode because it is built
-# without PGO
+# builtin/RegExp.cpp cannot be built in unified mode because it causes huge
+# win32 test slowdowns
 SOURCES += [
     'RegExp.cpp',
 ]
-
-if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
-    if CONFIG['CPU_ARCH'] == 'x86':
-        SOURCES['RegExp.cpp'].no_pgo = True # Bug 772303
 
 # Prepare self-hosted JS code for embedding
 GENERATED_FILES += [('../selfhosted.out.h', '../selfhosted.js')]
