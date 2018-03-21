@@ -362,18 +362,31 @@ class FullParseHandler
         return true;
     }
 
-    MOZ_MUST_USE bool addPropertyDefinition(ParseNode* literal, ParseNode* key, ParseNode* val) {
-        MOZ_ASSERT(literal->isKind(ParseNodeKind::Object));
-        MOZ_ASSERT(literal->isArity(PN_LIST));
+    ParseNode* newPropertyDefinition(ParseNode* key, ParseNode* val) {
         MOZ_ASSERT(key->isKind(ParseNodeKind::Number) ||
                    key->isKind(ParseNodeKind::ObjectPropertyName) ||
                    key->isKind(ParseNodeKind::String) ||
                    key->isKind(ParseNodeKind::ComputedName));
+        checkAndSetIsDirectRHSAnonFunction(val);
+        return newBinary(ParseNodeKind::Colon, key, val, JSOP_INITPROP);
+    }
 
-        ParseNode* propdef = newBinary(ParseNodeKind::Colon, key, val, JSOP_INITPROP);
+    void addPropertyDefinition(ParseNode* literal, ParseNode* propdef) {
+        MOZ_ASSERT(literal->isKind(ParseNodeKind::Object));
+        MOZ_ASSERT(literal->isArity(PN_LIST));
+        MOZ_ASSERT(propdef->isKind(ParseNodeKind::Colon));
+
+        if (!propdef->pn_right->isConstant())
+            setListFlag(literal, PNX_NONCONST);
+
+        literal->append(propdef);
+    }
+
+    MOZ_MUST_USE bool addPropertyDefinition(ParseNode* literal, ParseNode* key, ParseNode* val) {
+        ParseNode* propdef = newPropertyDefinition(key, val);
         if (!propdef)
             return false;
-        literal->append(propdef);
+        addPropertyDefinition(literal, propdef);
         return true;
     }
 
@@ -414,6 +427,8 @@ class FullParseHandler
                    key->isKind(ParseNodeKind::String) ||
                    key->isKind(ParseNodeKind::ComputedName));
 
+        checkAndSetIsDirectRHSAnonFunction(fn);
+
         ParseNode* propdef = newBinary(ParseNodeKind::Colon, key, fn, AccessorTypeToJSOp(atype));
         if (!propdef)
             return false;
@@ -431,6 +446,8 @@ class FullParseHandler
                    key->isKind(ParseNodeKind::ObjectPropertyName) ||
                    key->isKind(ParseNodeKind::String) ||
                    key->isKind(ParseNodeKind::ComputedName));
+
+        checkAndSetIsDirectRHSAnonFunction(fn);
 
         ParseNode* classMethod = new_<ClassMethod>(key, fn, AccessorTypeToJSOp(atype), isStatic);
         if (!classMethod)
@@ -569,6 +586,13 @@ class FullParseHandler
 
     ParseNode* newExportDefaultDeclaration(ParseNode* kid, ParseNode* maybeBinding,
                                            const TokenPos& pos) {
+        if (maybeBinding) {
+            MOZ_ASSERT(maybeBinding->isKind(ParseNodeKind::Name));
+            MOZ_ASSERT(!maybeBinding->isInParens());
+
+            checkAndSetIsDirectRHSAnonFunction(kid);
+        }
+
         return new_<BinaryNode>(ParseNodeKind::ExportDefault, JSOP_NOP, pos, kid, maybeBinding);
     }
 
@@ -727,11 +751,13 @@ class FullParseHandler
     inline MOZ_MUST_USE bool setLastFunctionFormalParameterDefault(ParseNode* funcpn,
                                                                    ParseNode* pn);
 
+  private:
     void checkAndSetIsDirectRHSAnonFunction(ParseNode* pn) {
         if (IsAnonymousFunctionDefinition(pn))
             pn->setDirectRHSAnonFunction(true);
     }
 
+  public:
     ParseNode* newFunctionStatement(const TokenPos& pos) {
         return new_<CodeNode>(ParseNodeKind::Function, JSOP_NOP, pos);
     }
@@ -782,6 +808,12 @@ class FullParseHandler
     }
 
     ParseNode* newAssignment(ParseNodeKind kind, ParseNode* lhs, ParseNode* rhs) {
+        if (kind == ParseNodeKind::Assign && lhs->isKind(ParseNodeKind::Name) &&
+            !lhs->isInParens())
+        {
+            checkAndSetIsDirectRHSAnonFunction(rhs);
+        }
+
         return newBinary(kind, lhs, rhs);
     }
 
@@ -921,10 +953,6 @@ class FullParseHandler
         pn->pn_prologue = true;
     }
 
-    bool isConstant(ParseNode* pn) {
-        return pn->isConstant();
-    }
-
     bool isName(ParseNode* node) {
         return node->isKind(ParseNodeKind::Name);
     }
@@ -996,11 +1024,9 @@ FullParseHandler::setLastFunctionFormalParameterDefault(ParseNode* funcpn,
     MOZ_ASSERT(funcpn->isArity(PN_CODE));
 
     ParseNode* arg = funcpn->pn_body->last();
-    ParseNode* pn = newBinary(ParseNodeKind::Assign, arg, defaultValue);
+    ParseNode* pn = newAssignment(ParseNodeKind::Assign, arg, defaultValue);
     if (!pn)
         return false;
-
-    checkAndSetIsDirectRHSAnonFunction(defaultValue);
 
     funcpn->pn_body->pn_pos.end = pn->pn_pos.end;
     ParseNode* pnchild = funcpn->pn_body->pn_head;
@@ -1023,6 +1049,11 @@ FullParseHandler::setLastFunctionFormalParameterDefault(ParseNode* funcpn,
 inline bool
 FullParseHandler::finishInitializerAssignment(ParseNode* pn, ParseNode* init)
 {
+    MOZ_ASSERT(pn->isKind(ParseNodeKind::Name));
+    MOZ_ASSERT(!pn->isInParens());
+
+    checkAndSetIsDirectRHSAnonFunction(init);
+
     pn->pn_expr = init;
     pn->setOp(JSOP_SETNAME);
 
