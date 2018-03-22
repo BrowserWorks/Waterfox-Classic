@@ -809,7 +809,10 @@ class Parser final
 
     bool namedImportsOrNamespaceImport(TokenKind tt, Node importSpecSet);
     bool checkExportedName(JSAtom* exportName);
+    bool checkExportedNamesForArrayBinding(Node node);
+    bool checkExportedNamesForObjectBinding(Node node);
     bool checkExportedNamesForDeclaration(Node node);
+    bool checkExportedNamesForDeclarationList(Node node);
     bool checkExportedNameForClause(Node node);
     bool checkExportedNameForFunction(Node node);
     bool checkExportedNameForClass(Node node);
@@ -1044,6 +1047,17 @@ class MOZ_STACK_CLASS AutoAwaitIsKeyword
         parser_->setAwaitHandling(oldAwaitHandling_);
     }
 };
+
+// Waterfox note: Likely due to us not having bug 1424420 and possibly related
+// refactorings, we need to break a circular template specialization instantiation
+// dependency using these forward declarations.
+template<>
+bool
+Parser<FullParseHandler, char16_t>::checkExportedNamesForDeclaration(ParseNode* node);
+
+template<>
+bool
+Parser<SyntaxParseHandler, char16_t>::checkExportedNamesForDeclaration(Node node);
 
 } /* namespace frontend */
 } /* namespace js */
