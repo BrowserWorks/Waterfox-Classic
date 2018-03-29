@@ -5738,8 +5738,7 @@ BytecodeEmitter::emitDefault(ParseNode* defaultExpr, ParseNode* pattern)
 }
 
 bool
-BytecodeEmitter::setOrEmitSetFunName(ParseNode* maybeFun, HandleAtom name,
-                                     FunctionPrefixKind prefixKind)
+BytecodeEmitter::setOrEmitSetFunName(ParseNode* maybeFun, HandleAtom name)
 {
     MOZ_ASSERT(maybeFun->isDirectRHSAnonFunction());
 
@@ -5747,7 +5746,16 @@ BytecodeEmitter::setOrEmitSetFunName(ParseNode* maybeFun, HandleAtom name,
         // Function doesn't have 'name' property at this point.
         // Set function's name at compile time.
         JSFunction* fun = maybeFun->pn_funbox->function();
-        MOZ_ASSERT(!fun->hasInferredName());
+
+        // The inferred name may already be set if this function is an
+        // interpreted lazy function and we OOM'ed after we set the inferred
+        // name the first time.
+        if (fun->hasInferredName()) {
+            MOZ_ASSERT(fun->isInterpretedLazy());
+            MOZ_ASSERT(fun->inferredName() == name);
+
+            return true;
+        }
 
         fun->setInferredName(name);
         return true;
@@ -5760,7 +5768,7 @@ BytecodeEmitter::setOrEmitSetFunName(ParseNode* maybeFun, HandleAtom name,
         return false;
     if (!emitIndexOp(JSOP_STRING, nameIndex))   // FUN NAME
         return false;
-    uint8_t kind = uint8_t(prefixKind);
+    uint8_t kind = uint8_t(FunctionPrefixKind::None);
     if (!emit2(JSOP_SETFUNNAME, kind))          // FUN
         return false;
     return true;
@@ -5775,7 +5783,7 @@ BytecodeEmitter::emitInitializer(ParseNode* initializer, ParseNode* pattern)
     if (initializer->isDirectRHSAnonFunction()) {
         MOZ_ASSERT(!pattern->isInParens());
         RootedAtom name(cx, pattern->name());
-        if (!setOrEmitSetFunName(initializer, name, FunctionPrefixKind::None))
+        if (!setOrEmitSetFunName(initializer, name))
             return false;
     }
 
@@ -6518,7 +6526,7 @@ BytecodeEmitter::emitAssignment(ParseNode* lhs, ParseNodeKind pnk, ParseNode* rh
                 MOZ_ASSERT(!lhs->isInParens());
                 MOZ_ASSERT(op == JSOP_NOP);
                 RootedAtom name(bce->cx, lhs->name());
-                if (!bce->setOrEmitSetFunName(rhs, name, FunctionPrefixKind::None))
+                if (!bce->setOrEmitSetFunName(rhs, name))
                     return false;
             }
 
@@ -10953,8 +10961,10 @@ BytecodeEmitter::emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp, 
             }
 
             if (propdef->pn_right->isDirectRHSAnonFunction()) {
+                MOZ_ASSERT(prefixKind == FunctionPrefixKind::None);
+
                 RootedAtom keyName(cx, key->pn_atom);
-                if (!setOrEmitSetFunName(propdef->pn_right, keyName, prefixKind))
+                if (!setOrEmitSetFunName(propdef->pn_right, keyName))
                     return false;
             }
             if (!emitIndex32(op, index))
@@ -11795,7 +11805,7 @@ BytecodeEmitter::emitExportDefault(ParseNode* pn)
 
         if (pn->pn_left->isDirectRHSAnonFunction()) {
             HandlePropertyName name = cx->names().default_;
-            if (!setOrEmitSetFunName(pn->pn_left, name, FunctionPrefixKind::None))
+            if (!setOrEmitSetFunName(pn->pn_left, name))
                 return false;
         }
 
