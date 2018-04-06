@@ -1447,7 +1447,7 @@ AccessorTypeToJSOp(AccessorType atype)
     }
 }
 
-enum FunctionSyntaxKind
+enum class FunctionSyntaxKind
 {
     Expression,
     Statement,
@@ -1464,26 +1464,31 @@ enum FunctionSyntaxKind
 static inline bool
 IsConstructorKind(FunctionSyntaxKind kind)
 {
-    return kind == ClassConstructor || kind == DerivedClassConstructor;
+    return kind == FunctionSyntaxKind::ClassConstructor ||
+           kind == FunctionSyntaxKind::DerivedClassConstructor;
 }
 
 static inline bool
 IsGetterKind(FunctionSyntaxKind kind)
 {
-    return kind == Getter || kind == GetterNoExpressionClosure;
+    return kind == FunctionSyntaxKind::Getter ||
+           kind == FunctionSyntaxKind::GetterNoExpressionClosure;
 }
 
 static inline bool
 IsSetterKind(FunctionSyntaxKind kind)
 {
-    return kind == Setter || kind == SetterNoExpressionClosure;
+    return kind == FunctionSyntaxKind::Setter ||
+           kind == FunctionSyntaxKind::SetterNoExpressionClosure;
 }
 
 static inline bool
 IsMethodDefinitionKind(FunctionSyntaxKind kind)
 {
-    return kind == Method || IsConstructorKind(kind) ||
-           IsGetterKind(kind) || IsSetterKind(kind);
+    return kind == FunctionSyntaxKind::Method ||
+                   IsConstructorKind(kind) ||
+                   IsGetterKind(kind) ||
+                   IsSetterKind(kind);
 }
 
 static inline ParseNode*
