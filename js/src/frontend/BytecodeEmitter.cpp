@@ -7108,9 +7108,6 @@ BytecodeEmitter::emitExpressionStatement(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(ParseNodeKind::ExpressionStatement));
 
-    if (!updateSourceCoordNotes(pn->pn_pos.begin))
-        return false;
-
     /*
      * Top-level or called-from-a-native JS_Execute/EvaluateScript,
      * debugger, and eval frames may need the value of the ultimate
@@ -7150,6 +7147,8 @@ BytecodeEmitter::emitExpressionStatement(ParseNode* pn)
         JSOp op = wantval ? JSOP_SETRVAL : JSOP_POP;
         ValueUsage valueUsage = wantval ? ValueUsage::WantValue : ValueUsage::IgnoreValue;
         MOZ_ASSERT_IF(expr->isKind(ParseNodeKind::Assign), expr->isOp(JSOP_NOP));
+        if (!updateSourceCoordNotes(pn->pn_pos.begin))
+            return false;
         if (!emitTree(expr, valueUsage))
             return false;
         if (!emit1(op))
