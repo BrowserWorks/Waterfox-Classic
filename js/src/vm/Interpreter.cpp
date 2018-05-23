@@ -34,6 +34,7 @@
 #include "jsstr.h"
 
 #include "builtin/Eval.h"
+#include "builtin/ModuleObject.h"
 #include "jit/AtomicOperations.h"
 #include "jit/BaselineJIT.h"
 #include "jit/Ion.h"
@@ -1650,7 +1651,6 @@ GetSuperEnvFunction(JSContext* cx, InterpreterRegs& regs)
     }
     MOZ_CRASH("unexpected env chain for GetSuperEnvFunction");
 }
-
 
 /*
  * As an optimization, the interpreter creates a handful of reserved Rooted<T>
@@ -4228,6 +4228,19 @@ END_CASE(JSOP_SUPERBASE)
 CASE(JSOP_NEWTARGET)
     PUSH_COPY(REGS.fp()->newTarget());
     MOZ_ASSERT(REGS.sp[-1].isObject() || REGS.sp[-1].isUndefined());
+END_CASE(JSOP_NEWTARGET)
+
+CASE(JSOP_IMPORTMETA)
+{
+    ReservedRooted<JSObject*> module(&rootObject0, GetModuleObjectForScript(script));
+    MOZ_ASSERT(module);
+
+    JSObject* metaObject = GetOrCreateModuleMetaObject(cx, module);
+    if (!metaObject)
+        goto error;
+
+    PUSH_OBJECT(*metaObject);
+}
 END_CASE(JSOP_NEWTARGET)
 
 CASE(JSOP_SUPERFUN)

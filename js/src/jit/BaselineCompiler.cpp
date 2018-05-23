@@ -1023,6 +1023,7 @@ BaselineCompiler::emitBody()
           case JSOP_UNUSED126:
           case JSOP_UNUSED223:
           case JSOP_LIMIT:
+          case JSOP_IMPORTMETA:
             // === !! WARNING WARNING WARNING !! ===
             // Do you really want to sacrifice performance by not implementing
             // this operation in the BaselineCompiler?

@@ -981,7 +981,11 @@ struct JSRuntime : public js::MallocProvider<JSRuntime>
     js::RuntimeCaches& caches() { return caches_.ref(); }
 
     // The implementation-defined abstract operation HostResolveImportedModule.
-    JS::ModuleResolveHook moduleResolveHook;
+    js::MainThreadData<JS::ModuleResolveHook> moduleResolveHook;
+
+    // A hook that implements the abstract operations
+    // HostGetImportMetaProperties and HostFinalizeImportMeta.
+    js::MainThreadData<JS::ModuleMetadataHook> moduleMetadataHook;
 
   private:
     // When wasm is interrupted, the pc at which we should return if the
