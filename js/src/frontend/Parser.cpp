@@ -839,7 +839,8 @@ ParserBase::ParserBase(JSContext* cx, LifoAlloc& alloc,
                        const ReadOnlyCompileOptions& options,
                        const char16_t* chars, size_t length,
                        bool foldConstants,
-                       UsedNameTracker& usedNames)
+                       UsedNameTracker& usedNames,
+                       ParseGoal parseGoal)
   : context(cx),
     alloc(alloc),
     anyChars(cx, options, thisForCtor()),
@@ -853,7 +854,8 @@ ParserBase::ParserBase(JSContext* cx, LifoAlloc& alloc,
     checkOptionsCalled(false),
 #endif
     isUnexpectedEOF_(false),
-    awaitHandling_(AwaitIsName)
+    awaitHandling_(AwaitIsName),
+    parseGoal_(uint8_t(parseGoal))
 {
     cx->frontendCollectionPool().addActiveCompilation();
     tempPoolMark = alloc.mark();
@@ -880,8 +882,9 @@ Parser<ParseHandler, CharT>::Parser(JSContext* cx, LifoAlloc& alloc,
                                     bool foldConstants,
                                     UsedNameTracker& usedNames,
                                     SyntaxParser* syntaxParser,
-                                    LazyScript* lazyOuterFunction)
-  : ParserBase(cx, alloc, options, chars, length, foldConstants, usedNames),
+                                    LazyScript* lazyOuterFunction,
+                                    ParseGoal parseGoal)
+  : ParserBase(cx, alloc, options, chars, length, foldConstants, usedNames, parseGoal),
     AutoGCRooter(cx, PARSER),
     syntaxParser_(syntaxParser),
     tokenStream(cx, options, chars, length),
@@ -2519,7 +2522,8 @@ Parser<SyntaxParseHandler, char16_t>::finishFunction(bool isStandaloneFunction /
                                           pc->innerFunctionsForLazy, versionNumber(),
                                           funbox->bufStart, funbox->bufEnd,
                                           funbox->toStringStart,
-                                          funbox->startLine, funbox->startColumn);
+                                          funbox->startLine, funbox->startColumn,
+                                          parseGoal());
     if (!lazy)
         return false;
 
@@ -5286,6 +5290,22 @@ Parser<SyntaxParseHandler, char16_t>::importDeclaration()
     return SyntaxParseHandler::NodeFailure;
 }
 
+template <class ParseHandler, typename CharT>
+typename ParseHandler::Node
+Parser<ParseHandler, CharT>::importDeclarationOrImportMeta(YieldHandling yieldHandling)
+{
+    MOZ_ASSERT(anyChars.isCurrentTokenType(TokenKind::Import));
+
+    TokenKind tt;
+    if (!tokenStream.peekToken(&tt))
+        return null();
+
+    if (tt == TokenKind::Dot)
+        return expressionStatement(yieldHandling);
+
+    return importDeclaration();
+}
+
 template<>
 bool
 Parser<FullParseHandler, char16_t>::checkExportedName(JSAtom* exportName)
@@ -7763,7 +7783,7 @@ Parser<ParseHandler, CharT>::statement(YieldHandling yieldHandling)
 
       // ImportDeclaration (only inside modules)
       case TokenKind::Import:
-        return importDeclaration();
+        return importDeclarationOrImportMeta(yieldHandling);
 
       // ExportDeclaration (only inside modules)
       case TokenKind::Export:
@@ -7955,7 +7975,7 @@ Parser<ParseHandler, CharT>::statementListItem(YieldHandling yieldHandling,
 
       // ImportDeclaration (only inside modules)
       case TokenKind::Import:
-        return importDeclaration();
+        return importDeclarationOrImportMeta(yieldHandling);
 
       // ExportDeclaration (only inside modules)
       case TokenKind::Export:
@@ -9262,6 +9282,10 @@ Parser<ParseHandler, CharT>::memberExpr(YieldHandling yieldHandling,
         lhs = handler.newSuperBase(thisName, pos());
         if (!lhs)
             return null();
+    } else if (tt == TokenKind::Import) {
+        lhs = importMeta();
+        if (!lhs)
+            return null();
     } else {
         lhs = primaryExpr(yieldHandling, tripledotHandling, tt, possibleError, invoked);
         if (!lhs)
@@ -10525,6 +10549,45 @@ Parser<ParseHandler, CharT>::tryNewTarget(Node &newTarget)
 
     newTarget = handler.newNewTarget(newHolder, targetHolder);
     return !!newTarget;
+}
+
+template <class ParseHandler, typename CharT>
+typename ParseHandler::Node
+Parser<ParseHandler, CharT>::importMeta()
+{
+    MOZ_ASSERT(anyChars.isCurrentTokenType(TokenKind::Import));
+
+    uint32_t begin = pos().begin;
+
+    if (parseGoal() != ParseGoal::Module) {
+        errorAt(begin, JSMSG_IMPORT_OUTSIDE_MODULE);
+        return null();
+    }
+
+    Node importHolder = handler.newPosHolder(pos());
+    if (!importHolder)
+        return null();
+
+    TokenKind next;
+    if (!tokenStream.getToken(&next))
+        return null();
+    if (next != TokenKind::Dot) {
+        error(JSMSG_UNEXPECTED_TOKEN, "dot", TokenKindToDesc(next));
+        return null();
+    }
+
+    if (!tokenStream.getToken(&next))
+        return null();
+    if (next != TokenKind::Meta) {
+        error(JSMSG_UNEXPECTED_TOKEN, "meta", TokenKindToDesc(next));
+        return null();
+    }
+
+    Node metaHolder = handler.newPosHolder(pos());
+    if (!metaHolder)
+        return null();
+
+    return handler.newImportMeta(importHolder, metaHolder);
 }
 
 template <class ParseHandler, typename CharT>

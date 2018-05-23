@@ -3992,7 +3992,7 @@ Parse(JSContext* cx, unsigned argc, Value* vp)
         return false;
     Parser<FullParseHandler, char16_t> parser(cx, cx->tempLifoAlloc(), options, chars, length,
                                               /* foldConstants = */ true, usedNames, nullptr,
-                                              nullptr);
+                                              nullptr, ParseGoal::Script);
     if (!parser.checkOptions())
         return false;
 
@@ -4044,7 +4044,8 @@ SyntaxParse(JSContext* cx, unsigned argc, Value* vp)
         return false;
     Parser<frontend::SyntaxParseHandler, char16_t> parser(cx, cx->tempLifoAlloc(),
                                                           options, chars, length, false,
-                                                          usedNames, nullptr, nullptr);
+                                                          usedNames, nullptr, nullptr,
+                                                          frontend::ParseGoal::Script);
     if (!parser.checkOptions())
         return false;
 

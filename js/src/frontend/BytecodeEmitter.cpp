@@ -1044,6 +1044,7 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
 
       // Trivial binary nodes with more token pos holders.
       case ParseNodeKind::NewTarget:
+      case ParseNodeKind::ImportMeta:
         MOZ_ASSERT(pn->isArity(PN_BINARY));
         MOZ_ASSERT(pn->pn_left->isKind(ParseNodeKind::PosHolder));
         MOZ_ASSERT(pn->pn_right->isKind(ParseNodeKind::PosHolder));
@@ -8228,8 +8229,8 @@ bool BytecodeEmitter::emitOptionalTree(ParseNode* pn, OptionalEmitter& oe,
             bool isMemberExpression = isPrimaryExpression ||
                                       kind == ParseNodeKind::TaggedTemplate ||
                                       kind == ParseNodeKind::New ||
-                                      kind == ParseNodeKind::NewTarget; /* ||
-                                      kind == ParseNodeKind::ImportMeta; Waterfox is missing bug 1427610 */
+                                      kind == ParseNodeKind::NewTarget ||
+                                      kind == ParseNodeKind::ImportMeta;
 
             bool isCallExpression = kind == ParseNodeKind::SetThis; /* ||
                                     kind == ParseNodeKind::CallImport; Waterfox is missing bug 1484948 */
@@ -9984,6 +9985,10 @@ BytecodeEmitter::emitTree(ParseNode* pn, ValueUsage valueUsage /* = ValueUsage::
       case ParseNodeKind::NewTarget:
         if (!emit1(JSOP_NEWTARGET))
             return false;
+        break;
+
+      case ParseNodeKind::ImportMeta:
+        MOZ_CRASH("NYI");
         break;
 
       case ParseNodeKind::SetThis:

@@ -157,14 +157,20 @@ class ParserBase : public StrictModeGetter
 
     /* AwaitHandling */ uint8_t awaitHandling_:2;
 
+    /* ParseGoal */ uint8_t parseGoal_:1;
+
   public:
     bool awaitIsKeyword() const {
       return awaitHandling_ != AwaitIsName;
     }
 
+    ParseGoal parseGoal() const {
+        return ParseGoal(parseGoal_);
+    }
+
     ParserBase(JSContext* cx, LifoAlloc& alloc, const ReadOnlyCompileOptions& options,
                const char16_t* chars, size_t length, bool foldConstants,
-               UsedNameTracker& usedNames);
+               UsedNameTracker& usedNames, ParseGoal parseGoal);
     ~ParserBase();
 
     const char* getFilename() const { return anyChars.getFilename(); }
@@ -447,7 +453,7 @@ class Parser final
   public:
     Parser(JSContext* cx, LifoAlloc& alloc, const ReadOnlyCompileOptions& options,
            const CharT* chars, size_t length, bool foldConstants, UsedNameTracker& usedNames,
-           SyntaxParser* syntaxParser, LazyScript* lazyOuterFunction);
+           SyntaxParser* syntaxParser, LazyScript* lazyOuterFunction, ParseGoal parseGoal);
     ~Parser();
 
     friend class AutoAwaitIsKeyword<Parser>;
@@ -661,6 +667,7 @@ class Parser final
     Node lexicalDeclaration(YieldHandling yieldHandling, DeclarationKind kind);
 
     Node importDeclaration();
+    Node importDeclarationOrImportMeta(YieldHandling yieldHandling);
 
     bool processExport(Node node);
     bool processExportFrom(Node node);
@@ -766,6 +773,8 @@ class Parser final
 
     bool tryNewTarget(Node& newTarget);
     bool checkAndMarkSuperScope();
+
+    Node importMeta();
 
     Node methodDefinition(uint32_t toStringStart, PropertyType propType, HandleAtom funName);
 

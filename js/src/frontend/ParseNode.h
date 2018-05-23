@@ -123,6 +123,7 @@ class ObjectBox;
     F(SuperBase) \
     F(SuperCall) \
     F(SetThis) \
+    F(ImportMeta) \
     \
     /* Unary operators. */ \
     F(TypeOfName) \
