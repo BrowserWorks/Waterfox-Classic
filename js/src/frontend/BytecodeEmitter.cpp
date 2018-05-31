@@ -2179,7 +2179,9 @@ class MOZ_STACK_CLASS IfThenElseEmitter
 
         // Restore stack depth of the then part.
         bce_->stackDepth = thenDepth_;
+#ifdef DEBUG
         state_ = State::Else;
+#endif
         return true;
     }
 
