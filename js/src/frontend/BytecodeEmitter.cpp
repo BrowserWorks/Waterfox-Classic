@@ -1994,11 +1994,11 @@ class MOZ_STACK_CLASS TryEmitter
 //     emit(c1);
 //     ifThenElse.emitIfElse();
 //     emit(b1);
-//     ifThenElse.emitElse();
+//     ifThenElse.emitElseIf();
 //     emit(c2);
 //     ifThenElse.emitIfElse();
 //     emit(b2);
-//     ifThenElse.emitElse();
+//     ifThenElse.emitElseIf();
 //     emit(c3);
 //     ifThenElse.emitIfElse();
 //     emit(b3);
@@ -2039,21 +2039,25 @@ class MOZ_STACK_CLASS IfThenElseEmitter
 
     // The state of this emitter.
     //
-    // +-------+   emitCond +------+ emitElse +------+      emitEnd +-----+
-    // | Start |-+--------->| Cond |--------->| Else |---->+------->| End |
-    // +-------+ |          +------+          +------+     ^        +-----+
-    //           |                                         |
-    //           v emitIf +----+                           |
-    //        +->+------->| If |-------------------------->+
-    //        ^  |        +----+                           ^
-    //        |  |                                         |
-    //        |  |                                         |
-    //        |  |                                         |
-    //        |  | emitIfElse +--------+ emitElse +------+ |
-    //        |  +----------->| IfElse |--------->| Else |-+
-    //        |               +--------+          +------+ |
-    //        |                                            |
-    //        +--------------------------------------------+
+    // +-------+   emitCond +------+ emitElse +------+        emitEnd +-----+
+    // | Start |-+--------->| Cond |--------->| Else |------>+------->| End |
+    // +-------+ |          +------+          +------+       ^        +-----+
+    //           |                                           |
+    //           v emitIf +----+                             |
+    //        +->+------->| If |---------------------------->+
+    //        ^  |        +----+                             ^
+    //        |  |                                           |
+    //        |  |                                           |
+    //        |  |                                           |
+    //        |  | emitIfElse +--------+   emitElse +------+ |
+    //        |  +----------->| IfElse |-+--------->| Else |-+
+    //        |               +--------+ |          +------+
+    //        |                          |
+    //        |                          | emitElseIf +--------+
+    //        |                          +----------->| ElseIf |-+
+    //        |                                       +--------+ |
+    //        |                                                  |
+    //        +--------------------------------------------------+
     enum class State {
         // The initial state.
         Start,
@@ -2069,6 +2073,9 @@ class MOZ_STACK_CLASS IfThenElseEmitter
 
         // After calling emitElse.
         Else,
+
+        // After calling emitElseIf.
+        ElseIf,
 
         // After calling emitEnd.
         End
@@ -2090,29 +2097,16 @@ class MOZ_STACK_CLASS IfThenElseEmitter
     {}
 
   private:
-    MOZ_MUST_USE bool emitIf(State nextState) {
-        MOZ_ASSERT(state_ == State::Start || state_ == State::Else);
-        MOZ_ASSERT(nextState == State::If || nextState == State::IfElse ||
-                   nextState == State::Cond);
-
-        // Clear jumpAroundThen_ offset that points previous JSOP_IFEQ.
-        if (state_ == State::Else)
-            jumpAroundThen_ = JumpList();
+    MOZ_MUST_USE bool emitIfInternal(State nextState, SrcNoteType type) {
+        MOZ_ASSERT_IF(state_ == State::Start,
+                      nextState == State::If ||
+                      nextState == State::IfElse ||
+                      nextState == State::Cond);
+        MOZ_ASSERT_IF(state_ == State::ElseIf,
+                      nextState == State::If ||
+                      nextState == State::IfElse);
 
         // Emit an annotated branch-if-false around the then part.
-        SrcNoteType type;
-        switch (nextState) {
-          case State::If:
-            type = SRC_IF;
-            break;
-          case State::IfElse:
-            type = SRC_IF_ELSE;
-            break;
-          default:
-            MOZ_ASSERT(nextState == State::Cond);
-            type = SRC_COND;
-            break;
-        }
         if (!bce_->newSrcNote(type))
             return false;
         if (!bce_->emitJump(JSOP_IFEQ, &jumpAroundThen_))
@@ -2143,15 +2137,18 @@ class MOZ_STACK_CLASS IfThenElseEmitter
 
   public:
     MOZ_MUST_USE bool emitIf() {
-        return emitIf(State::If);
+        MOZ_ASSERT(state_ == State::Start || state_ == State::ElseIf);
+        return emitIfInternal(State::If, SRC_IF);
     }
 
     MOZ_MUST_USE bool emitCond() {
-        return emitIf(State::Cond);
+        MOZ_ASSERT(state_ == State::Start);
+        return emitIfInternal(State::Cond, SRC_COND);
     }
 
     MOZ_MUST_USE bool emitIfElse() {
-        return emitIf(State::IfElse);
+        MOZ_ASSERT(state_ == State::Start || state_ == State::ElseIf);
+        return emitIfInternal(State::IfElse, SRC_IF_ELSE);
     }
 
     MOZ_MUST_USE bool emitElse() {
@@ -2172,6 +2169,19 @@ class MOZ_STACK_CLASS IfThenElseEmitter
         // Restore stack depth of the then part.
         bce_->stackDepth = thenDepth_;
         state_ = State::Else;
+        return true;
+    }
+
+    MOZ_MUST_USE bool emitElseIf() {
+        MOZ_ASSERT(state_ == State::IfElse);
+
+        if (!emitElse())
+            return false;
+
+        // Clear jumpAroundThen_ offset that points previous JSOP_IFEQ.
+        jumpAroundThen_ = JumpList();
+        state_ = State::ElseIf;
+
         return true;
     }
 
@@ -7194,13 +7204,17 @@ BytecodeEmitter::emitIf(ParseNode* pn)
         return false;
 
     if (elseNode) {
-        if (!ifThenElse.emitElse())
-            return false;
-
         if (elseNode->isKind(ParseNodeKind::If)) {
             pn = elseNode;
+
+            if (!ifThenElse.emitElseIf())
+                return false;
+
             goto if_again;
         }
+
+        if (!ifThenElse.emitElse())
+            return false;
 
         /* Emit code for the else part. */
         if (!emitTreeInBranch(elseNode))
