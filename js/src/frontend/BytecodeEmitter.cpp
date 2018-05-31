@@ -1976,14 +1976,14 @@ class MOZ_STACK_CLASS TryEmitter
 //   `if (cond) then_block`
 //     IfThenElseEmitter ifThen(this);
 //     emit(cond);
-//     ifThen.emitIf();
+//     ifThen.emitThen();
 //     emit(then_block);
 //     ifThen.emitEnd();
 //
 //   `if (cond) then_block else else_block`
 //     IfThenElseEmitter ifThenElse(this);
 //     emit(cond);
-//     ifThenElse.emitIfElse();
+//     ifThenElse.emitThenElse();
 //     emit(then_block);
 //     ifThenElse.emitElse();
 //     emit(else_block);
@@ -1992,15 +1992,15 @@ class MOZ_STACK_CLASS TryEmitter
 //   `if (c1) b1 else if (c2) b2 else if (c3) b3 else b4`
 //     IfThenElseEmitter ifThenElse(this);
 //     emit(c1);
-//     ifThenElse.emitIfElse();
+//     ifThenElse.emitThenElse();
 //     emit(b1);
 //     ifThenElse.emitElseIf();
 //     emit(c2);
-//     ifThenElse.emitIfElse();
+//     ifThenElse.emitThenElse();
 //     emit(b2);
 //     ifThenElse.emitElseIf();
 //     emit(c3);
-//     ifThenElse.emitIfElse();
+//     ifThenElse.emitThenElse();
 //     emit(b3);
 //     ifThenElse.emitElse();
 //     emit(b4);
@@ -2043,33 +2043,33 @@ class MOZ_STACK_CLASS IfThenElseEmitter
     // | Start |-+--------->| Cond |--------->| Else |------>+------->| End |
     // +-------+ |          +------+          +------+       ^        +-----+
     //           |                                           |
-    //           v emitIf +----+                             |
-    //        +->+------->| If |---------------------------->+
-    //        ^  |        +----+                             ^
+    //           v emitThen +------+                         |
+    //        +->+--------->| Then |------------------------>+
+    //        ^  |          +------+                         ^
     //        |  |                                           |
-    //        |  |                                           |
-    //        |  |                                           |
-    //        |  | emitIfElse +--------+   emitElse +------+ |
-    //        |  +----------->| IfElse |-+--------->| Else |-+
-    //        |               +--------+ |          +------+
-    //        |                          |
-    //        |                          | emitElseIf +--------+
-    //        |                          +----------->| ElseIf |-+
-    //        |                                       +--------+ |
-    //        |                                                  |
-    //        +--------------------------------------------------+
+    //        |  |                                           +---+
+    //        |  |                                               |
+    //        |  | emitThenElse +----------+   emitElse +------+ |
+    //        |  +------------->| ThenElse |-+--------->| Else |-+
+    //        |                 +----------+ |          +------+
+    //        |                              |
+    //        |                              | emitElseIf +--------+
+    //        |                              +----------->| ElseIf |-+
+    //        |                                           +--------+ |
+    //        |                                                      |
+    //        +------------------------------------------------------+
     enum class State {
         // The initial state.
         Start,
 
-        // After calling emitIf.
-        If,
+        // After calling emitThen.
+        Then,
 
         // After calling emitCond.
         Cond,
 
-        // After calling emitIfElse.
-        IfElse,
+        // After calling emitThenElse.
+        ThenElse,
 
         // After calling emitElse.
         Else,
@@ -2099,12 +2099,12 @@ class MOZ_STACK_CLASS IfThenElseEmitter
   private:
     MOZ_MUST_USE bool emitIfInternal(State nextState, SrcNoteType type) {
         MOZ_ASSERT_IF(state_ == State::Start,
-                      nextState == State::If ||
-                      nextState == State::IfElse ||
+                      nextState == State::Then ||
+                      nextState == State::ThenElse ||
                       nextState == State::Cond);
         MOZ_ASSERT_IF(state_ == State::ElseIf,
-                      nextState == State::If ||
-                      nextState == State::IfElse);
+                      nextState == State::Then ||
+                      nextState == State::ThenElse);
 
         // Emit an annotated branch-if-false around the then part.
         if (!bce_->newSrcNote(type))
@@ -2117,7 +2117,7 @@ class MOZ_STACK_CLASS IfThenElseEmitter
         // If DEBUG, this is also necessary to calculate |pushed_|.
         thenDepth_ = bce_->stackDepth;
 #else
-        if (nextState == State::IfElse || nextState == State::Cond)
+        if (nextState == State::ThenElse || nextState == State::Cond)
             thenDepth_ = bce_->stackDepth;
 #endif
         state_ = nextState;
@@ -2136,9 +2136,9 @@ class MOZ_STACK_CLASS IfThenElseEmitter
     }
 
   public:
-    MOZ_MUST_USE bool emitIf() {
+    MOZ_MUST_USE bool emitThen() {
         MOZ_ASSERT(state_ == State::Start || state_ == State::ElseIf);
-        return emitIfInternal(State::If, SRC_IF);
+        return emitIfInternal(State::Then, SRC_IF);
     }
 
     MOZ_MUST_USE bool emitCond() {
@@ -2146,13 +2146,13 @@ class MOZ_STACK_CLASS IfThenElseEmitter
         return emitIfInternal(State::Cond, SRC_COND);
     }
 
-    MOZ_MUST_USE bool emitIfElse() {
+    MOZ_MUST_USE bool emitThenElse() {
         MOZ_ASSERT(state_ == State::Start || state_ == State::ElseIf);
-        return emitIfInternal(State::IfElse, SRC_IF_ELSE);
+        return emitIfInternal(State::ThenElse, SRC_IF_ELSE);
     }
 
     MOZ_MUST_USE bool emitElse() {
-        MOZ_ASSERT(state_ == State::IfElse || state_ == State::Cond);
+        MOZ_ASSERT(state_ == State::ThenElse || state_ == State::Cond);
 
         calculateOrCheckPushed();
 
@@ -2173,7 +2173,7 @@ class MOZ_STACK_CLASS IfThenElseEmitter
     }
 
     MOZ_MUST_USE bool emitElseIf() {
-        MOZ_ASSERT(state_ == State::IfElse);
+        MOZ_ASSERT(state_ == State::ThenElse);
 
         if (!emitElse())
             return false;
@@ -2186,11 +2186,11 @@ class MOZ_STACK_CLASS IfThenElseEmitter
     }
 
     MOZ_MUST_USE bool emitEnd() {
-        MOZ_ASSERT(state_ == State::If || state_ == State::Else);
+        MOZ_ASSERT(state_ == State::Then || state_ == State::Else);
 
         calculateOrCheckPushed();
 
-        if (state_ == State::If) {
+        if (state_ == State::Then) {
             // No else part, fixup the branch-if-false to come here.
             if (!bce_->emitJumpTargetAndPatch(jumpAroundThen_))
                 return false;
@@ -2271,7 +2271,7 @@ class MOZ_RAII BytecodeEmitter::OptionalEmitter {
         if (!bce_->emit1(JSOP_NOT))
             return false;
 
-        if (!ifEmitter.emitIf())
+        if (!ifEmitter.emitThen())
             return false;
 
         // Perform ShortCircuiting code and break
@@ -2308,7 +2308,7 @@ class MOZ_RAII BytecodeEmitter::OptionalEmitter {
         if (!bce_->emit1(JSOP_NOT))
             return false;
 
-        if (!ifEmitter.emitIf())
+        if (!ifEmitter.emitThen())
             return false;
 
         // Perform ShortCircuiting code for Call and break
@@ -2449,7 +2449,7 @@ class ForOfLoopControl : public LoopControl
             return false;
 
         IfThenElseEmitter ifIteratorIsNotClosed(bce);
-        if (!ifIteratorIsNotClosed.emitIf())      // ITER ... EXCEPTION
+        if (!ifIteratorIsNotClosed.emitThen())    // ITER ... EXCEPTION
             return false;
 
         MOZ_ASSERT(slotFromTop == unsigned(bce->stackDepth - iterDepth_));
@@ -2475,7 +2475,7 @@ class ForOfLoopControl : public LoopControl
             IfThenElseEmitter ifGeneratorClosing(bce);
             if (!bce->emit1(JSOP_ISGENCLOSING))   // ITER ... FTYPE FVALUE CLOSING
                 return false;
-            if (!ifGeneratorClosing.emitIf())     // ITER ... FTYPE FVALUE
+            if (!ifGeneratorClosing.emitThen())   // ITER ... FTYPE FVALUE
                 return false;
             if (!bce->emitDupAt(slotFromTop + 1)) // ITER ... FTYPE FVALUE ITER
                 return false;
@@ -5711,7 +5711,7 @@ BytecodeEmitter::emitIteratorCloseInScope(EmitterScope& currentScope,
     if (!emitPushNotUndefinedOrNull())                    // ... ITER RET NOT-UNDEF-OR-NULL
         return false;
 
-    if (!ifReturnMethodIsDefined.emitIfElse())            // ... ITER RET
+    if (!ifReturnMethodIsDefined.emitThenElse())          // ... ITER RET
         return false;
 
     if (completionKind == CompletionKind::Throw) {
@@ -6085,7 +6085,7 @@ BytecodeEmitter::emitDestructuringOpsArray(ParseNode* pattern, DestructuringFlav
                 // If spread is not the first element of the pattern,
                 // iterator can already be completed.
                                                                   // ... OBJ ITER *LREF DONE
-                if (!ifThenElse.emitIfElse())                     // ... OBJ ITER *LREF
+                if (!ifThenElse.emitThenElse())                   // ... OBJ ITER *LREF
                     return false;
 
                 if (!emitUint32Operand(JSOP_NEWARRAY, 0))         // ... OBJ ITER *LREF ARRAY
@@ -6138,7 +6138,7 @@ BytecodeEmitter::emitDestructuringOpsArray(ParseNode* pattern, DestructuringFlav
         IfThenElseEmitter ifAlreadyDone(this);
         if (!isFirst) {
                                                                   // ... OBJ ITER *LREF DONE
-            if (!ifAlreadyDone.emitIfElse())                      // ... OBJ ITER *LREF
+            if (!ifAlreadyDone.emitThenElse())                    // ... OBJ ITER *LREF
                 return false;
 
             if (!emit1(JSOP_UNDEFINED))                           // ... OBJ ITER *LREF UNDEF
@@ -6171,7 +6171,7 @@ BytecodeEmitter::emitDestructuringOpsArray(ParseNode* pattern, DestructuringFlav
             return false;
 
         IfThenElseEmitter ifDone(this);
-        if (!ifDone.emitIfElse())                                 // ... OBJ ITER DONE *LREF RESULT
+        if (!ifDone.emitThenElse())                               // ... OBJ ITER DONE *LREF RESULT
             return false;
 
         if (!emit1(JSOP_POP))                                     // ... OBJ ITER DONE *LREF
@@ -6223,7 +6223,7 @@ BytecodeEmitter::emitDestructuringOpsArray(ParseNode* pattern, DestructuringFlav
     // IteratorClose.
                                                                   // ... OBJ ITER DONE
     IfThenElseEmitter ifDone(this);
-    if (!ifDone.emitIfElse())                                     // ... OBJ ITER
+    if (!ifDone.emitThenElse())                                   // ... OBJ ITER
         return false;
     if (!emit1(JSOP_POP))                                         // ... OBJ
         return false;
@@ -7192,10 +7192,10 @@ BytecodeEmitter::emitIf(ParseNode* pn)
 
     ParseNode* elseNode = pn->pn_kid3;
     if (elseNode) {
-        if (!ifThenElse.emitIfElse())
+        if (!ifThenElse.emitThenElse())
             return false;
     } else {
-        if (!ifThenElse.emitIf())
+        if (!ifThenElse.emitThen())
             return false;
     }
 
@@ -7423,7 +7423,7 @@ BytecodeEmitter::emitAsyncIterator()
         return false;
     if (!emit1(JSOP_NOT))                                         // OBJ ITERFN UNDEF-OR-NULL
         return false;
-    if (!ifAsyncIterIsUndefined.emitIfElse())                     // OBJ ITERFN
+    if (!ifAsyncIterIsUndefined.emitThenElse())                   // OBJ ITERFN
         return false;
 
     if (!emit1(JSOP_POP))                                         // OBJ
@@ -7721,7 +7721,7 @@ BytecodeEmitter::emitForOf(ParseNode* forOfLoop, EmitterScope* headLexicalEmitte
 
         IfThenElseEmitter ifDone(this);
 
-        if (!ifDone.emitIf())                             // ITER RESULT
+        if (!ifDone.emitThen())                           // ITER RESULT
             return false;
 
         // Remove RESULT from the stack to release it.
@@ -8267,7 +8267,7 @@ BytecodeEmitter::emitComprehensionForOf(ParseNode* pn)
 
     IfThenElseEmitter ifDone(this);
 
-    if (!ifDone.emitIf())                                 // ITER RESULT
+    if (!ifDone.emitThen())                               // ITER RESULT
         return false;
 
     // Remove RESULT from the stack to release it.
@@ -9244,7 +9244,7 @@ BytecodeEmitter::emitYieldStar(ParseNode* iter)
         return false;
 
     IfThenElseEmitter ifThrowMethodIsNotDefined(this);
-    if (!ifThrowMethodIsNotDefined.emitIf())              // ITER RESULT EXCEPTION ITER THROW
+    if (!ifThrowMethodIsNotDefined.emitThen())            // ITER RESULT EXCEPTION ITER THROW
         return false;
     savedDepthTemp = stackDepth;
     if (!emit1(JSOP_POP))                                 // ITER RESULT EXCEPTION ITER
@@ -9302,7 +9302,7 @@ BytecodeEmitter::emitYieldStar(ParseNode* iter)
     IfThenElseEmitter ifGeneratorClosing(this);
     if (!emit1(JSOP_ISGENCLOSING))                        // ITER RESULT FTYPE FVALUE CLOSING
         return false;
-    if (!ifGeneratorClosing.emitIf())                     // ITER RESULT FTYPE FVALUE
+    if (!ifGeneratorClosing.emitThen())                   // ITER RESULT FTYPE FVALUE
         return false;
 
     // Step ii.
@@ -9326,7 +9326,7 @@ BytecodeEmitter::emitYieldStar(ParseNode* iter)
     //
     // Call "return" with the argument passed to Generator.prototype.return,
     // which is currently in rval.value.
-    if (!ifReturnMethodIsDefined.emitIfElse())            // ITER OLDRESULT FTYPE FVALUE ITER RET
+    if (!ifReturnMethodIsDefined.emitThenElse())          // ITER OLDRESULT FTYPE FVALUE ITER RET
         return false;
     if (!emit1(JSOP_SWAP))                                // ITER OLDRESULT FTYPE FVALUE RET ITER
         return false;
@@ -9356,7 +9356,7 @@ BytecodeEmitter::emitYieldStar(ParseNode* iter)
         return false;
     if (!emitAtomOp(cx->names().done, JSOP_GETPROP))      // ITER OLDRESULT FTYPE FVALUE RESULT DONE
         return false;
-    if (!ifReturnDone.emitIfElse())                       // ITER OLDRESULT FTYPE FVALUE RESULT
+    if (!ifReturnDone.emitThenElse())                     // ITER OLDRESULT FTYPE FVALUE RESULT
         return false;
     if (!emitAtomOp(cx->names().value, JSOP_GETPROP))     // ITER OLDRESULT FTYPE FVALUE VALUE
         return false;
@@ -10287,7 +10287,7 @@ BytecodeEmitter::emitArguments(ParseNode* pn, bool callop, bool spread)
             if (!emit1(JSOP_NOT))
                 return false;
 
-            if (!ifNotOptimizable.emitIf())
+            if (!ifNotOptimizable.emitThen())
                 return false;
 
             if (!emit1(JSOP_POP))
@@ -11841,7 +11841,7 @@ BytecodeEmitter::emitClass(ParseNode* pn)
             return false;
 
         // [THEN] funProto = heritage, objProto = heritage.prototype
-        if (!ifThenElse.emitIfElse())
+        if (!ifThenElse.emitThenElse())
             return false;
         if (!emit1(JSOP_DUP))                                   // ... HERITAGE HERITAGE
             return false;
