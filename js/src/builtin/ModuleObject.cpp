@@ -1651,7 +1651,11 @@ js::GetOrCreateModuleMetaObject(JSContext* cx, HandleObject moduleArg)
         return nullptr;
 
     JS::ModuleMetadataHook func = cx->runtime()->moduleMetadataHook;
-    MOZ_ASSERT(func);
+    if (!func) {
+        JS_ReportErrorASCII(cx, "Module metadata hook not set");
+        return nullptr;
+    }
+
     if (!func(cx, module, metaObject))
         return nullptr;
 
