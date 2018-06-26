@@ -260,7 +260,7 @@ nsComponentManagerImpl::nsComponentManagerImpl()
 {
 }
 
-nsTArray<const mozilla::Module*>* nsComponentManagerImpl::sStaticModules;
+static nsTArray<const mozilla::Module*>* sExtraStaticModules;
 
 /* NSMODULE_DEFN places NSModules in specific sections, as per Module.h.
  * The linker will group them all together, and we use tricks below to
@@ -341,14 +341,11 @@ mozilla::Module const* const* end(AllStaticModules& _) {
 /* static */ void
 nsComponentManagerImpl::InitializeStaticModules()
 {
-  if (sStaticModules) {
+  if (sExtraStaticModules) {
     return;
   }
 
-  sStaticModules = new nsTArray<const mozilla::Module*>;
-  for (auto module : AllStaticModules()) {
-    sStaticModules->AppendElement(module);
-  }
+  sExtraStaticModules = new nsTArray<const mozilla::Module*>;
 }
 
 nsTArray<nsComponentManagerImpl::ComponentLocation>*
@@ -380,8 +377,12 @@ nsComponentManagerImpl::Init()
 
   RegisterModule(&kXPCOMModule, nullptr);
 
-  for (uint32_t i = 0; i < sStaticModules->Length(); ++i) {
-    RegisterModule((*sStaticModules)[i], nullptr);
+  for (auto module : AllStaticModules()) {
+    RegisterModule(module, nullptr);
+  }
+
+  for (uint32_t i = 0; i < sExtraStaticModules->Length(); ++i) {
+    RegisterModule((*sExtraStaticModules)[i], nullptr);
   }
 
   bool loadChromeManifests = (XRE_GetProcessType() != GeckoProcessType_GPU);
@@ -881,7 +882,7 @@ nsresult nsComponentManagerImpl::Shutdown(void)
   mKnownModules.Clear();
   mKnownStaticModules.Clear();
 
-  delete sStaticModules;
+  delete sExtraStaticModules;
   delete sModuleLocations;
 
   mStatus = SHUTDOWN_COMPLETE;
@@ -1789,7 +1790,7 @@ nsComponentManagerImpl::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
     n += iter.Key().SizeOfExcludingThisIfUnshared(aMallocSizeOf);
   }
 
-  n += sStaticModules->ShallowSizeOfIncludingThis(aMallocSizeOf);
+  n += sExtraStaticModules->ShallowSizeOfIncludingThis(aMallocSizeOf);
   if (sModuleLocations) {
     n += sModuleLocations->ShallowSizeOfIncludingThis(aMallocSizeOf);
   }
@@ -1805,7 +1806,6 @@ nsComponentManagerImpl::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
   // worthwhile:
   // - mLoaderMap's keys and values
   // - mMon
-  // - sStaticModules' entries
   // - sModuleLocations' entries
   // - mKnownStaticModules' entries?
   // - mKnownModules' keys and values?
@@ -1944,7 +1944,7 @@ EXPORT_XPCOM_API(nsresult)
 XRE_AddStaticComponent(const mozilla::Module* aComponent)
 {
   nsComponentManagerImpl::InitializeStaticModules();
-  nsComponentManagerImpl::sStaticModules->AppendElement(aComponent);
+  sExtraStaticModules->AppendElement(aComponent);
 
   if (nsComponentManagerImpl::gComponentManager &&
       nsComponentManagerImpl::NORMAL ==
