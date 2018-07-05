@@ -1288,16 +1288,22 @@ set_define('MOZ_CODE_COVERAGE', code_coverage)
 
 # Elfhack
 # ==============================================================
-@depends(host, target)
-def has_elfhack(host, target):
-    return target.kernel == 'Linux' and host.kernel == 'Linux' and \
-           target.cpu in ('arm', 'x86', 'x86_64')
+with only_when('--enable-compile-environment'):
+    @depends(host, target)
+    def has_elfhack(host, target):
+        return target.kernel == 'Linux' and host.kernel == 'Linux' and \
+               target.cpu in ('arm', 'x86', 'x86_64')
 
-with only_when(has_elfhack):
-    option('--disable-elf-hack', help='Disable elf hacks')
+    @depends('--enable-release')
+    def default_elfhack(release):
+        return bool(release)
 
-    set_config('USE_ELF_HACK',
-               depends_if('--enable-elf-hack')(lambda _: True))
+    with only_when(has_elfhack):
+        option('--disable-elf-hack', default=default_elfhack,
+               help='Disable elf hacks')
+
+        set_config('USE_ELF_HACK',
+                   depends_if('--enable-elf-hack')(lambda _: True))
 
 
 @depends(check_build_environment)
