@@ -172,8 +172,8 @@ widget/android/bindings/export: build/annotationProcessors/export
 xpcom/xpidl/export: xpcom/idl-parser/xpidl/export
 
 ifdef ENABLE_CLANG_PLUGIN
-$(filter-out config/host build/unix/stdc++compat/% build/clang-plugin/%,$(compile_targets)): build/clang-plugin/target build/clang-plugin/tests/target
-build/clang-plugin/tests/target: build/clang-plugin/target
+$(filter-out config/host build/unix/stdc++compat/% build/clang-plugin/%,$(compile_targets)): build/clang-plugin/host build/clang-plugin/tests/target
+build/clang-plugin/tests/target: build/clang-plugin/host
 endif
 
 # Interdependencies that moz.build world don't know about yet for compilation.
@@ -188,4 +188,4 @@ endif
 endif
 # Most things are built during compile (target/host), but some things happen during export
 # Those need to depend on config/export for system wrappers.
-$(addprefix build/unix/stdc++compat/,target host) build/clang-plugin/target: config/export
+$(addprefix build/unix/stdc++compat/,target host) build/clang-plugin/host: config/export
