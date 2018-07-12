@@ -17,12 +17,14 @@ UNIFIED_SOURCES += [
     'BytecodeEmitter.cpp',
     'EmitterScope.cpp',
     'FoldConstants.cpp',
+    'ForOfLoopControl.cpp',
     'IfEmitter.cpp',
     'JumpList.cpp',
     'NameFunctions.cpp',
     'ParseNode.cpp',
     'TDZCheckCache.cpp',
     'TokenStream.cpp',
+    'TryEmitter.cpp',
 ]
 
 # frontend/Parser.cpp cannot be built in unified mode because of explicit
