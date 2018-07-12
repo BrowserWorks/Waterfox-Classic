@@ -17,6 +17,7 @@ UNIFIED_SOURCES += [
     'FoldConstants.cpp',
     'NameFunctions.cpp',
     'ParseNode.cpp',
+    'TDZCheckCache.cpp',
     'TokenStream.cpp',
 ]
 

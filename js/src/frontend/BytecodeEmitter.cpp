@@ -30,6 +30,7 @@
 
 #include "ds/Nestable.h"
 #include "frontend/Parser.h"
+#include "frontend/TDZCheckCache.h"
 #include "frontend/TokenStream.h"
 #include "vm/Debugger.h"
 #include "vm/GeneratorObject.h"
@@ -69,40 +70,6 @@ ParseNodeRequiresSpecialLineNumberNotes(ParseNode* pn)
 {
     return pn->getKind() == ParseNodeKind::While || pn->getKind() == ParseNodeKind::For;
 }
-
-// A cache that tracks Temporal Dead Zone (TDZ) checks, so that any use of a
-// lexical variable that's dominated by an earlier use, or by evaluation of its
-// declaration (which will initialize it, perhaps to |undefined|), doesn't have
-// to redundantly check that the lexical variable has been initialized
-//
-// Each basic block should have a TDZCheckCache in scope. Some NestableControl
-// subclasses contain a TDZCheckCache.
-//
-// When a scope containing lexical variables is entered, all such variables are
-// marked as CheckTDZ.  When a lexical variable is accessed, its entry is
-// checked.  If it's CheckTDZ, a JSOP_CHECKLEXICAL is emitted and then the
-// entry is marked DontCheckTDZ.  If it's DontCheckTDZ, no check is emitted
-// because a prior check would have already failed.  Finally, because
-// evaluating a lexical variable declaration initializes it (after any
-// initializer is evaluated), evaluating a lexical declaration marks its entry
-// as DontCheckTDZ.
-class BytecodeEmitter::TDZCheckCache : public Nestable<BytecodeEmitter::TDZCheckCache>
-{
-    PooledMapPtr<CheckTDZMap> cache_;
-
-    MOZ_MUST_USE bool ensureCache(BytecodeEmitter* bce) {
-        return cache_ || cache_.acquire(bce->cx);
-    }
-
-  public:
-    explicit TDZCheckCache(BytecodeEmitter* bce)
-      : Nestable<TDZCheckCache>(&bce->innermostTDZCheckCache),
-        cache_(bce->cx->frontendCollectionPool())
-    { }
-
-    Maybe<MaybeCheckTDZ> needsTDZCheck(BytecodeEmitter* bce, JSAtom* name);
-    MOZ_MUST_USE bool noteTDZCheck(BytecodeEmitter* bce, JSAtom* name, MaybeCheckTDZ check);
-};
 
 class BytecodeEmitter::NestableControl : public Nestable<BytecodeEmitter::NestableControl>
 {
@@ -227,7 +194,7 @@ class LoopControl : public BreakableControl
 {
     // Loops' children are emitted in dominance order, so they can always
     // have a TDZCheckCache.
-    BytecodeEmitter::TDZCheckCache tdzCache_;
+    TDZCheckCache tdzCache_;
 
     // Stack depth when this loop was pushed on the control stack.
     int32_t stackDepth_;
@@ -1488,55 +1455,6 @@ BytecodeEmitter::EmitterScope::leave(BytecodeEmitter* bce, bool nonLocal)
     return true;
 }
 
-Maybe<MaybeCheckTDZ>
-BytecodeEmitter::TDZCheckCache::needsTDZCheck(BytecodeEmitter* bce, JSAtom* name)
-{
-    if (!ensureCache(bce))
-        return Nothing();
-
-    CheckTDZMap::AddPtr p = cache_->lookupForAdd(name);
-    if (p)
-        return Some(p->value().wrapped);
-
-    MaybeCheckTDZ rv = CheckTDZ;
-    for (TDZCheckCache* it = enclosing(); it; it = it->enclosing()) {
-        if (it->cache_) {
-            if (CheckTDZMap::Ptr p2 = it->cache_->lookup(name)) {
-                rv = p2->value();
-                break;
-            }
-        }
-    }
-
-    if (!cache_->add(p, name, rv)) {
-        ReportOutOfMemory(bce->cx);
-        return Nothing();
-    }
-
-    return Some(rv);
-}
-
-bool
-BytecodeEmitter::TDZCheckCache::noteTDZCheck(BytecodeEmitter* bce, JSAtom* name,
-                                             MaybeCheckTDZ check)
-{
-    if (!ensureCache(bce))
-        return false;
-
-    CheckTDZMap::AddPtr p = cache_->lookupForAdd(name);
-    if (p) {
-        MOZ_ASSERT(!check, "TDZ only needs to be checked once per binding per basic block.");
-        p->value() = check;
-    } else {
-        if (!cache_->add(p, name, check)) {
-            ReportOutOfMemory(bce->cx);
-            return false;
-        }
-    }
-
-    return true;
-}
-
 // Class for emitting bytecode for blocks like try-catch-finally.
 //
 // Usage: (check for the return value is omitted for simplicity)
@@ -2067,8 +1985,6 @@ class MOZ_STACK_CLASS IfEmitter
     };
 
   private:
-    using TDZCheckCache = BytecodeEmitter::TDZCheckCache;
-
     BytecodeEmitter* bce_;
 
     // Jump around the then clause, to the beginning of the else clause.
@@ -2371,7 +2287,7 @@ class MOZ_RAII BytecodeEmitter::OptionalEmitter {
   private:
     BytecodeEmitter* bce_;
 
-    BytecodeEmitter::TDZCheckCache tdzCache_;
+    TDZCheckCache tdzCache_;
 
     // jumpTarget for the fake label over the optional chaining code
     JumpList top_;
