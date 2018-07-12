@@ -13,9 +13,11 @@ LOCAL_INCLUDES += ["!..", ".."]
 
 UNIFIED_SOURCES += [
     'BytecodeCompiler.cpp',
+    'BytecodeControlStructures.cpp',
     'BytecodeEmitter.cpp',
     'EmitterScope.cpp',
     'FoldConstants.cpp',
+    'JumpList.cpp',
     'NameFunctions.cpp',
     'ParseNode.cpp',
     'TDZCheckCache.cpp',

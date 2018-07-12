@@ -18,6 +18,7 @@
 
 #include "ds/InlineTable.h"
 #include "frontend/EitherParser.h"
+#include "frontend/JumpList.h"
 #include "frontend/SharedContext.h"
 #include "frontend/SourceNotes.h"
 #include "vm/Interpreter.h"
@@ -111,72 +112,17 @@ static constexpr size_t MaxSrcNotesLength = INT32_MAX;
 typedef Vector<jsbytecode, 64> BytecodeVector;
 typedef Vector<jssrcnote, 64> SrcNotesVector;
 
-// Linked list of jump instructions that need to be patched. The linked list is
-// stored in the bytes of the incomplete bytecode that will be patched, so no
-// extra memory is needed, and patching the instructions destroys the list.
-//
-// Example:
-//
-//     JumpList brList;
-//     if (!emitJump(JSOP_IFEQ, &brList))
-//         return false;
-//     ...
-//     JumpTarget label;
-//     if (!emitJumpTarget(&label))
-//         return false;
-//     ...
-//     if (!emitJump(JSOP_GOTO, &brList))
-//         return false;
-//     ...
-//     patchJumpsToTarget(brList, label);
-//
-//                 +-> -1
-//                 |
-//                 |
-//    ifeq ..   <+ +                +-+   ifeq ..
-//    ..         |                  |     ..
-//  label:       |                  +-> label:
-//    jumptarget |                  |     jumptarget
-//    ..         |                  |     ..
-//    goto .. <+ +                  +-+   goto .. <+
-//             |                                   |
-//             |                                   |
-//             +                                   +
-//           brList                              brList
-//
-//       |                                  ^
-//       +------- patchJumpsToTarget -------+
-//
-
-// Offset of a jump target instruction, used for patching jump instructions.
-struct JumpTarget {
-    ptrdiff_t offset;
-};
-
-struct JumpList {
-    // -1 is used to mark the end of jump lists.
-    JumpList() : offset(-1) {}
-    ptrdiff_t offset;
-
-    // Add a jump instruction to the list.
-    void push(jsbytecode* code, ptrdiff_t jumpOffset);
-
-    // Patch all jump instructions in this list to jump to `target`.  This
-    // clobbers the list.
-    void patchAll(jsbytecode* code, JumpTarget target);
-};
-
 enum class ValueUsage {
     WantValue,
     IgnoreValue
 };
 
 class EmitterScope;
+class NestableControl;
 class TDZCheckCache;
 
 struct MOZ_STACK_CLASS BytecodeEmitter
 {
-    class NestableControl;
     class OptionalEmitter;
 
     SharedContext* const sc;      /* context shared between parsing and bytecode generation */
