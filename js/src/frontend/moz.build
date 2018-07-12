@@ -17,6 +17,7 @@ UNIFIED_SOURCES += [
     'BytecodeEmitter.cpp',
     'EmitterScope.cpp',
     'FoldConstants.cpp',
+    'IfEmitter.cpp',
     'JumpList.cpp',
     'NameFunctions.cpp',
     'ParseNode.cpp',
