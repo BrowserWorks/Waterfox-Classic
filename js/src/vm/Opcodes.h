@@ -535,7 +535,7 @@
     macro(JSOP_GETELEM,   55, "getelem",    NULL,         1,  2,  1, JOF_BYTE |JOF_ELEM|JOF_TYPESET|JOF_LEFTASSOC) \
     /*
      * Pops the top three values on the stack as 'val', 'propval' and 'obj',
-     * sets 'propval' property of 'obj' as 'val', pushes 'obj' onto the
+     * sets 'propval' property of 'obj' as 'val', pushes 'val' onto the
      * stack.
      *   Category: Literals
      *   Type: Object
@@ -545,7 +545,7 @@
     macro(JSOP_SETELEM,   56, "setelem",    NULL,         1,  3,  1, JOF_BYTE |JOF_ELEM|JOF_PROPSET|JOF_DETECTING|JOF_CHECKSLOPPY) \
     /*
      * Pops the top three values on the stack as 'val', 'propval' and 'obj',
-     * sets 'propval' property of 'obj' as 'val', pushes 'obj' onto the
+     * sets 'propval' property of 'obj' as 'val', pushes 'val' onto the
      * stack. Throws a TypeError if the set fails, per strict mode
      * semantics.
      *   Category: Literals
@@ -1279,7 +1279,7 @@
      *   Category: Literals
      *   Type: Object
      *   Operands:
-     *   Stack: propval, receiver, obj => obj[propval]
+     *   Stack: receiver, propval, obj => obj[propval]
      */ \
     macro(JSOP_GETELEM_SUPER, 125, "getelem-super", NULL, 1,  3,  1, JOF_BYTE|JOF_ELEM|JOF_TYPESET|JOF_LEFTASSOC) \
     macro(JSOP_UNUSED126, 126, "unused126", NULL, 5,  0,  1, JOF_UINT32) \
@@ -1631,7 +1631,7 @@
      *   Category: Literals
      *   Type: Object
      *   Operands:
-     *   Stack: propval, receiver, obj, val => val
+     *   Stack: receiver, propval, obj, val => val
      */ \
     macro(JSOP_SETELEM_SUPER,   158, "setelem-super", NULL, 1,  4,  1, JOF_BYTE |JOF_ELEM|JOF_PROPSET|JOF_DETECTING|JOF_CHECKSLOPPY) \
     /*
@@ -1640,7 +1640,7 @@
      *   Category: Literals
      *   Type: Object
      *   Operands:
-     *   Stack: propval, receiver, obj, val => val
+     *   Stack: receiver, propval, obj, val => val
      */ \
     macro(JSOP_STRICTSETELEM_SUPER, 159, "strict-setelem-super", NULL, 1,  4, 1, JOF_BYTE |JOF_ELEM|JOF_PROPSET|JOF_DETECTING|JOF_CHECKSTRICT) \
     \
