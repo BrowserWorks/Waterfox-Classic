@@ -44,6 +44,10 @@
 #include "GreekCasing.h"
 
 #include "cairo.h"
+#ifdef XP_WIN
+#include "cairo-win32.h"
+#include "gfxWindowsPlatform.h"
+#endif
 
 #include "harfbuzz/hb.h"
 #include "harfbuzz/hb-ot.h"
