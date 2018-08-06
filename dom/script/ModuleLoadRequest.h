@@ -45,12 +45,10 @@ public:
 
   // Create a top-level module load request.
   ModuleLoadRequest(nsIURI* aURI,
-                    nsIScriptElement* aElement,
+                    ScriptFetchOptions* aFetchOptions,
                     uint32_t aVersion,
-                    CORSMode aCORSMode,
                     const SRIMetadata& aIntegrity,
                     nsIURI* aReferrer,
-                    mozilla::net::ReferrerPolicy,
                     ScriptLoader* aLoader);
 
   // Create a module load request for an imported module.
