@@ -11,6 +11,7 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/PodOperations.h"
+#include "mozilla/ErrorResult.h"
 
 #include "MainThreadUtils.h"
 #include "MediaStreamGraph.h"
@@ -155,13 +156,6 @@ inline int64_t AudioTimelineEvent::Time<int64_t>() const
   return mTimeInTicks;
 }
 
-/**
- * Some methods in this class will be instantiated with different ErrorResult
- * template arguments for testing and production code.
- *
- * ErrorResult is a type which satisfies the following:
- *  - Implements a Throw() method taking an nsresult argument, representing an error code.
- */
 class AudioEventTimeline
 {
 public:
@@ -171,7 +165,6 @@ public:
       mLastComputedValue(aDefaultValue)
   { }
 
-  template <class ErrorResult>
   bool ValidateEvent(AudioTimelineEvent& aEvent, ErrorResult& aRv)
   {
     MOZ_ASSERT(NS_IsMainThread());
@@ -315,7 +308,6 @@ public:
     }
   }
 
-  template <class ErrorResult>
   void SetValueAtTime(float aValue, double aStartTime, ErrorResult& aRv)
   {
     AudioTimelineEvent event(AudioTimelineEvent::SetValueAtTime, aStartTime, aValue);
@@ -325,7 +317,6 @@ public:
     }
   }
 
-  template <class ErrorResult>
   void LinearRampToValueAtTime(float aValue, double aEndTime, ErrorResult& aRv)
   {
     AudioTimelineEvent event(AudioTimelineEvent::LinearRamp, aEndTime, aValue);
@@ -335,7 +326,6 @@ public:
     }
   }
 
-  template <class ErrorResult>
   void ExponentialRampToValueAtTime(float aValue, double aEndTime, ErrorResult& aRv)
   {
     AudioTimelineEvent event(AudioTimelineEvent::ExponentialRamp, aEndTime, aValue);
@@ -345,7 +335,6 @@ public:
     }
   }
 
-  template <class ErrorResult>
   void SetTargetAtTime(float aTarget, double aStartTime, double aTimeConstant, ErrorResult& aRv)
   {
     AudioTimelineEvent event(AudioTimelineEvent::SetTarget, aStartTime, aTarget, aTimeConstant);
@@ -355,7 +344,6 @@ public:
     }
   }
 
-  template <class ErrorResult>
   void SetValueCurveAtTime(const float* aValues, uint32_t aValuesLength, double aStartTime, double aDuration, ErrorResult& aRv)
   {
     AudioTimelineEvent event(AudioTimelineEvent::SetValueCurve, aStartTime, 0.0f, 0.0f, aDuration, aValues, aValuesLength);
