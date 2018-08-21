@@ -7404,7 +7404,7 @@ CheckModuleReturn(ModuleValidator& m)
         return false;
     auto& ts = m.parser().tokenStream;
     if (tk != TokenKind::Return) {
-        return m.failCurrentOffset((tk == TokenKind::Rc || tk == TokenKind::Eof)
+        return m.failCurrentOffset((tk == TokenKind::RightCurly || tk == TokenKind::Eof)
                                    ? "expecting return statement"
                                    : "invalid asm.js. statement");
     }
@@ -7436,7 +7436,7 @@ CheckModuleEnd(ModuleValidator &m)
     if (!GetToken(m.parser(), &tk))
         return false;
 
-    if (tk != TokenKind::Eof && tk != TokenKind::Rc)
+    if (tk != TokenKind::Eof && tk != TokenKind::RightCurly)
         return m.failCurrentOffset("top-level export (return) must be the last statement");
 
     m.parser().tokenStream.anyCharsAccess().ungetToken();

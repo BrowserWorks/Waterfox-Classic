@@ -427,9 +427,9 @@ TokenStreamAnyChars::TokenStreamAnyChars(JSContext* cx, const ReadOnlyCompileOpt
     isExprEnding[size_t(TokenKind::Comma)] = true;
     isExprEnding[size_t(TokenKind::Semi)] = true;
     isExprEnding[size_t(TokenKind::Colon)] = true;
-    isExprEnding[size_t(TokenKind::Rp)] = true;
-    isExprEnding[size_t(TokenKind::Rb)] = true;
-    isExprEnding[size_t(TokenKind::Rc)] = true;
+    isExprEnding[size_t(TokenKind::RightParen)] = true;
+    isExprEnding[size_t(TokenKind::RightBracket)] = true;
+    isExprEnding[size_t(TokenKind::RightCurly)] = true;
 }
 
 template<typename CharT>
@@ -1390,13 +1390,13 @@ enum FirstCharKind {
 #define T_COMMA     size_t(TokenKind::Comma)
 #define T_COLON     size_t(TokenKind::Colon)
 #define T_BITNOT    size_t(TokenKind::BitNot)
-#define T_LP        size_t(TokenKind::Lp)
-#define T_RP        size_t(TokenKind::Rp)
+#define T_LP        size_t(TokenKind::LeftParen)
+#define T_RP        size_t(TokenKind::RightParen)
 #define T_SEMI      size_t(TokenKind::Semi)
-#define T_LB        size_t(TokenKind::Lb)
-#define T_RB        size_t(TokenKind::Rb)
-#define T_LC        size_t(TokenKind::Lc)
-#define T_RC        size_t(TokenKind::Rc)
+#define T_LB        size_t(TokenKind::LeftBracket)
+#define T_RB        size_t(TokenKind::RightBracket)
+#define T_LC        size_t(TokenKind::LeftCurly)
+#define T_RC        size_t(TokenKind::RightCurly)
 #define Templat     String
 #define _______     Other
 static const uint8_t firstCharKinds[] = {
