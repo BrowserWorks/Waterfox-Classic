@@ -5292,7 +5292,7 @@ Parser<SyntaxParseHandler, char16_t>::importDeclaration()
 
 template <class ParseHandler, typename CharT>
 typename ParseHandler::Node
-Parser<ParseHandler, CharT>::importDeclarationOrImportMeta(YieldHandling yieldHandling)
+Parser<ParseHandler, CharT>::importDeclarationOrImportExpr(YieldHandling yieldHandling)
 {
     MOZ_ASSERT(anyChars.isCurrentTokenType(TokenKind::Import));
 
@@ -5300,7 +5300,7 @@ Parser<ParseHandler, CharT>::importDeclarationOrImportMeta(YieldHandling yieldHa
     if (!tokenStream.peekToken(&tt))
         return null();
 
-    if (tt == TokenKind::Dot)
+    if (tt == TokenKind::Dot || tt == TokenKind::LeftParen)
         return expressionStatement(yieldHandling);
 
     return importDeclaration();
@@ -7790,7 +7790,7 @@ Parser<ParseHandler, CharT>::statement(YieldHandling yieldHandling)
 
       // ImportDeclaration (only inside modules)
       case TokenKind::Import:
-        return importDeclarationOrImportMeta(yieldHandling);
+        return importDeclarationOrImportExpr(yieldHandling);
 
       // ExportDeclaration (only inside modules)
       case TokenKind::Export:
@@ -7982,7 +7982,7 @@ Parser<ParseHandler, CharT>::statementListItem(YieldHandling yieldHandling,
 
       // ImportDeclaration (only inside modules)
       case TokenKind::Import:
-        return importDeclarationOrImportMeta(yieldHandling);
+        return importDeclarationOrImportExpr(yieldHandling);
 
       // ExportDeclaration (only inside modules)
       case TokenKind::Export:
@@ -9290,7 +9290,7 @@ Parser<ParseHandler, CharT>::memberExpr(YieldHandling yieldHandling,
         if (!lhs)
             return null();
     } else if (tt == TokenKind::Import) {
-        lhs = importMeta();
+        lhs = importExpr(yieldHandling);
         if (!lhs)
             return null();
     } else {
@@ -10560,16 +10560,9 @@ Parser<ParseHandler, CharT>::tryNewTarget(Node &newTarget)
 
 template <class ParseHandler, typename CharT>
 typename ParseHandler::Node
-Parser<ParseHandler, CharT>::importMeta()
+Parser<ParseHandler, CharT>::importExpr(YieldHandling yieldHandling)
 {
     MOZ_ASSERT(anyChars.isCurrentTokenType(TokenKind::Import));
-
-    uint32_t begin = pos().begin;
-
-    if (parseGoal() != ParseGoal::Module) {
-        errorAt(begin, JSMSG_IMPORT_OUTSIDE_MODULE);
-        return null();
-    }
 
     Node importHolder = handler.newPosHolder(pos());
     if (!importHolder)
@@ -10578,23 +10571,37 @@ Parser<ParseHandler, CharT>::importMeta()
     TokenKind next;
     if (!tokenStream.getToken(&next))
         return null();
-    if (next != TokenKind::Dot) {
-        error(JSMSG_UNEXPECTED_TOKEN, "dot", TokenKindToDesc(next));
+
+    if (next == TokenKind::Dot) {
+        if (!tokenStream.getToken(&next))
+            return null();
+        if (next != TokenKind::Meta) {
+            error(JSMSG_UNEXPECTED_TOKEN, "meta", TokenKindToDesc(next));
+            return null();
+        }
+
+        if (parseGoal() != ParseGoal::Module) {
+            errorAt(pos().begin, JSMSG_IMPORT_META_OUTSIDE_MODULE);
+            return null();
+        }
+
+        Node metaHolder = handler.newPosHolder(pos());
+        if (!metaHolder)
+            return null();
+
+        return handler.newImportMeta(importHolder, metaHolder);
+    } else if (next == TokenKind::LeftParen) {
+        Node arg = assignExpr(InAllowed, yieldHandling, TripledotProhibited);
+        if (!arg)
+            return null();
+
+        MUST_MATCH_TOKEN_MOD(TokenKind::RightParen, TokenStream::Operand, JSMSG_PAREN_AFTER_ARGS);
+
+        return handler.newCallImport(importHolder, arg);
+    } else {
+        error(JSMSG_UNEXPECTED_TOKEN_NO_EXPECT, TokenKindToDesc(next));
         return null();
     }
-
-    if (!tokenStream.getToken(&next))
-        return null();
-    if (next != TokenKind::Meta) {
-        error(JSMSG_UNEXPECTED_TOKEN, "meta", TokenKindToDesc(next));
-        return null();
-    }
-
-    Node metaHolder = handler.newPosHolder(pos());
-    if (!metaHolder)
-        return null();
-
-    return handler.newImportMeta(importHolder, metaHolder);
 }
 
 template <class ParseHandler, typename CharT>

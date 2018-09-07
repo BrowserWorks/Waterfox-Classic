@@ -667,7 +667,7 @@ class Parser final
     Node lexicalDeclaration(YieldHandling yieldHandling, DeclarationKind kind);
 
     Node importDeclaration();
-    Node importDeclarationOrImportMeta(YieldHandling yieldHandling);
+    Node importDeclarationOrImportExpr(YieldHandling yieldHandling);
 
     bool processExport(Node node);
     bool processExportFrom(Node node);
@@ -774,7 +774,7 @@ class Parser final
     bool tryNewTarget(Node& newTarget);
     bool checkAndMarkSuperScope();
 
-    Node importMeta();
+    Node importExpr(YieldHandling yieldHandling);
 
     Node methodDefinition(uint32_t toStringStart, PropertyType propType, HandleAtom funName);
 

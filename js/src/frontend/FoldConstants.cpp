@@ -137,6 +137,7 @@ ContainsHoistedDeclaration(JSContext* cx, ParseNode* node, bool* result)
       case ParseNodeKind::ExportSpec:
       case ParseNodeKind::Export:
       case ParseNodeKind::ExportBatchSpec:
+      case ParseNodeKind::CallImport:
         *result = false;
         return true;
 
@@ -1870,6 +1871,11 @@ Fold(JSContext* cx, ParseNode** pnp, Parser<FullParseHandler, char16_t>& parser,
         MOZ_ASSERT(pn->pn_left->isKind(ParseNodeKind::PosHolder));
         MOZ_ASSERT(pn->pn_right->isKind(ParseNodeKind::PosHolder));
         return true;
+
+      case ParseNodeKind::CallImport:
+        MOZ_ASSERT(pn->isArity(PN_BINARY));
+        MOZ_ASSERT(pn->pn_left->isKind(ParseNodeKind::PosHolder));
+        return Fold(cx, &pn->pn_right, parser, inGenexpLambda);
 
       case ParseNodeKind::ClassNames:
         MOZ_ASSERT(pn->isArity(PN_BINARY));

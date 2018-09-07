@@ -1268,6 +1268,11 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
         *answer = true;
         return true;
 
+      case ParseNodeKind::CallImport:
+        MOZ_ASSERT(pn->isArity(PN_BINARY));
+        *answer = true;
+        return true;
+
       // Every part of a loop might be effect-free, but looping infinitely *is*
       // an effect.  (Language lawyer trivia: C++ says threads can be assumed
       // to exit or have side effects, C++14 [intro.multithread]p27, so a C++
@@ -8232,8 +8237,8 @@ bool BytecodeEmitter::emitOptionalTree(ParseNode* pn, OptionalEmitter& oe,
                                       kind == ParseNodeKind::NewTarget ||
                                       kind == ParseNodeKind::ImportMeta;
 
-            bool isCallExpression = kind == ParseNodeKind::SetThis; /* ||
-                                    kind == ParseNodeKind::CallImport; Waterfox is missing bug 1484948 */
+            bool isCallExpression = kind == ParseNodeKind::SetThis ||
+                                    kind == ParseNodeKind::CallImport;
 
             MOZ_ASSERT(isMemberExpression || isCallExpression,
                        "Unknown ParseNodeKind for OptionalChain");
@@ -9991,6 +9996,10 @@ BytecodeEmitter::emitTree(ParseNode* pn, ValueUsage valueUsage /* = ValueUsage::
         if (!emit1(JSOP_IMPORTMETA))
             return false;
         break;
+
+      case ParseNodeKind::CallImport:
+        reportError(nullptr, JSMSG_NO_DYNAMIC_IMPORT);
+        return false;
 
       case ParseNodeKind::SetThis:
         if (!emitSetThis(pn))
