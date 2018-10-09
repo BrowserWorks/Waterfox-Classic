@@ -113,9 +113,11 @@ static constexpr size_t MaxSrcNotesLength = INT32_MAX;
 typedef Vector<jsbytecode, 64> BytecodeVector;
 typedef Vector<jssrcnote, 64> SrcNotesVector;
 
+class CallOrNewEmitter;
 class ElemOpEmitter;
 class EmitterScope;
 class NestableControl;
+class PropOpEmitter;
 class TDZCheckCache;
 
 struct MOZ_STACK_CLASS BytecodeEmitter
@@ -715,16 +717,16 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     MOZ_MUST_USE bool emitOptionalChain(ParseNode* pn, ValueUsage valueUsage);
     MOZ_MUST_USE bool emitCalleeAndThisForOptionalChain(ParseNode* optionalChain,
                                                         ParseNode* callNode,
-                                                        bool isCall, bool isNew);
+                                                        CallOrNewEmitter& cone);
     MOZ_MUST_USE bool emitDeleteOptionalChain(ParseNode* pn);
   
     // Optional methods which emit a shortCircuit jump. They need to be called by
     // a method which emits an Optional Jump Target, see below.
     MOZ_MUST_USE bool emitOptionalDotExpression(PropertyAccessBase* prop,
-                                                bool isCall, bool isSuper,
+                                                PropOpEmitter& poe, bool isSuper,
                                                 OptionalEmitter& oe);
     MOZ_MUST_USE bool emitOptionalElemExpression(PropertyByValueBase* elem,
-                                                 bool isCall, bool isSuper,
+                                                 ElemOpEmitter& eoe, bool isSuper,
                                                  OptionalEmitter& oe);
     MOZ_MUST_USE bool emitOptionalCall(BinaryNode* callNode, OptionalEmitter& oe,
                                        ValueUsage valueUsage);
@@ -753,7 +755,8 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     MOZ_MUST_USE ParseNode* getCoordNode(ParseNode* pn,
                                          ParseNode* calleeNode,
                                          ParseNode* argsList);
-    MOZ_MUST_USE bool emitArguments(ParseNode* pn, bool callop, bool spread);
+    MOZ_MUST_USE bool emitArguments(ListNode* argsList, bool isCall, bool isSpread,
+                                    CallOrNewEmitter& cone);
     MOZ_MUST_USE bool emitCallOrNew(ParseNode* pn, ValueUsage valueUsage = ValueUsage::WantValue);
     MOZ_MUST_USE bool emitSelfHostedCallFunction(ParseNode* pn);
     MOZ_MUST_USE bool emitSelfHostedResumeGenerator(ParseNode* pn);
@@ -805,10 +808,11 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     MOZ_MUST_USE bool emitSuperGetElem(ParseNode* pn, bool isCall = false);
 
     MOZ_MUST_USE bool emitCalleeAndThis(ParseNode* callee, ParseNode* call,
-                                        bool isCall, bool isNew);
+                                        CallOrNewEmitter& cone);
 
-    MOZ_MUST_USE bool emitOptionalCalleeAndThis(ParseNode* callee, ParseNode* call,
-                                                bool isCall, bool isNew,
+    MOZ_MUST_USE bool emitOptionalCalleeAndThis(ParseNode* callee,
+                                                ParseNode* call,
+                                                CallOrNewEmitter& cone,
                                                 OptionalEmitter& oe);
 
     MOZ_MUST_USE bool emitPipeline(ParseNode* pn);
