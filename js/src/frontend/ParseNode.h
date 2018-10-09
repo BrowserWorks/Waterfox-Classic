@@ -1303,6 +1303,10 @@ class PropertyByValueBase : public ParseNode
         return *pn_u.binary.left;
     }
 
+    ParseNode& key() const {
+        return *pn_u.binary.right;
+    }
+
     static bool test(const ParseNode& node) {
         bool match = node.isKind(ParseNodeKind::Elem) ||
                      node.isKind(ParseNodeKind::OptionalElem);

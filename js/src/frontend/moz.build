@@ -15,6 +15,7 @@ UNIFIED_SOURCES += [
     'BytecodeCompiler.cpp',
     'BytecodeControlStructures.cpp',
     'BytecodeEmitter.cpp',
+    'ElemOpEmitter.cpp',
     'EmitterScope.cpp',
     'ExpressionStatementEmitter.cpp',
     'FoldConstants.cpp',
