@@ -1235,6 +1235,10 @@ class PropertyAccessBase : public BinaryNode
         return *pn_u.binary.left;
     }
 
+    ParseNode& key() const {
+        return *pn_u.binary.right;
+    }
+
     static bool test(const ParseNode& node) {
         bool match = node.isKind(ParseNodeKind::Dot) ||
                      node.isKind(ParseNodeKind::OptionalDot);
