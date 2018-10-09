@@ -559,17 +559,16 @@ EmitterScope::enterComprehensionFor(BytecodeEmitter* bce,
     // For comprehensions, initialize all lexical names up front to undefined
     // because they're now a dead feature and don't interact properly with
     // TDZ.
-    auto nop = [](BytecodeEmitter*, const NameLocation&, bool) {
-        return true;
-    };
-
     if (!bce->emit1(JSOP_UNDEFINED))
         return false;
 
     RootedAtom name(bce->cx);
     for (BindingIter bi(*bindings, frameSlotStart(), /* isNamedLambda = */ false); bi; bi++) {
         name = bi.name();
-        if (!bce->emitInitializeName(name, nop))
+        NameOpEmitter noe(bce, name, NameOpEmitter::Kind::Initialize);
+        if (!noe.prepareForRhs())
+            return false;
+        if (!noe.emitAssignment())
             return false;
     }
 

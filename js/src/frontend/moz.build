@@ -23,6 +23,7 @@ UNIFIED_SOURCES += [
     'IfEmitter.cpp',
     'JumpList.cpp',
     'NameFunctions.cpp',
+    'NameOpEmitter.cpp',
     'ParseNode.cpp',
     'PropOpEmitter.cpp',
     'TDZCheckCache.cpp',

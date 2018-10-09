@@ -992,6 +992,10 @@ struct NameNode : public ParseNode
         pn_expr = nullptr;
     }
 
+    static bool test(const ParseNode& node) {
+        return node.isArity(PN_NAME);
+    }
+
 #ifdef DEBUG
     void dump(GenericPrinter& out, int indent);
 #endif
