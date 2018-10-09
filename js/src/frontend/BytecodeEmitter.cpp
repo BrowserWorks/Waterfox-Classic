@@ -4301,19 +4301,20 @@ CompoundAssignmentParseNodeKindToJSOp(ParseNodeKind pnk)
 }
 
 bool
-BytecodeEmitter::emitAssignment(ParseNode* lhs, ParseNodeKind pnk, ParseNode* rhs)
+BytecodeEmitter::emitAssignment(ParseNode* lhs, JSOp compoundOp, ParseNode* rhs)
 {
-    JSOp op = CompoundAssignmentParseNodeKindToJSOp(pnk);
+    bool isCompound = compoundOp != JSOP_NOP;
 
     // Name assignments are handled separately because choosing ops and when
     // to emit BINDNAME is involved and should avoid duplication.
     if (lhs->isKind(ParseNodeKind::Name)) {
-        auto emitRhs = [op, lhs, rhs](BytecodeEmitter* bce, const NameLocation& lhsLoc,
-                                      bool emittedBindOp)
+        auto emitRhs = [lhs, compoundOp, rhs, isCompound](BytecodeEmitter* bce,
+                                                          const NameLocation& lhsLoc,
+                                                          bool emittedBindOp)
         {
             // For compound assignments, first get the LHS value, then emit
-            // the RHS and the op.
-            if (op != JSOP_NOP) {
+            // the RHS and the compoundOp.
+            if (isCompound) {
                 if (!bce->emitGetNameAtLocationForCompoundAssignment(lhs->name(), lhsLoc))
                     return false;
             }
@@ -4325,16 +4326,17 @@ BytecodeEmitter::emitAssignment(ParseNode* lhs, ParseNodeKind pnk, ParseNode* rh
 
             if (rhs && rhs->isDirectRHSAnonFunction()) {
                 MOZ_ASSERT(!lhs->isInParens());
-                MOZ_ASSERT(op == JSOP_NOP);
+                MOZ_ASSERT(!isCompound);
                 RootedAtom name(bce->cx, lhs->name());
                 if (!bce->setOrEmitSetFunName(rhs, name))
                     return false;
             }
 
             // Emit the compound assignment op if there is one.
-            if (op != JSOP_NOP) {
-                if (!bce->emit1(op))
+            if (isCompound) {
+                if (!bce->emit1(compoundOp)) {
                     return false;
+                }
             }
 
             return true;
@@ -4365,7 +4367,7 @@ BytecodeEmitter::emitAssignment(ParseNode* lhs, ParseNodeKind pnk, ParseNode* rh
         break;
       case ParseNodeKind::Elem: {
         MOZ_ASSERT(lhs->isArity(PN_BINARY));
-        EmitElemOption opt = op == JSOP_NOP ? EmitElemOption::Get : EmitElemOption::CompoundAssign;
+        EmitElemOption opt = isCompound ? EmitElemOption::CompoundAssign : EmitElemOption::Get;
         if (lhs->as<PropertyByValue>().isSuper()) {
             if (!emitSuperElemOperands(lhs, opt)) {       // THIS KEY OBJ
                 return false;
@@ -4399,7 +4401,7 @@ BytecodeEmitter::emitAssignment(ParseNode* lhs, ParseNodeKind pnk, ParseNode* rh
         MOZ_ASSERT(0);
     }
 
-    if (op != JSOP_NOP) {
+    if (isCompound) {
         MOZ_ASSERT(rhs);
         switch (lhs->getKind()) {
           case ParseNodeKind::Dot: {
@@ -4464,11 +4466,11 @@ BytecodeEmitter::emitAssignment(ParseNode* lhs, ParseNodeKind pnk, ParseNode* rh
     }
 
     /* If += etc., emit the binary operator with a source note. */
-    if (op != JSOP_NOP) {
+    if (isCompound) {
         if (!newSrcNote(SRC_ASSIGNOP)) {
             return false;
         }
-        if (!emit1(op)) {                                 // ... VAL
+        if (!emit1(compoundOp)) {                         // ... VAL
             return false;
         }
     }
@@ -5249,7 +5251,7 @@ BytecodeEmitter::emitInitializeForInOrOfTarget(ParseNode* forHead)
     // initialization is just assigning the iteration value to a target
     // expression.
     if (!parser.isDeclarationList(target))
-        return emitAssignment(target, ParseNodeKind::Assign, nullptr); // ... ITERVAL
+        return emitAssignment(target, JSOP_NOP, nullptr); // ... ITERVAL
 
     // Otherwise, per-loop initialization is (possibly) declaration
     // initialization.  If the declaration is a lexical declaration, it must be
@@ -5977,7 +5979,7 @@ BytecodeEmitter::emitComprehensionForOf(ParseNode* pn)
 
     // Notice: Comprehension for-of doesn't perform IteratorClose, since it's
     // not in the spec.
-    if (!emitAssignment(loopVariableName,ParseNodeKind::Assign, nullptr)) // ITER VALUE
+    if (!emitAssignment(loopVariableName, JSOP_NOP, nullptr)) // ITER VALUE
         return false;
 
     // Remove VALUE from the stack to release it.
@@ -6101,7 +6103,7 @@ BytecodeEmitter::emitComprehensionForIn(ParseNode* pn)
 
     // Emit code to assign the enumeration value to the left hand side, but
     // also leave it on the stack.
-    if (!emitAssignment(forHead->pn_kid2,ParseNodeKind::Assign, nullptr))
+    if (!emitAssignment(forHead->pn_kid2, JSOP_NOP, nullptr))
         return false;
 
     /* The stack should be balanced around the assignment opcode sequence. */
@@ -9903,8 +9905,12 @@ BytecodeEmitter::emitTree(ParseNode* pn, ValueUsage valueUsage /* = ValueUsage::
       case ParseNodeKind::DivAssign:
       case ParseNodeKind::ModAssign:
       case ParseNodeKind::PowAssign:
-        if (!emitAssignment(pn->pn_left, pn->getKind(), pn->pn_right))
+        if (!emitAssignment(pn->pn_left,
+                            CompoundAssignmentParseNodeKindToJSOp(pn->getKind()),
+                            pn->pn_right))
+        {
             return false;
+        }
         break;
 
       case ParseNodeKind::Conditional:
