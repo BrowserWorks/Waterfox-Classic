@@ -1796,7 +1796,7 @@ BytecodeEmitter::emitFinishIteratorResult(bool done)
 }
 
 bool
-BytecodeEmitter::emitGetNameAtLocation(JSAtom* name, const NameLocation& loc, bool callContext)
+BytecodeEmitter::emitGetNameAtLocation(JSAtom* name, const NameLocation& loc)
 {
     switch (loc.kind()) {
       case NameLocation::Kind::Dynamic:
@@ -1851,43 +1851,13 @@ BytecodeEmitter::emitGetNameAtLocation(JSAtom* name, const NameLocation& loc, bo
         MOZ_CRASH("Synthesized vars for Annex B.3.3 should only be used in initialization");
     }
 
-    // Need to provide |this| value for call.
-    if (callContext) {
-        switch (loc.kind()) {
-          case NameLocation::Kind::Dynamic: {
-            JSOp thisOp = needsImplicitThis() ? JSOP_IMPLICITTHIS : JSOP_GIMPLICITTHIS;
-            if (!emitAtomOp(name, thisOp))
-                return false;
-            break;
-          }
-
-          case NameLocation::Kind::Global:
-            if (!emitAtomOp(name, JSOP_GIMPLICITTHIS))
-                return false;
-            break;
-
-          case NameLocation::Kind::Intrinsic:
-          case NameLocation::Kind::NamedLambdaCallee:
-          case NameLocation::Kind::Import:
-          case NameLocation::Kind::ArgumentSlot:
-          case NameLocation::Kind::FrameSlot:
-          case NameLocation::Kind::EnvironmentCoordinate:
-            if (!emit1(JSOP_UNDEFINED))
-                return false;
-            break;
-
-          case NameLocation::Kind::DynamicAnnexBVar:
-            MOZ_CRASH("Synthesized vars for Annex B.3.3 should only be used in initialization");
-        }
-    }
-
     return true;
 }
 
 bool
-BytecodeEmitter::emitGetName(ParseNode* pn, bool callContext)
+BytecodeEmitter::emitGetName(ParseNode* pn)
 {
-    return emitGetName(pn->name(), callContext);
+    return emitGetName(pn->name());
 }
 
 template <typename RHSEmitter>
@@ -7657,9 +7627,45 @@ bool BytecodeEmitter::emitOptionalCalleeAndThis(ParseNode* callee, ParseNode* ca
 
     switch (ParseNodeKind kind = callee->getKind()) {
         case ParseNodeKind::Name: {
-            if (!emitGetName(callee, isCall))
-                return false;
-            break;
+          JSAtom* name = callee->name();
+          NameLocation loc = lookupName(name);
+          if (!emitGetNameAtLocation(name, loc)) {          // CALLEE
+              return false;
+          }
+
+          if (isCall) {
+              switch (loc.kind()) {
+                case NameLocation::Kind::Dynamic: {
+                  JSOp thisOp = needsImplicitThis() ? JSOP_IMPLICITTHIS : JSOP_GIMPLICITTHIS;
+                  if (!emitAtomOp(name, thisOp)) {
+                      return false;
+                  }
+                  break;
+                }
+
+                case NameLocation::Kind::Global:
+                  if (!emitAtomOp(name, JSOP_GIMPLICITTHIS)) {
+                      return false;
+                  }
+                  break;
+
+                case NameLocation::Kind::Intrinsic:
+                case NameLocation::Kind::NamedLambdaCallee:
+                case NameLocation::Kind::Import:
+                case NameLocation::Kind::ArgumentSlot:
+                case NameLocation::Kind::FrameSlot:
+                case NameLocation::Kind::EnvironmentCoordinate:
+                  if (!emit1(JSOP_UNDEFINED)) {
+                      return false;
+                  }
+                  break;
+
+                case NameLocation::Kind::DynamicAnnexBVar:
+                  MOZ_CRASH("Synthesized vars for Annex B.3.3 should only be used in initialization");
+              }
+          }
+
+          break;
         }
 
         case ParseNodeKind::OptionalDot: {
@@ -7746,11 +7752,48 @@ BytecodeEmitter::emitCalleeAndThis(ParseNode* callee, ParseNode* call, bool isCa
 {
     bool needsThis = !isCall;
     switch (callee->getKind()) {
-      case ParseNodeKind::Name:
-        if (!emitGetName(callee, isCall))
+      case ParseNodeKind::Name: {
+        JSAtom* name = callee->name();
+        NameLocation loc = lookupName(name);
+        if (!emitGetNameAtLocation(name, loc)) {          // CALLEE
             return false;
+        }
+
+        if (isCall) {
+            switch (loc.kind()) {
+              case NameLocation::Kind::Dynamic: {
+                JSOp thisOp = needsImplicitThis() ? JSOP_IMPLICITTHIS : JSOP_GIMPLICITTHIS;
+                if (!emitAtomOp(name, thisOp)) {
+                    return false;
+                }
+                break;
+              }
+
+              case NameLocation::Kind::Global:
+                if (!emitAtomOp(name, JSOP_GIMPLICITTHIS)) {
+                    return false;
+                }
+                break;
+
+              case NameLocation::Kind::Intrinsic:
+              case NameLocation::Kind::NamedLambdaCallee:
+              case NameLocation::Kind::Import:
+              case NameLocation::Kind::ArgumentSlot:
+              case NameLocation::Kind::FrameSlot:
+              case NameLocation::Kind::EnvironmentCoordinate:
+                if (!emit1(JSOP_UNDEFINED)) {
+                    return false;
+                }
+                break;
+
+              case NameLocation::Kind::DynamicAnnexBVar:
+                MOZ_CRASH("Synthesized vars for Annex B.3.3 should only be used in initialization");
+            }
+        }
+
         break;
-      case ParseNodeKind::Dot:
+      }
+      case ParseNodeKind::Dot: {
         MOZ_ASSERT(emitterMode != BytecodeEmitter::SelfHosting);
         if (callee->as<PropertyAccess>().isSuper()) {
             if (!emitSuperGetProp(callee, isCall))
@@ -7761,21 +7804,31 @@ BytecodeEmitter::emitCalleeAndThis(ParseNode* callee, ParseNode* call, bool isCa
         }
 
         break;
-      case ParseNodeKind::Elem:
+      }
+      case ParseNodeKind::Elem: {
+        PropertyByValue* elem = &callee->as<PropertyByValue>();
         MOZ_ASSERT(emitterMode != BytecodeEmitter::SelfHosting);
-        if (callee->as<PropertyByValue>().isSuper()) {
-            if (!emitSuperGetElem(callee, isCall))
+        if (elem->isSuper()) {
+            if (!emitSuperGetElem(elem, isCall)) {
                 return false;
+            }
         } else {
-            if (!emitElemOp(callee, isCall ? JSOP_CALLELEM : JSOP_GETELEM))
-                return false;
             if (isCall) {
-                if (!emit1(JSOP_SWAP))
+                if (!emitElemOp(elem, JSOP_CALLELEM)) {
                     return false;
+                }
+                if (!emit1(JSOP_SWAP)) {
+                    return false;
+                }
+            } else {
+                if (!emitElemOp(elem, JSOP_GETELEM)) {
+                    return false;
+                }
             }
         }
 
         break;
+      }
       case ParseNodeKind::Function:
         /*
          * Top level lambdas which are immediately invoked should be
