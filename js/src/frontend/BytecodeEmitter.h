@@ -21,6 +21,7 @@
 #include "frontend/JumpList.h"
 #include "frontend/SharedContext.h"
 #include "frontend/SourceNotes.h"
+#include "frontend/ValueUsage.h"
 #include "vm/Interpreter.h"
 
 namespace js {
@@ -111,11 +112,6 @@ static constexpr size_t MaxSrcNotesLength = INT32_MAX;
 // sequences.  See bug 1390526.
 typedef Vector<jsbytecode, 64> BytecodeVector;
 typedef Vector<jssrcnote, 64> SrcNotesVector;
-
-enum class ValueUsage {
-    WantValue,
-    IgnoreValue
-};
 
 class EmitterScope;
 class NestableControl;

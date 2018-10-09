@@ -31,6 +31,7 @@
 #include "ds/Nestable.h"
 #include "frontend/BytecodeControlStructures.h"
 #include "frontend/EmitterScope.h"
+#include "frontend/ExpressionStatementEmitter.h"
 #include "frontend/ForOfLoopControl.h"
 #include "frontend/IfEmitter.h"
 #include "frontend/Parser.h"
@@ -7154,15 +7155,18 @@ BytecodeEmitter::emitExpressionStatement(ParseNode* pn)
     }
 
     if (useful) {
-        JSOp op = wantval ? JSOP_SETRVAL : JSOP_POP;
-        ValueUsage valueUsage = wantval ? ValueUsage::WantValue : ValueUsage::IgnoreValue;
         MOZ_ASSERT_IF(expr->isKind(ParseNodeKind::Assign), expr->isOp(JSOP_NOP));
-        if (!updateSourceCoordNotes(pn->pn_pos.begin))
+        ValueUsage valueUsage = wantval ? ValueUsage::WantValue : ValueUsage::IgnoreValue;
+        ExpressionStatementEmitter ese(this, valueUsage);
+        if (!ese.prepareForExpr(Some(pn->pn_pos.begin))) {
             return false;
-        if (!emitTree(expr, valueUsage))
+        }
+        if (!emitTree(expr, valueUsage)) {
             return false;
-        if (!emit1(op))
+        }
+        if (!ese.emitEnd()) {
             return false;
+        }
     } else if (pn->isDirectivePrologueMember()) {
         // Don't complain about directive prologue members; just don't emit
         // their code.
