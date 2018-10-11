@@ -2730,6 +2730,18 @@ CodeGenerator::visitClassConstructor(LClassConstructor* lir)
     callVM(MakeDefaultConstructorInfo, lir);
 }
 
+typedef JSObject* (*GetOrCreateModuleMetaObjectFn)(JSContext*, HandleObject);
+static const VMFunction GetOrCreateModuleMetaObjectInfo =
+    FunctionInfo<GetOrCreateModuleMetaObjectFn>(js::GetOrCreateModuleMetaObject,
+                                                "GetOrCreateModuleMetaObject");
+
+void
+CodeGenerator::visitModuleMetadata(LModuleMetadata* lir)
+{
+    pushArg(ImmPtr(lir->mir()->module()));
+    callVM(GetOrCreateModuleMetaObjectInfo, lir);
+}
+
 typedef JSObject* (*LambdaFn)(JSContext*, HandleFunction, HandleObject);
 static const VMFunction LambdaInfo = FunctionInfo<LambdaFn>(js::Lambda, "Lambda");
 

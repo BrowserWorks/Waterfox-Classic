@@ -243,6 +243,7 @@
     _(UnarySharedStub)              \
     _(NullarySharedStub)            \
     _(ClassConstructor)             \
+    _(ModuleMetadata)               \
     _(Lambda)                       \
     _(LambdaArrow)                  \
     _(LambdaForSingleton)           \

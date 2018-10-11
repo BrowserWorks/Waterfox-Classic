@@ -165,6 +165,7 @@ namespace jit {
     _(GetFirstDollarIndex)                                                  \
     _(StringReplace)                                                        \
     _(ClassConstructor)                                                     \
+    _(ModuleMetadata)                                                       \
     _(Lambda)                                                               \
     _(LambdaArrow)                                                          \
     _(SetFunName)                                                           \

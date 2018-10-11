@@ -140,6 +140,7 @@ class CodeGenerator final : public CodeGeneratorSpecific
     void visitUnarySharedStub(LUnarySharedStub* lir);
     void visitNullarySharedStub(LNullarySharedStub* lir);
     void visitClassConstructor(LClassConstructor* lir);
+    void visitModuleMetadata(LModuleMetadata* lir);
     void visitLambda(LLambda* lir);
     void visitOutOfLineLambdaArrow(OutOfLineLambdaArrow* ool);
     void visitLambdaArrow(LLambdaArrow* lir);

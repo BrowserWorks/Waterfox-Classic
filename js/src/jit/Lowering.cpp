@@ -2541,6 +2541,14 @@ LIRGenerator::visitClassConstructor(MClassConstructor* ins)
 }
 
 void
+LIRGenerator::visitModuleMetadata(MModuleMetadata* ins)
+{
+    LModuleMetadata* lir = new(alloc()) LModuleMetadata();
+    defineReturn(lir, ins);
+    assignSafepoint(lir, ins);
+}
+
+void
 LIRGenerator::visitLambda(MLambda* ins)
 {
     if (ins->info().singletonType || ins->info().useSingletonForClone) {
