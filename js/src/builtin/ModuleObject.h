@@ -301,6 +301,7 @@ class ModuleObject : public NativeObject
 #endif
     void fixEnvironmentsAfterCompartmentMerge();
 
+    JSScript* maybeScript() const;
     JSScript* script() const;
     Scope* enclosingScope() const;
     ModuleEnvironmentObject& initialEnvironment() const;
@@ -347,7 +348,6 @@ class ModuleObject : public NativeObject
     static void trace(JSTracer* trc, JSObject* obj);
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
-    bool hasScript() const;
     bool hasImportBindings() const;
     FunctionDeclarationVector* functionDeclarations();
 };
