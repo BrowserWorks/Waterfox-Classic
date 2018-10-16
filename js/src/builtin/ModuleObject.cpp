@@ -840,6 +840,12 @@ ModuleObject::namespace_()
     return &value.toObject().as<ModuleNamespaceObject>();
 }
 
+ScriptSourceObject*
+ModuleObject::scriptSourceObject() const
+{
+    return &getReservedSlot(ScriptSourceObjectSlot).toObject().as<ScriptSourceObject>();
+}
+
 FunctionDeclarationVector*
 ModuleObject::functionDeclarations()
 {
@@ -853,8 +859,10 @@ ModuleObject::functionDeclarations()
 void
 ModuleObject::init(HandleScript script)
 {
+    MOZ_ASSERT(script);
     initReservedSlot(ScriptSlot, PrivateGCThingValue(script));
     initReservedSlot(StatusSlot, Int32Value(MODULE_STATUS_UNINSTANTIATED));
+    initReservedSlot(ScriptSourceObjectSlot, ObjectValue(script->scriptSourceUnwrap()));
 }
 
 void
@@ -1016,18 +1024,6 @@ ModuleObject::setMetaObject(JSObject* obj)
     MOZ_ASSERT(obj);
     MOZ_ASSERT(!metaObject());
     setReservedSlot(MetaObjectSlot, ObjectValue(*obj));
-}
-
-Value
-ModuleObject::hostDefinedField() const
-{
-    return getReservedSlot(HostDefinedSlot);
-}
-
-void
-ModuleObject::setHostDefinedField(const JS::Value& value)
-{
-    setReservedSlot(HostDefinedSlot, value);
 }
 
 Scope*
@@ -1688,8 +1684,10 @@ js::GetOrCreateModuleMetaObject(JSContext* cx, HandleObject moduleArg)
         return nullptr;
     }
 
-    if (!func(cx, module, metaObject))
+    RootedValue modulePrivate(cx, JS::GetModulePrivate(module));
+    if (!func(cx, modulePrivate, metaObject)) {
         return nullptr;
+    }
 
     module->setMetaObject(metaObject);
 
