@@ -1028,6 +1028,7 @@ class DebugEnvironments
     static void onPopLexical(JSContext* cx, const EnvironmentIter& ei);
     static void onPopLexical(JSContext* cx, AbstractFramePtr frame, jsbytecode* pc);
     static void onPopWith(AbstractFramePtr frame);
+    static void onPopModule(JSContext* cx, const EnvironmentIter& ei);
     static void onCompartmentUnsetIsDebuggee(JSCompartment* c);
 };
 

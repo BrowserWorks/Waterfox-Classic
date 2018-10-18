@@ -1067,10 +1067,14 @@ PopEnvironment(JSContext* cx, EnvironmentIter& ei)
         if (ei.scope().hasEnvironment())
             ei.initialFrame().popOffEnvironmentChain<VarEnvironmentObject>();
         break;
+      case ScopeKind::Module:
+        if (MOZ_UNLIKELY(cx->compartment()->isDebuggee())) {
+            DebugEnvironments::onPopModule(cx, ei);
+        }
+        break;
       case ScopeKind::Eval:
       case ScopeKind::Global:
       case ScopeKind::NonSyntactic:
-      case ScopeKind::Module:
         break;
       case ScopeKind::WasmInstance:
       case ScopeKind::WasmFunction:
