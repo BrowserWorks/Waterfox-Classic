@@ -166,6 +166,7 @@ namespace jit {
     _(StringReplace)                                                        \
     _(ClassConstructor)                                                     \
     _(ModuleMetadata)                                                       \
+    _(DynamicImport)                                                        \
     _(Lambda)                                                               \
     _(LambdaArrow)                                                          \
     _(SetFunName)                                                           \

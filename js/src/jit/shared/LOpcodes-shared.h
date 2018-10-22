@@ -244,6 +244,7 @@
     _(NullarySharedStub)            \
     _(ClassConstructor)             \
     _(ModuleMetadata)               \
+    _(DynamicImport)                \
     _(Lambda)                       \
     _(LambdaArrow)                  \
     _(LambdaForSingleton)           \
