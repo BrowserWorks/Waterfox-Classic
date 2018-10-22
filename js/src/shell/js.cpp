@@ -3922,7 +3922,7 @@ SetModuleResolveHook(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static JSObject*
-CallModuleResolveHook(JSContext* cx, HandleValue referencingPrivate, HandleString specifier)
+ShellModuleResolveHook(JSContext* cx, HandleValue referencingPrivate, HandleString specifier)
 {
     Handle<GlobalObject*> global = cx->global();
     RootedValue hookValue(cx, global->getReservedSlot(GlobalAppSlotModuleResolveHook));
@@ -8367,7 +8367,7 @@ main(int argc, char** argv, char** envp)
 
     js::SetPreserveWrapperCallback(cx, DummyPreserveWrapperCallback);
 
-    JS::SetModuleResolveHook(cx->runtime(), CallModuleResolveHook);
+    JS::SetModuleResolveHook(cx->runtime(), ShellModuleResolveHook);
     JS::SetModuleMetadataHook(cx->runtime(), CallModuleMetadataHook);
 
     result = Shell(cx, &op, envp);

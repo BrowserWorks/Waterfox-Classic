@@ -609,7 +609,7 @@ class FullParseHandler
     }
 
     ParseNode* newCallImport(ParseNode* importHolder, ParseNode* singleArg) {
-        return new_<BinaryNode>(ParseNodeKind::CallImport, JSOP_NOP, importHolder, singleArg);
+        return new_<BinaryNode>(ParseNodeKind::CallImport, JSOP_DYNAMIC_IMPORT, importHolder, singleArg);
     }
 
     ParseNode* newExprStatement(ParseNode* expr, uint32_t end) {

@@ -987,6 +987,10 @@ struct JSRuntime : public js::MallocProvider<JSRuntime>
     // HostGetImportMetaProperties and HostFinalizeImportMeta.
     js::MainThreadData<JS::ModuleMetadataHook> moduleMetadataHook;
 
+    // A hook that implements the abstract operation
+    // HostImportModuleDynamically.
+    js::MainThreadData<JS::ModuleDynamicImportHook> moduleDynamicImportHook;
+
   private:
     // When wasm is interrupted, the pc at which we should return if the
     // interrupt hasn't stopped execution of the current running code. Since

@@ -4471,6 +4471,25 @@ GetModuleMetadataHook(JSRuntime* rt);
 extern JS_PUBLIC_API(void)
 SetModuleMetadataHook(JSRuntime* rt, ModuleMetadataHook func);
 
+using ModuleDynamicImportHook = bool (*)(JSContext* cx, HandleValue referencingPrivate,
+                                         HandleString specifier, HandleObject promise);
+
+/**
+ * Get the HostResolveImportedModule hook for the runtime.
+ */
+extern JS_PUBLIC_API(ModuleDynamicImportHook)
+GetModuleDynamicImportHook(JSRuntime* rt);
+
+/**
+ * Set the HostResolveImportedModule hook for the runtime to the given function.
+ */
+extern JS_PUBLIC_API(void)
+SetModuleDynamicImportHook(JSRuntime* rt, ModuleDynamicImportHook func);
+
+extern JS_PUBLIC_API(bool)
+FinishDynamicModuleImport(JSContext* cx, HandleValue referencingPrivate, HandleString specifier,
+                          HandleObject promise);
+
 /**
  * Parse the given source buffer as a module in the scope of the current global
  * of cx and return a source text module record.
