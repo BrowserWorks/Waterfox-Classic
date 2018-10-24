@@ -1747,6 +1747,17 @@ js::shell::FileAsString(JSContext* cx, JS::HandleString pathnameStr)
 
     AutoCloseFile autoClose(file);
 
+    struct stat st;
+    if (fstat(fileno(file), &st) != 0) {
+        JS_ReportErrorUTF8(cx, "can't stat %s", pathname.ptr());
+        return nullptr;
+    }
+
+    if ((st.st_mode & S_IFMT) != S_IFREG) {
+        JS_ReportErrorUTF8(cx, "can't read non-regular file %s", pathname.ptr());
+        return nullptr;
+    }
+
     if (fseek(file, 0, SEEK_END) != 0) {
         pathname.clear();
         if (!pathname.encodeUtf8(cx, pathnameStr))
@@ -1755,7 +1766,13 @@ js::shell::FileAsString(JSContext* cx, JS::HandleString pathnameStr)
         return nullptr;
     }
 
-    size_t len = ftell(file);
+    long endPos = ftell(file);
+    if (endPos < 0) {
+        JS_ReportErrorUTF8(cx, "can't read length of %s", pathname.ptr());
+        return nullptr;
+    }
+
+    size_t len = endPos;
     if (fseek(file, 0, SEEK_SET) != 0) {
         pathname.clear();
         if (!pathname.encodeUtf8(cx, pathnameStr))
@@ -1765,8 +1782,10 @@ js::shell::FileAsString(JSContext* cx, JS::HandleString pathnameStr)
     }
 
     UniqueChars buf(static_cast<char*>(js_malloc(len + 1)));
-    if (!buf)
+    if (!buf) {
+        JS_ReportErrorUTF8(cx, "out of memory reading %s", pathname.ptr());
         return nullptr;
+    }
 
     size_t cc = fread(buf.get(), 1, len, file);
     if (cc != len) {
