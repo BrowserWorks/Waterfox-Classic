@@ -5953,7 +5953,8 @@ BytecodeEmitter::emitAsyncWrapper(unsigned index, bool needsHomeObject, bool isA
     //                    // classObj classCtor classProto
     //   (emitted code)   // classObj classCtor classProto unwrapped wrapped
     //   swap             // classObj classCtor classProto wrapped unwrapped
-    //   inithomeobject 1 // classObj classCtor classProto wrapped unwrapped
+    //   dupat 2          // classObj classCtor classProto wrapped unwrapped classProto
+    //   inithomeobject   // classObj classCtor classProto wrapped unwrapped
     //                    //   initialize the home object of unwrapped
     //                    //   with classProto here
     //   pop              // classObj classCtor classProto wrapped
@@ -8291,11 +8292,16 @@ BytecodeEmitter::emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp, 
                 if (!emit1(JSOP_SWAP))
                     return false;
             }
-            if (!emit2(JSOP_INITHOMEOBJECT, isIndex + isAsync))
+            if (!emitDupAt(1 + isIndex + isAsync)) {
                 return false;
+            }
+            if (!emit1(JSOP_INITHOMEOBJECT)) {
+                return false;
+            }
             if (isAsync) {
-                if (!emit1(JSOP_POP))
+                if (!emit1(JSOP_POP)) {
                     return false;
+                }
             }
         }
 
@@ -9118,11 +9124,18 @@ BytecodeEmitter::emitClass(ParseNode* pn)
     // is not used, an implicit value of %FunctionPrototype% is implied.
 
     if (constructor) {
-        if (!emitFunction(constructor, !!heritageExpression))   // ... HOMEOBJ CONSTRUCTOR
+        if (!emitFunction(constructor, !!heritageExpression)) { // ... HOMEOBJ CONSTRUCTOR
             return false;
+        }
         if (constructor->pn_funbox->needsHomeObject()) {
-            if (!emit2(JSOP_INITHOMEOBJECT, 0))                 // ... HOMEOBJ CONSTRUCTOR
+            if (!emitDupAt(1)) {
+                //            [stack] ... HOMEOBJ CONSTRUCTOR HOMEOBJ
                 return false;
+            }
+            if (!emit1(JSOP_INITHOMEOBJECT)) {
+                //            [stack] ... HOMEOBJ CONSTRUCTOR
+                return false;
+            }
         }
     } else {
         // In the case of default class constructors, emit the start and end
