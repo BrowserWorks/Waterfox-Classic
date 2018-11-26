@@ -774,7 +774,7 @@ class Parser final
     bool tryNewTarget(Node& newTarget);
     bool checkAndMarkSuperScope();
 
-    Node importExpr(YieldHandling yieldHandling);
+    Node importExpr(YieldHandling yieldHandling, bool allowCallSyntax);
 
     Node methodDefinition(uint32_t toStringStart, PropertyType propType, HandleAtom funName);
 

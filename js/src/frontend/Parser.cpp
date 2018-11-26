@@ -9290,7 +9290,7 @@ Parser<ParseHandler, CharT>::memberExpr(YieldHandling yieldHandling,
         if (!lhs)
             return null();
     } else if (tt == TokenKind::Import) {
-        lhs = importExpr(yieldHandling);
+        lhs = importExpr(yieldHandling, allowCallSyntax);
         if (!lhs)
             return null();
     } else {
@@ -10560,7 +10560,7 @@ Parser<ParseHandler, CharT>::tryNewTarget(Node &newTarget)
 
 template <class ParseHandler, typename CharT>
 typename ParseHandler::Node
-Parser<ParseHandler, CharT>::importExpr(YieldHandling yieldHandling)
+Parser<ParseHandler, CharT>::importExpr(YieldHandling yieldHandling, bool allowCallSyntax)
 {
     MOZ_ASSERT(anyChars.isCurrentTokenType(TokenKind::Import));
 
@@ -10590,7 +10590,7 @@ Parser<ParseHandler, CharT>::importExpr(YieldHandling yieldHandling)
             return null();
 
         return handler.newImportMeta(importHolder, metaHolder);
-    } else if (next == TokenKind::LeftParen) {
+    } else if (next == TokenKind::LeftParen && allowCallSyntax) {
         Node arg = assignExpr(InAllowed, yieldHandling, TripledotProhibited);
         if (!arg)
             return null();
