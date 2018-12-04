@@ -2633,10 +2633,16 @@ js::OriginalPromiseThen(JSContext* cx, Handle<PromiseObject*> promise,
 MOZ_MUST_USE bool
 js::RejectPromiseWithPendingError(JSContext* cx, Handle<PromiseObject*> promise)
 {
-    // Not much we can do about uncatchable exceptions, just bail.
-    RootedValue exn(cx);
-    if (!GetAndClearException(cx, &exn))
+    if (!cx->isExceptionPending()) {
+        // Reject the promise, but also propagate this uncatchable error.
+        mozilla::Unused << PromiseObject::reject(cx, promise, UndefinedHandleValue);
         return false;
+    }
+
+    RootedValue exn(cx);
+    if (!GetAndClearException(cx, &exn)) {
+        return false;
+    }
     return PromiseObject::reject(cx, promise, exn);
 }
 
