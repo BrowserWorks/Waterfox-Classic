@@ -352,6 +352,11 @@ public:
     GiveUpBytecodeEncoding();
   }
 
+  void StartDynamicImport(ModuleLoadRequest* aRequest);
+  void FinishDynamicImport(ModuleLoadRequest* aRequest, nsresult aResult);
+  void FinishDynamicImport(JSContext* aCx, ModuleLoadRequest* aRequest,
+                           nsresult aResult);
+
   /*
    * Clear the map of loaded modules. Called when a Document object is reused
    * for a different global.
@@ -360,6 +365,8 @@ public:
 
  private:
   virtual ~ScriptLoader();
+
+  void EnsureModuleHooksInitialized();
 
   ScriptLoadRequest* CreateLoadRequest(ScriptKind aKind,
                                        nsIURI* aURI,
@@ -465,6 +472,7 @@ public:
 
   nsresult AttemptAsyncScriptCompile(ScriptLoadRequest* aRequest);
   nsresult ProcessRequest(ScriptLoadRequest* aRequest);
+  void ProcessDynamicImport(ModuleLoadRequest* aRequest);
   nsresult CompileOffThreadOrProcessRequest(ScriptLoadRequest* aRequest);
   void FireScriptAvailable(nsresult aResult,
                            ScriptLoadRequest* aRequest);
@@ -550,6 +558,8 @@ public:
   nsresult AssociateSourceElementsForModuleTree(JSContext* aCx,
                                                 ModuleLoadRequest* aRequest);
 
+  void RunScriptWhenSafe(ScriptLoadRequest* aRequest);
+
   nsIDocument* mDocument;                   // [WEAK]
   nsCOMArray<nsIScriptLoaderObserver> mObservers;
   ScriptLoadRequestList mNonAsyncExternalScriptInsertedRequests;
@@ -559,6 +569,7 @@ public:
   ScriptLoadRequestList mLoadedAsyncRequests;
   ScriptLoadRequestList mDeferRequests;
   ScriptLoadRequestList mXSLTRequests;
+  ScriptLoadRequestList mDynamicImportRequests;
   RefPtr<ScriptLoadRequest> mParserBlockingRequest;
 
   // List of script load request that are holding a buffer which has to be saved

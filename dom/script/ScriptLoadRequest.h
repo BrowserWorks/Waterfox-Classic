@@ -231,6 +231,8 @@ public:
     mFetchOptions->mElement = aElement;
   }
 
+  void SetScript(JSScript* aScript);
+
   void MaybeCancelOffThreadScript();
   void DropBytecodeCacheReferences();
 
