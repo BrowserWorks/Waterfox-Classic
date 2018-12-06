@@ -31,6 +31,7 @@ ScriptFetchOptions::ScriptFetchOptions(mozilla::CORSMode aCORSMode,
                                        nsIPrincipal* aTriggeringPrincipal)
   : mCORSMode(aCORSMode)
   , mReferrerPolicy(aReferrerPolicy)
+  , mIsPreload(false)
   , mElement(aElement)
   , mTriggeringPrincipal(aTriggeringPrincipal)
 {
