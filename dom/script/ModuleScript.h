@@ -4,12 +4,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef mozilla_dom_ModuleScript_h
-#define mozilla_dom_ModuleScript_h
+#ifndef mozilla_dom_LoadedScript_h
+#define mozilla_dom_LoadedScript_h
 
 #include "nsCOMPtr.h"
 #include "nsCycleCollectionParticipant.h"
 #include "jsapi.h"
+#include "ScriptLoadRequest.h"
 
 class nsIURI;
 
@@ -20,11 +21,46 @@ class ScriptLoader;
 
 void HostFinalizeTopLevelScript(JSFreeOp* aFop, const JS::Value& aPrivate);
 
-class ModuleScript final : public nsISupports
-{
+class ClassicScript;
+class ModuleScript;
+
+class LoadedScript : public nsISupports {
+  ScriptKind mKind;
   RefPtr<ScriptLoader> mLoader;
   RefPtr<ScriptFetchOptions> mFetchOptions;
   nsCOMPtr<nsIURI> mBaseURL;
+
+ protected:
+  LoadedScript(ScriptKind aKind, ScriptLoader* aLoader,
+               ScriptFetchOptions* aFetchOptions, nsIURI* aBaseURL);
+
+  virtual ~LoadedScript();
+
+ public:
+  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(LoadedScript)
+
+  bool IsModuleScript() const { return mKind == ScriptKind::eModule; }
+
+  inline ClassicScript* AsClassicScript();
+  inline ModuleScript* AsModuleScript();
+
+  ScriptLoader* Loader() const { return mLoader; }
+  ScriptFetchOptions* FetchOptions() const { return mFetchOptions; }
+  nsIURI* BaseURL() const { return mBaseURL; }
+};
+
+class ClassicScript final : public LoadedScript {
+  ~ClassicScript() = default;
+
+ public:
+  ClassicScript(ScriptLoader* aLoader, ScriptFetchOptions* aFetchOptions,
+                nsIURI* aBaseURL);
+};
+
+// A single module script. May be used to satisfy multiple load requests.
+
+class ModuleScript final : public LoadedScript {
   JS::Heap<JSObject*> mModuleRecord;
   JS::Heap<JS::Value> mParseError;
   JS::Heap<JS::Value> mErrorToRethrow;
@@ -32,9 +68,10 @@ class ModuleScript final : public nsISupports
 
   ~ModuleScript();
 
-public:
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(ModuleScript)
+ public:
+  NS_DECL_ISUPPORTS_INHERITED
+  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS_INHERITED(ModuleScript,
+                                                         LoadedScript)
 
   ModuleScript(ScriptLoader* aLoader, ScriptFetchOptions* aFetchOptions,
                nsIURI* aBaseURL);
@@ -44,10 +81,8 @@ public:
   void SetErrorToRethrow(const JS::Value& aError);
   void SetSourceElementAssociated();
 
-  ScriptLoader* Loader() const { return mLoader; }
-  ScriptFetchOptions* FetchOptions() const { return mFetchOptions; }
   JSObject* ModuleRecord() const { return mModuleRecord; }
-  nsIURI* BaseURL() const { return mBaseURL; }
+
   JS::Value ParseError() const { return mParseError; }
   JS::Value ErrorToRethrow() const { return mErrorToRethrow; }
   bool HasParseError() const { return !mParseError.isUndefined(); }
@@ -59,7 +94,18 @@ public:
   friend void HostFinalizeTopLevelScript(JSFreeOp*, const JS::Value&);
 };
 
-} // dom namespace
-} // mozilla namespace
+ClassicScript* LoadedScript::AsClassicScript() {
+  MOZ_ASSERT(!IsModuleScript());
+  return static_cast<ClassicScript*>(this);
+}
 
-#endif // mozilla_dom_ModuleScript_h
+ModuleScript* LoadedScript::AsModuleScript() {
+  MOZ_ASSERT(IsModuleScript());
+  return static_cast<ModuleScript*>(this);
+}
+
+}  // namespace dom
+}  // namespace mozilla
+
+#endif  // mozilla_dom_LoadedScript_h
+

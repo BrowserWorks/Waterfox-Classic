@@ -14,53 +14,91 @@
 namespace mozilla {
 namespace dom {
 
-// A single module script.  May be used to satisfy multiple load requests.
+//////////////////////////////////////////////////////////////
+// LoadedScript
+//////////////////////////////////////////////////////////////
 
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ModuleScript)
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(LoadedScript)
 NS_INTERFACE_MAP_END
 
-NS_IMPL_CYCLE_COLLECTION_CLASS(ModuleScript)
+NS_IMPL_CYCLE_COLLECTION_CLASS(LoadedScript)
 
-NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(ModuleScript)
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(LoadedScript)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLoader)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFetchOptions)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mBaseURL)
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(LoadedScript)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLoader)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFetchOptions)
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
+
+NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(LoadedScript)
+NS_IMPL_CYCLE_COLLECTION_TRACE_END
+
+NS_IMPL_CYCLE_COLLECTING_ADDREF(LoadedScript)
+NS_IMPL_CYCLE_COLLECTING_RELEASE(LoadedScript)
+
+LoadedScript::LoadedScript(ScriptKind aKind, ScriptLoader* aLoader,
+                           ScriptFetchOptions* aFetchOptions, nsIURI* aBaseURL)
+    : mKind(aKind),
+      mLoader(aLoader),
+      mFetchOptions(aFetchOptions),
+      mBaseURL(aBaseURL) {
+  MOZ_ASSERT(mLoader);
+  MOZ_ASSERT(mFetchOptions);
+  MOZ_ASSERT(mBaseURL);
+}
+
+LoadedScript::~LoadedScript() { DropJSObjects(this); }
+
+//////////////////////////////////////////////////////////////
+// ClassicScript
+//////////////////////////////////////////////////////////////
+
+ClassicScript::ClassicScript(ScriptLoader* aLoader,
+                             ScriptFetchOptions* aFetchOptions,
+                             nsIURI* aBaseURL)
+    : LoadedScript(ScriptKind::eClassic, aLoader, aFetchOptions, aBaseURL) {}
+
+//////////////////////////////////////////////////////////////
+// ModuleScript
+//////////////////////////////////////////////////////////////
+
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ModuleScript)
+NS_INTERFACE_MAP_END_INHERITING(LoadedScript)
+
+NS_IMPL_CYCLE_COLLECTION_CLASS(ModuleScript)
+
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(ModuleScript, LoadedScript)
   tmp->UnlinkModuleRecord();
   tmp->mParseError.setUndefined();
   tmp->mErrorToRethrow.setUndefined();
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
-NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ModuleScript)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLoader)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFetchOptions)
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(ModuleScript, LoadedScript)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
-NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(ModuleScript)
+NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(ModuleScript, LoadedScript)
   NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mModuleRecord)
   NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mParseError)
   NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mErrorToRethrow)
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
-NS_IMPL_CYCLE_COLLECTING_ADDREF(ModuleScript)
-NS_IMPL_CYCLE_COLLECTING_RELEASE(ModuleScript)
+NS_IMPL_ADDREF_INHERITED(ModuleScript, LoadedScript)
+NS_IMPL_RELEASE_INHERITED(ModuleScript, LoadedScript)
 
 ModuleScript::ModuleScript(ScriptLoader* aLoader,
                            ScriptFetchOptions* aFetchOptions, nsIURI* aBaseURL)
-    : mLoader(aLoader),
-      mFetchOptions(aFetchOptions),
-      mBaseURL(aBaseURL),
+    : LoadedScript(ScriptKind::eModule, aLoader, aFetchOptions, aBaseURL),
       mSourceElementAssociated(false) {
-  MOZ_ASSERT(mLoader);
-  MOZ_ASSERT(mFetchOptions);
-  MOZ_ASSERT(mBaseURL);
-  MOZ_ASSERT(!mModuleRecord);
+  MOZ_ASSERT(!ModuleRecord());
   MOZ_ASSERT(!HasParseError());
   MOZ_ASSERT(!HasErrorToRethrow());
 }
 
-void
-ModuleScript::UnlinkModuleRecord()
-{
+void ModuleScript::UnlinkModuleRecord() {
   // Remove the module record's pointer to this object if present and
   // decrement our reference count. The reference is added by
   // SetModuleRecord() below.
@@ -72,26 +110,24 @@ ModuleScript::UnlinkModuleRecord()
   }
 }
 
-ModuleScript::~ModuleScript()
-{
+ModuleScript::~ModuleScript() {
   // The object may be destroyed without being unlinked first.
   UnlinkModuleRecord();
-  DropJSObjects(this);
 }
 
-void
-ModuleScript::SetModuleRecord(JS::Handle<JSObject*> aModuleRecord)
-{
+void ModuleScript::SetModuleRecord(JS::Handle<JSObject*> aModuleRecord) {
   MOZ_ASSERT(!mModuleRecord);
-  MOZ_ASSERT(!HasParseError());
-  MOZ_ASSERT(!HasErrorToRethrow());
+  MOZ_ASSERT_IF(IsModuleScript(), !AsModuleScript()->HasParseError());
+  MOZ_ASSERT_IF(IsModuleScript(), !AsModuleScript()->HasErrorToRethrow());
 
   mModuleRecord = aModuleRecord;
 
   // Make module's host defined field point to this object and
   // increment our reference count. This is decremented by
   // UnlinkModuleRecord() above.
+  MOZ_ASSERT(JS::GetModulePrivate(mModuleRecord).isUndefined());
   JS::SetModulePrivate(mModuleRecord, JS::PrivateValue(this));
+
   HoldJSObjects(this);
   AddRef();
 }
@@ -105,9 +141,7 @@ void HostFinalizeTopLevelScript(JSFreeOp* aFop, const JS::Value& aPrivate) {
   }
 }
 
-void
-ModuleScript::SetParseError(const JS::Value& aError)
-{
+void ModuleScript::SetParseError(const JS::Value& aError) {
   MOZ_ASSERT(!aError.isUndefined());
   MOZ_ASSERT(!HasParseError());
   MOZ_ASSERT(!HasErrorToRethrow());
@@ -117,26 +151,23 @@ ModuleScript::SetParseError(const JS::Value& aError)
   HoldJSObjects(this);
 }
 
-void
-ModuleScript::SetErrorToRethrow(const JS::Value& aError)
-{
+void ModuleScript::SetErrorToRethrow(const JS::Value& aError) {
   MOZ_ASSERT(!aError.isUndefined());
 
   // This is only called after SetModuleRecord() or SetParseError() so we don't
   // need to call HoldJSObjects() here.
-  MOZ_ASSERT(mModuleRecord || HasParseError());
+  MOZ_ASSERT(ModuleRecord() || HasParseError());
 
   mErrorToRethrow = aError;
 }
 
-void
-ModuleScript::SetSourceElementAssociated()
-{
-  MOZ_ASSERT(mModuleRecord);
+void ModuleScript::SetSourceElementAssociated() {
+  MOZ_ASSERT(ModuleRecord());
   MOZ_ASSERT(!mSourceElementAssociated);
 
   mSourceElementAssociated = true;
 }
 
-} // dom namespace
-} // mozilla namespace
+}  // namespace dom
+}  // namespace mozilla
+
