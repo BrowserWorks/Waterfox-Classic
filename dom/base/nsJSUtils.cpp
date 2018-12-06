@@ -141,6 +141,7 @@ nsJSUtils::ExecutionContext::ExecutionContext(JSContext* aCx,
   , mCompartment(aCx, aGlobal)
   , mRetValue(aCx)
   , mScopeChain(aCx)
+  , mScript(aCx)
   , mRv(NS_OK)
   , mSkip(false)
   , mCoerceToString(false)
@@ -148,6 +149,7 @@ nsJSUtils::ExecutionContext::ExecutionContext(JSContext* aCx,
 #ifdef DEBUG
   , mWantsReturnValue(false)
   , mExpectScopeChain(false)
+  , mScriptUsed(false)
 #endif
 {
   MOZ_ASSERT(aCx == nsContentUtils::GetCurrentJSContext());
@@ -193,8 +195,7 @@ nsJSUtils::ExecutionContext::SetScopeChain(
 }
 
 nsresult
-nsJSUtils::ExecutionContext::JoinAndExec(void **aOffThreadToken,
-                                         JS::MutableHandle<JSScript*> aScript)
+nsJSUtils::ExecutionContext::JoinCompile(void **aOffThreadToken)
 {
   if (mSkip) {
     return mRv;
@@ -202,21 +203,16 @@ nsJSUtils::ExecutionContext::JoinAndExec(void **aOffThreadToken,
 
   MOZ_ASSERT(!mWantsReturnValue);
   MOZ_ASSERT(!mExpectScopeChain);
-  aScript.set(JS::FinishOffThreadScript(mCx, *aOffThreadToken));
+  MOZ_ASSERT(!mScript);
+  mScript.set(JS::FinishOffThreadScript(mCx, *aOffThreadToken));
   *aOffThreadToken = nullptr; // Mark the token as having been finished.
-  if (!aScript) {
+  if (!mScript) {
     mSkip = true;
     mRv = EvaluationExceptionToNSResult(mCx);
     return mRv;
   }
 
-  if (mEncodeBytecode && !StartIncrementalEncoding(mCx, aScript)) {
-    mSkip = true;
-    mRv = EvaluationExceptionToNSResult(mCx);
-    return mRv;
-  }
-
-  if (!JS_ExecuteScript(mCx, mScopeChain, aScript)) {
+if (mEncodeBytecode && !StartIncrementalEncoding(mCx, mScript)) {
     mSkip = true;
     mRv = EvaluationExceptionToNSResult(mCx);
     return mRv;
@@ -226,9 +222,8 @@ nsJSUtils::ExecutionContext::JoinAndExec(void **aOffThreadToken,
 }
 
 nsresult
-nsJSUtils::ExecutionContext::CompileAndExec(JS::CompileOptions& aCompileOptions,
-                                            JS::SourceBufferHolder& aSrcBuf,
-                                            JS::MutableHandle<JSScript*> aScript)
+nsJSUtils::ExecutionContext::Compile(JS::CompileOptions& aCompileOptions,
+                                            JS::SourceBufferHolder& aSrcBuf)
 {
   if (mSkip) {
     return mRv;
@@ -242,28 +237,23 @@ nsJSUtils::ExecutionContext::CompileAndExec(JS::CompileOptions& aCompileOptions,
   mWantsReturnValue = !aCompileOptions.noScriptRval;
 #endif
 
+  MOZ_ASSERT(!mScript);
   bool compiled = true;
   if (mScopeChain.length() == 0) {
-    compiled = JS::Compile(mCx, aCompileOptions, aSrcBuf, aScript);
+    compiled = JS::Compile(mCx, aCompileOptions, aSrcBuf, &mScript);
   } else {
-    compiled = JS::CompileForNonSyntacticScope(mCx, aCompileOptions, aSrcBuf, aScript);
+    compiled = JS::CompileForNonSyntacticScope(mCx, aCompileOptions, aSrcBuf,
+                                               &mScript);
   }
 
-  MOZ_ASSERT_IF(compiled, aScript);
+  MOZ_ASSERT_IF(compiled, mScript);
   if (!compiled) {
     mSkip = true;
     mRv = EvaluationExceptionToNSResult(mCx);
     return mRv;
   }
 
-  if (mEncodeBytecode && !StartIncrementalEncoding(mCx, aScript)) {
-    mSkip = true;
-    mRv = EvaluationExceptionToNSResult(mCx);
-    return mRv;
-  }
-
-  MOZ_ASSERT(!mCoerceToString || mWantsReturnValue);
-  if (!JS_ExecuteScript(mCx, mScopeChain, aScript, &mRetValue)) {
+  if (mEncodeBytecode && !StartIncrementalEncoding(mCx, mScript)) {
     mSkip = true;
     mRv = EvaluationExceptionToNSResult(mCx);
     return mRv;
@@ -273,10 +263,9 @@ nsJSUtils::ExecutionContext::CompileAndExec(JS::CompileOptions& aCompileOptions,
 }
 
 nsresult
-nsJSUtils::ExecutionContext::CompileAndExec(JS::CompileOptions& aCompileOptions,
-                                            const nsAString& aScript)
+nsJSUtils::ExecutionContext::Compile(JS::CompileOptions& aCompileOptions,
+                                     const nsAString& aScript)
 {
-  MOZ_ASSERT(!mEncodeBytecode, "A JSScript is needed for calling FinishIncrementalEncoding");
   if (mSkip) {
     return mRv;
   }
@@ -284,23 +273,20 @@ nsJSUtils::ExecutionContext::CompileAndExec(JS::CompileOptions& aCompileOptions,
   const nsPromiseFlatString& flatScript = PromiseFlatString(aScript);
   JS::SourceBufferHolder srcBuf(flatScript.get(), aScript.Length(),
                                 JS::SourceBufferHolder::NoOwnership);
-  JS::Rooted<JSScript*> script(mCx);
-  return CompileAndExec(aCompileOptions, srcBuf, &script);
+  return Compile(aCompileOptions, srcBuf);
 }
 
 nsresult
-nsJSUtils::ExecutionContext::DecodeAndExec(JS::CompileOptions& aCompileOptions,
-                                           mozilla::Vector<uint8_t>& aBytecodeBuf,
-                                           size_t aBytecodeIndex)
+nsJSUtils::ExecutionContext::Decode(JS::CompileOptions& aCompileOptions,
+                                    mozilla::Vector<uint8_t>& aBytecodeBuf,
+                                    size_t aBytecodeIndex)
 {
-  MOZ_ASSERT(!mEncodeBytecode, "A JSScript is needed for calling FinishIncrementalEncoding");
   if (mSkip) {
     return mRv;
   }
 
   MOZ_ASSERT(!mWantsReturnValue);
-  JS::Rooted<JSScript*> script(mCx);
-  JS::TranscodeResult tr = JS::DecodeScript(mCx, aBytecodeBuf, &script, aBytecodeIndex);
+  JS::TranscodeResult tr = JS::DecodeScript(mCx, aBytecodeBuf, &mScript, aBytecodeIndex);
   // These errors are external parameters which should be handled before the
   // decoding phase, and which are the only reasons why you might want to
   // fallback on decoding failures.
@@ -312,17 +298,11 @@ nsJSUtils::ExecutionContext::DecodeAndExec(JS::CompileOptions& aCompileOptions,
     return mRv;
   }
 
-  if (!JS_ExecuteScript(mCx, mScopeChain, script)) {
-    mSkip = true;
-    mRv = EvaluationExceptionToNSResult(mCx);
-    return mRv;
-  }
-
   return mRv;
 }
 
 nsresult
-nsJSUtils::ExecutionContext::DecodeJoinAndExec(void **aOffThreadToken)
+nsJSUtils::ExecutionContext::JoinDecode(void **aOffThreadToken)
 {
   if (mSkip) {
     return mRv;
@@ -330,10 +310,9 @@ nsJSUtils::ExecutionContext::DecodeJoinAndExec(void **aOffThreadToken)
 
   MOZ_ASSERT(!mWantsReturnValue);
   MOZ_ASSERT(!mExpectScopeChain);
-  JS::Rooted<JSScript*> script(mCx);
-  script.set(JS::FinishOffThreadScriptDecoder(mCx, *aOffThreadToken));
+  mScript.set(JS::FinishOffThreadScriptDecoder(mCx, *aOffThreadToken));
   *aOffThreadToken = nullptr; // Mark the token as having been finished.
-  if (!script || !JS_ExecuteScript(mCx, mScopeChain, script)) {
+  if (!mScript) {
     mSkip = true;
     mRv = EvaluationExceptionToNSResult(mCx);
     return mRv;
@@ -341,6 +320,33 @@ nsJSUtils::ExecutionContext::DecodeJoinAndExec(void **aOffThreadToken)
 
   return NS_OK;
 }
+
+JSScript* nsJSUtils::ExecutionContext::GetScript() {
+#ifdef DEBUG
+  MOZ_ASSERT(!mSkip);
+  MOZ_ASSERT(mScript);
+  mScriptUsed = true;
+#endif
+
+  return mScript;
+}
+
+nsresult nsJSUtils::ExecutionContext::ExecScript() {
+  if (mSkip) {
+    return mRv;
+  }
+
+  MOZ_ASSERT(mScript);
+
+  if (!JS_ExecuteScript(mCx, mScopeChain, mScript)) {
+    mSkip = true;
+    mRv = EvaluationExceptionToNSResult(mCx);
+    return mRv;
+  }
+
+  return NS_OK;
+}
+
 
 static bool
 IsPromiseValue(JSContext* aCx, JS::Handle<JS::Value> aValue)
@@ -358,43 +364,45 @@ IsPromiseValue(JSContext* aCx, JS::Handle<JS::Value> aValue)
 }
 
 nsresult
-nsJSUtils::ExecutionContext::ExtractReturnValue(JS::MutableHandle<JS::Value> aRetValue)
+nsJSUtils::ExecutionContext::ExecScript(JS::MutableHandle<JS::Value> aRetValue)
 {
-  MOZ_ASSERT(aRetValue.isUndefined());
   if (mSkip) {
-    // Repeat earlier result, as NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW are not
-    // failures cases.
-#ifdef DEBUG
-    mWantsReturnValue = false;
-#endif
+    aRetValue.setUndefined();
     return mRv;
   }
 
+  MOZ_ASSERT(mScript);
   MOZ_ASSERT(mWantsReturnValue);
+
+  if (!JS_ExecuteScript(mCx, mScopeChain, mScript, aRetValue)) {
+    mSkip = true;
+    mRv = EvaluationExceptionToNSResult(mCx);
+    return mRv;
+  }
+
 #ifdef DEBUG
   mWantsReturnValue = false;
 #endif
-  if (mCoerceToString && IsPromiseValue(mCx, mRetValue)) {
+  if (mCoerceToString && IsPromiseValue(mCx, aRetValue)) {
     // We're a javascript: url and we should treat Promise return values as
     // undefined.
     //
     // Once bug 1477821 is fixed this code might be able to go away, or will
     // become enshrined in the spec, depending.
-    mRetValue.setUndefined();
+    aRetValue.setUndefined();
   }
 
-  if (mCoerceToString && !mRetValue.isUndefined()) {
-    JSString* str = JS::ToString(mCx, mRetValue);
+  if (mCoerceToString && !aRetValue.isUndefined()) {
+    JSString* str = JS::ToString(mCx, aRetValue);
     if (!str) {
       // ToString can be a function call, so an exception can be raised while
       // executing the function.
       mSkip = true;
       return EvaluationExceptionToNSResult(mCx);
     }
-    mRetValue.set(JS::StringValue(str));
+    aRetValue.set(JS::StringValue(str));
   }
 
-  aRetValue.set(mRetValue);
   return NS_OK;
 }
 
@@ -406,7 +414,6 @@ nsJSUtils::CompileModule(JSContext* aCx,
                        JS::MutableHandle<JSObject*> aModule)
 {
   AUTO_PROFILER_LABEL("nsJSUtils::CompileModule", JS);
-
   MOZ_ASSERT_IF(aCompileOptions.versionSet,
                 aCompileOptions.version != JSVERSION_UNKNOWN);
   MOZ_ASSERT(aCx == nsContentUtils::GetCurrentJSContext());

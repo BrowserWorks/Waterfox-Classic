@@ -8,8 +8,8 @@
 #include "ScriptLoadHandler.h"
 #include "ScriptLoadRequest.h"
 #include "ScriptTrace.h"
-#include "ModuleLoadRequest.h"
 #include "LoadedScript.h"
+#include "ModuleLoadRequest.h"
 
 #include "prsystem.h"
 #include "jsapi.h"
@@ -2479,13 +2479,14 @@ ScriptLoader::EvaluateScript(ScriptLoadRequest* aRequest)
           if (aRequest->mOffThreadToken) {
             LOG(("ScriptLoadRequest (%p): Decode Bytecode & Join and Execute", aRequest));
             AutoTimer<DOM_SCRIPT_OFF_THREAD_DECODE_EXEC_MS> timer;
-            rv = exec.DecodeJoinAndExec(&aRequest->mOffThreadToken);
+            exec.JoinDecode(&aRequest->mOffThreadToken);
           } else {
             LOG(("ScriptLoadRequest (%p): Decode Bytecode and Execute", aRequest));
             AutoTimer<DOM_SCRIPT_MAIN_THREAD_DECODE_EXEC_MS> timer;
-            rv = exec.DecodeAndExec(options, aRequest->mScriptBytecode,
-                                    aRequest->mBytecodeOffset);
+            exec.Decode(options, aRequest->mScriptBytecode,
+                        aRequest->mBytecodeOffset);
           }
+          rv = exec.ExecScript();
           // We do not expect to be saving anything when we already have some
           // bytecode.
           MOZ_ASSERT(!aRequest->mCacheInfo);
@@ -2510,7 +2511,7 @@ ScriptLoader::EvaluateScript(ScriptLoadRequest* aRequest)
               // Off-main-thread parsing.
               LOG(("ScriptLoadRequest (%p): Join (off-thread parsing) and Execute",
                    aRequest));
-              rv = exec.JoinAndExec(&aRequest->mOffThreadToken, &script);
+              rv = exec.JoinCompile(&aRequest->mOffThreadToken);
               if (start) {
                 AccumulateTimeDelta(encodeBytecode
                                     ? DOM_SCRIPT_OFF_THREAD_PARSE_ENCODE_EXEC_MS
@@ -2522,13 +2523,18 @@ ScriptLoader::EvaluateScript(ScriptLoadRequest* aRequest)
               LOG(("ScriptLoadRequest (%p): Compile And Exec", aRequest));
               nsAutoString inlineData;
               SourceBufferHolder srcBuf = GetScriptSource(aRequest, inlineData);
-              rv = exec.CompileAndExec(options, srcBuf, &script);
+              rv = exec.Compile(options, srcBuf);
               if (start) {
                 AccumulateTimeDelta(encodeBytecode
                                     ? DOM_SCRIPT_MAIN_THREAD_PARSE_ENCODE_EXEC_MS
                                     : DOM_SCRIPT_MAIN_THREAD_PARSE_EXEC_MS,
                                     start);
               }
+            }
+
+            if (rv == NS_OK) {
+              script = exec.GetScript();
+              rv = exec.ExecScript();
             }
           }
 
