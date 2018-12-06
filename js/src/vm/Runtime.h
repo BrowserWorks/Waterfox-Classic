@@ -992,6 +992,9 @@ struct JSRuntime : public js::MallocProvider<JSRuntime>
     // module import and can accessed by off-thread parsing.
     mozilla::Atomic<JS::ModuleDynamicImportHook> moduleDynamicImportHook;
 
+    // A hook called on script finalization.
+    js::MainThreadData<JS::ScriptPrivateFinalizeHook> scriptPrivateFinalizeHook;
+
   private:
     // When wasm is interrupted, the pc at which we should return if the
     // interrupt hasn't stopped execution of the current running code. Since

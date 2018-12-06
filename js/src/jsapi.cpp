@@ -4879,7 +4879,7 @@ JS::SetModulePrivate(JSObject* module, const JS::Value& value)
 JS_PUBLIC_API(JS::Value)
 JS::GetModulePrivate(JSObject* module)
 {
-    return module->as<ModuleObject>().scriptSourceObject()->unwrappedPrivate();
+    return module->as<ModuleObject>().scriptSourceObject()->canonicalPrivate();
 }
 
 JS_PUBLIC_API(void)
@@ -4891,7 +4891,21 @@ JS::SetScriptPrivate(JSScript* script, const JS::Value& value)
 JS_PUBLIC_API(JS::Value)
 JS::GetScriptPrivate(JSScript* script)
 {
-    return script->sourceObject()->unwrappedPrivate();
+    return script->sourceObject()->canonicalPrivate();
+}
+
+JS_PUBLIC_API(JS::ScriptPrivateFinalizeHook)
+JS::GetScriptPrivateFinalizeHook(JSRuntime* rt)
+{
+    AssertHeapIsIdle();
+    return rt->scriptPrivateFinalizeHook;
+}
+
+JS_PUBLIC_API(void)
+JS::SetScriptPrivateFinalizeHook(JSRuntime* rt, JS::ScriptPrivateFinalizeHook func)
+{
+    AssertHeapIsIdle();
+    rt->scriptPrivateFinalizeHook = func;
 }
 
 JS_PUBLIC_API(bool)

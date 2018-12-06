@@ -3268,7 +3268,7 @@ js::FindScriptOrModulePrivateForScript(JSScript* script)
 {
     while (script) {
         ScriptSourceObject* sso = script->sourceObject();
-        Value value = sso->unwrappedPrivate();
+        Value value = sso->canonicalPrivate();
         if (!value.isUndefined()) {
             return value;
         }

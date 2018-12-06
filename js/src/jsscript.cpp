@@ -1396,6 +1396,16 @@ ScriptSourceObject::finalize(FreeOp* fop, JSObject* obj)
     ScriptSourceObject* sso = &obj->as<ScriptSourceObject>();
     sso->source()->decref();
     sso->setReservedSlot(SOURCE_SLOT, PrivateValue(nullptr));
+
+    Value value = sso->canonicalPrivate();
+    if (!value.isUndefined()) {
+        // The embedding may need to dispose of its private data.
+        JS::AutoSuppressGCAnalysis suppressGC;
+        if (JS::ScriptPrivateFinalizeHook hook =
+                fop->runtime()->scriptPrivateFinalizeHook) {
+            hook(fop, value);
+        }
+    }
 }
 
 static const ClassOps ScriptSourceObjectClassOps = {
