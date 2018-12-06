@@ -2579,6 +2579,15 @@ ScriptLoader::EvaluateScript(ScriptLoadRequest* aRequest)
   return rv;
 }
 
+/* static */ LoadedScript* ScriptLoader::GetActiveScript(JSContext* aCx) {
+  JS::Value value = JS::GetScriptedCallerPrivate(aCx);
+  if (value.isUndefined()) {
+    return nullptr;
+  }
+
+  return static_cast<LoadedScript*>(value.toPrivate());
+}
+
 void
 ScriptLoader::RegisterForBytecodeEncoding(ScriptLoadRequest* aRequest)
 {
