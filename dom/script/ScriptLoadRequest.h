@@ -283,6 +283,9 @@ public:
   // Holds the Cache information, which is used to register the bytecode
   // on the cache entry, such that we can load it the next time.
   nsCOMPtr<nsICacheInfoChannel> mCacheInfo;
+
+  // The base URL used for resolving relative module imports.
+  nsCOMPtr<nsIURI> mBaseURL;
 };
 
 class ScriptLoadRequestList : private mozilla::LinkedList<ScriptLoadRequest>
