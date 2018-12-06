@@ -63,8 +63,8 @@ public:
 
   // Create a module load request for dynamic module import.
   static ModuleLoadRequest* CreateDynamicImport(
-      nsIURI* aURI, LoadedScript* aScript,
-      JS::Handle<JS::Value> aReferencingPrivate,
+      nsIURI* aURI, ScriptFetchOptions* aFetchOptions, nsIURI* aBaseURL,
+      ScriptLoader* aLoader, JS::Handle<JS::Value> aReferencingPrivate,
       JS::Handle<JSString*> aSpecifier, JS::Handle<JSObject*> aPromise);
 
   bool IsTopLevel() const override { return mIsTopLevel; }
