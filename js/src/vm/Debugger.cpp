@@ -7472,7 +7472,7 @@ struct DebuggerSourceGetElementMatcher
 {
     using ReturnType = JSObject*;
     ReturnType match(HandleScriptSource sourceObject) {
-        return sourceObject->element();
+        return sourceObject->unwrappedElement();
     }
     ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {
         return nullptr;
@@ -7499,7 +7499,7 @@ struct DebuggerSourceGetElementPropertyMatcher
 {
     using ReturnType = Value;
     ReturnType match(HandleScriptSource sourceObject) {
-        return sourceObject->elementAttributeName();
+        return sourceObject->unwrappedElementAttributeName();
     }
     ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {
         return UndefinedValue();
@@ -7532,7 +7532,7 @@ class DebuggerSourceGetIntroductionScriptMatcher
     using ReturnType = bool;
 
     ReturnType match(HandleScriptSource sourceObject) {
-        RootedScript script(cx_, sourceObject->introductionScript());
+        RootedScript script(cx_, sourceObject->unwrappedIntroductionScript());
         if (script) {
             RootedObject scriptDO(cx_, dbg_->wrapScript(cx_, script));
             if (!scriptDO)
@@ -7570,8 +7570,10 @@ struct DebuggerGetIntroductionOffsetMatcher
         // ScriptSource, only hand out the introduction offset if we also have
         // the script within which it applies.
         ScriptSource* ss = sourceObject->source();
-        if (ss->hasIntroductionOffset() && sourceObject->introductionScript())
+        if (ss->hasIntroductionOffset() &&
+            sourceObject->unwrappedIntroductionScript()) {
             return Int32Value(ss->introductionOffset());
+        }
         return UndefinedValue();
     }
     ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {

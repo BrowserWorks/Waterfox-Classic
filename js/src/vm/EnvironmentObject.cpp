@@ -3267,14 +3267,14 @@ Value
 js::FindScriptOrModulePrivateForScript(JSScript* script)
 {
     while (script) {
-        ScriptSourceObject* sso = &script->scriptSourceUnwrap();
-        Value value = sso->getPrivate();
+        ScriptSourceObject* sso = script->sourceObject();
+        Value value = sso->unwrappedPrivate();
         if (!value.isUndefined()) {
             return value;
         }
 
-        MOZ_ASSERT(sso->introductionScript() != script);
-        script = sso->introductionScript();
+        MOZ_ASSERT(sso->unwrappedIntroductionScript() != script);
+        script = sso->unwrappedIntroductionScript();
     }
 
     return UndefinedValue();

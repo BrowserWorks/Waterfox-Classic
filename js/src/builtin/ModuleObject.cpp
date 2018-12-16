@@ -863,7 +863,7 @@ ModuleObject::init(HandleScript script)
     MOZ_ASSERT(script);
     initReservedSlot(ScriptSlot, PrivateGCThingValue(script));
     initReservedSlot(StatusSlot, Int32Value(MODULE_STATUS_UNINSTANTIATED));
-    initReservedSlot(ScriptSourceObjectSlot, ObjectValue(script->scriptSourceUnwrap()));
+    initReservedSlot(ScriptSourceObjectSlot, ObjectValue(*script->sourceObject()));
 }
 
 void

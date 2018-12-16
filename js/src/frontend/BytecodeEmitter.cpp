@@ -6121,7 +6121,7 @@ BytecodeEmitter::emitFunction(ParseNode* pn, bool needsProto)
             const TransitiveCompileOptions& transitiveOptions = parser.options();
             CompileOptions options(cx, transitiveOptions);
 
-            Rooted<JSObject*> sourceObject(cx, script->sourceObject());
+            Rooted<ScriptSourceObject*> sourceObject(cx, script->sourceObject());
             Rooted<JSScript*> script(cx, JSScript::Create(cx, options, sourceObject,
                                                           funbox->bufStart, funbox->bufEnd,
                                                           funbox->toStringStart,

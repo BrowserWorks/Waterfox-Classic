@@ -571,8 +571,9 @@ js::NukeCrossCompartmentWrappers(JSContext* cx,
             // the wrapper, this could save us a bit of time.
             JSObject* wrapped = UncheckedUnwrap(k.as<JSObject*>());
 
-            // We never nuke script source objects, since only ever used internally by the JS
-            // engine, and are expected to remain valid throughout a scripts lifetime.
+            // We never nuke ScriptSourceObjects, since they are only ever used
+            // internally by the JS engine, and are expected to remain valid
+            // throughout a script's lifetime.
             if (MOZ_UNLIKELY(wrapped->is<ScriptSourceObject>())) {
                 continue;
             }
