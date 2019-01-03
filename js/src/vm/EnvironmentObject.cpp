@@ -3266,15 +3266,18 @@ js::GetModuleObjectForScript(JSScript* script)
 Value
 js::FindScriptOrModulePrivateForScript(JSScript* script)
 {
-    while (script) {
+    MOZ_ASSERT(script);
+    ScriptSourceObject* sso = script->sourceObject();
+    while (sso) {
         ScriptSourceObject* sso = script->sourceObject();
         Value value = sso->canonicalPrivate();
         if (!value.isUndefined()) {
             return value;
         }
 
-        MOZ_ASSERT(sso->unwrappedIntroductionScript() != script);
-        script = sso->unwrappedIntroductionScript();
+        ScriptSourceObject* parent = sso->unwrappedIntroductionSourceObject();
+        MOZ_ASSERT(parent != sso);
+        sso = parent;
     }
 
     return UndefinedValue();
