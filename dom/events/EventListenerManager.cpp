@@ -26,6 +26,8 @@
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/EventTargetBinding.h"
+#include "mozilla/dom/LoadedScript.h"
+#include "mozilla/dom/ScriptLoader.h"
 #include "mozilla/dom/TouchEvent.h"
 #include "mozilla/TimelineConsumers.h"
 #include "mozilla/EventTimelineMarker.h"
@@ -1093,6 +1095,15 @@ EventListenerManager::CompileEventHandlerInternal(Listener* aListener,
                                       argCount, argNames, *body, handler.address());
   NS_ENSURE_SUCCESS(result, result);
   NS_ENSURE_TRUE(handler, NS_ERROR_FAILURE);
+
+  JS::Rooted<JSFunction*> func(cx, JS_GetObjectFunction(handler));
+  MOZ_ASSERT(func);
+  JS::Rooted<JSScript*> jsScript(cx, JS_GetFunctionScript(cx, func));
+  MOZ_ASSERT(jsScript);
+  RefPtr<LoadedScript> loaderScript = ScriptLoader::GetActiveScript(cx);
+  if (loaderScript) {
+    loaderScript->AssociateWithScript(jsScript);
+  }
 
   if (jsEventHandler->EventName() == nsGkAtoms::onerror && win) {
     RefPtr<OnErrorEventHandlerNonNull> handlerCallback =
