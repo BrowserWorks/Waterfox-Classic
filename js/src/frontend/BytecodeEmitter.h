@@ -118,6 +118,7 @@ class ElemOpEmitter;
 class EmitterScope;
 class NestableControl;
 class OptionalEmitter;
+class PropertyEmitter;
 class PropOpEmitter;
 class TDZCheckCache;
 
@@ -534,7 +535,7 @@ struct MOZ_STACK_CLASS BytecodeEmitter
 
     MOZ_MUST_USE bool emitHoistedFunctionsInList(ParseNode* pn);
 
-    MOZ_MUST_USE bool emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp,
+    MOZ_MUST_USE bool emitPropertyList(ParseNode* pn, PropertyEmitter& pe,
                                        PropListType type);
 
     // To catch accidental misuse, emitUint16Operand/emit3 assert that they are
@@ -697,6 +698,8 @@ struct MOZ_STACK_CLASS BytecodeEmitter
 
     MOZ_MUST_USE bool setOrEmitSetFunName(ParseNode* maybeFun, HandleAtom name);
 
+    MOZ_MUST_USE bool setFunName(JSFunction* fun, JSAtom* name);
+    MOZ_MUST_USE bool emitSetClassConstructorName(JSAtom* name);
     MOZ_MUST_USE bool emitInitializer(ParseNode* initializer, ParseNode* pattern);
     MOZ_MUST_USE bool emitInitializerInBranch(ParseNode* initializer, ParseNode* pattern);
 
@@ -788,7 +791,8 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     MOZ_MUST_USE bool emitFunctionFormalParameters(ParseNode* pn);
     MOZ_MUST_USE bool emitInitializeFunctionSpecialNames();
     MOZ_MUST_USE bool emitFunctionBody(ParseNode* pn);
-    MOZ_MUST_USE bool emitLexicalInitialization(ParseNode* pn);
+    MOZ_MUST_USE bool emitLexicalInitialization(ParseNode* name);
+    MOZ_MUST_USE bool emitLexicalInitialization(JSAtom* name);
 
     // Emit bytecode for the spread operator.
     //

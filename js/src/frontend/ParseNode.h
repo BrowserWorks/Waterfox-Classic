@@ -977,6 +977,12 @@ struct CodeNode : public ParseNode
         MOZ_ASSERT(!pn_objbox);
     }
 
+    static bool test(const ParseNode& node) {
+        bool match = node.isKind(ParseNodeKind::Function) || node.isKind(ParseNodeKind::Module);
+        MOZ_ASSERT_IF(match, node.isArity(PN_CODE));
+        return match;
+    }
+
   public:
 #ifdef DEBUG
   void dump(GenericPrinter& out, int indent);
