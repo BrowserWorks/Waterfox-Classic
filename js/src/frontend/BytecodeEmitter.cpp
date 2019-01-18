@@ -36,6 +36,7 @@
 #include "frontend/ExpressionStatementEmitter.h"
 #include "frontend/ForOfLoopControl.h"
 #include "frontend/IfEmitter.h"
+#include "frontend/LabelEmitter.h"  // LabelEmitter
 #include "frontend/NameOpEmitter.h"
 #include "frontend/OptionalEmitter.h"
 #include "frontend/Parser.h"
@@ -8143,32 +8144,18 @@ BytecodeEmitter::emitIncOrDec(ParseNode* pn)
 // Using MOZ_NEVER_INLINE in here is a workaround for llvm.org/pr14047. See
 // the comment on emitSwitch.
 MOZ_NEVER_INLINE bool
-BytecodeEmitter::emitLabeledStatement(const LabeledStatement* pn)
+BytecodeEmitter::emitLabeledStatement(const LabeledStatement* labeledStmt)
 {
-    /*
-     * Emit a JSOP_LABEL instruction. The argument is the offset to the statement
-     * following the labeled statement.
-     */
-    uint32_t index;
-    if (!makeAtomIndex(pn->label(), &index))
+    LabelEmitter label(this);
+    if (!label.emitLabel(labeledStmt->label())) {
         return false;
-
-    JumpList top;
-    if (!emitJump(JSOP_LABEL, &top))
+    }
+    if (!emitTree(labeledStmt->statement())) {
         return false;
-
-    /* Emit code for the labeled statement. */
-    LabelControl controlInfo(this, pn->label(), offset());
-
-    if (!emitTree(pn->statement()))
+    }
+    if (!label.emitEnd()) {
         return false;
-
-    /* Patch the JSOP_LABEL offset. */
-    JumpTarget brk{ lastNonJumpTargetOffset() };
-    patchJumpsToTarget(top, brk);
-
-    if (!controlInfo.patchBreaks(this))
-        return false;
+    }
 
     return true;
 }

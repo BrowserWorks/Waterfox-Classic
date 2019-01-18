@@ -607,7 +607,8 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     MOZ_MUST_USE bool emitIf(ParseNode* pn);
     MOZ_MUST_USE bool emitWith(ParseNode* pn);
 
-    MOZ_NEVER_INLINE MOZ_MUST_USE bool emitLabeledStatement(const LabeledStatement* pn);
+    MOZ_NEVER_INLINE MOZ_MUST_USE bool emitLabeledStatement(
+        const LabeledStatement* labeledStmt);
     MOZ_NEVER_INLINE MOZ_MUST_USE bool emitLexicalScope(ParseNode* pn);
     MOZ_MUST_USE bool emitLexicalScopeBody(ParseNode* body,
                                            EmitLineNumberNote emitLineNote = EMIT_LINENOTE);
