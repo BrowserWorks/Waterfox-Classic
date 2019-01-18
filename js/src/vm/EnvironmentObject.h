@@ -1145,9 +1145,6 @@ CreateObjectsForEnvironmentChain(JSContext* cx, AutoObjectVector& chain,
 ModuleObject*
 GetModuleObjectForScript(JSScript* script);
 
-Value
-FindScriptOrModulePrivateForScript(JSScript* script);
-
 ModuleEnvironmentObject* GetModuleEnvironmentForScript(JSScript* script);
 
 MOZ_MUST_USE bool

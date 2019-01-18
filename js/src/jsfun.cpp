@@ -1782,7 +1782,8 @@ CreateDynamicFunction(JSContext* cx, const CallArgs& args, GeneratorKind generat
     options.setMutedErrors(mutedErrors)
            .setFileAndLine(filename, 1)
            .setNoScriptRval(false)
-           .setIntroductionInfo(introducerFilename, introductionType, lineno, maybeScript, pcOffset);
+           .setIntroductionInfo(introducerFilename, introductionType, lineno, maybeScript, pcOffset)
+           .setScriptOrModule(maybeScript);
 
     StringBuffer sb(cx);
 

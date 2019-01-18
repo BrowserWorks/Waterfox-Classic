@@ -3886,6 +3886,15 @@ class JS_FRIEND_API(TransitiveCompileOptions)
     virtual JSString* elementAttributeName() const = 0;
     virtual JSScript* introductionScript() const = 0;
 
+    // For some compilations the spec requires the ScriptOrModule field of the
+    // resulting script to be set to the currently executing script. This can be
+    // achieved by setting this option with setScriptOrModule() below.
+    //
+    // Note that this field doesn't explicitly exist in our implementation;
+    // instead the ScriptSourceObject's private value is set to that associated
+    // with the specified script.
+    virtual JSScript* scriptOrModule() const = 0;
+
     // POD options.
     JSVersion version;
     bool versionSet;
@@ -3948,9 +3957,10 @@ class JS_FRIEND_API(ReadOnlyCompileOptions) : public TransitiveCompileOptions
     const char* filename() const { return filename_; }
     const char* introducerFilename() const { return introducerFilename_; }
     const char16_t* sourceMapURL() const { return sourceMapURL_; }
-    virtual JSObject* element() const = 0;
-    virtual JSString* elementAttributeName() const = 0;
-    virtual JSScript* introductionScript() const = 0;
+    JSObject* element() const override = 0;
+    JSString* elementAttributeName() const override = 0;
+    JSScript* introductionScript() const override = 0;
+    JSScript* scriptOrModule() const override = 0;
 
     // POD options.
     unsigned lineno;
@@ -3993,6 +4003,7 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     PersistentRootedObject elementRoot;
     PersistentRootedString elementAttributeNameRoot;
     PersistentRootedScript introductionScriptRoot;
+    PersistentRootedScript scriptOrModuleRoot;
 
   public:
     // A minimal constructor, for use with OwningCompileOptions::copy. This
@@ -4005,6 +4016,7 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     JSObject* element() const override { return elementRoot; }
     JSString* elementAttributeName() const override { return elementAttributeNameRoot; }
     JSScript* introductionScript() const override { return introductionScriptRoot; }
+    JSScript* scriptOrModule() const override { return scriptOrModuleRoot; }
 
     // Set this to a copy of |rhs|. Return false on OOM.
     bool copy(JSContext* cx, const ReadOnlyCompileOptions& rhs);
@@ -4027,6 +4039,10 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     }
     OwningCompileOptions& setIntroductionScript(JSScript* s) {
         introductionScriptRoot = s;
+        return *this;
+    }
+    OwningCompileOptions& setScriptOrModule(JSScript* s) {
+        scriptOrModuleRoot = s;
         return *this;
     }
     OwningCompileOptions& setMutedErrors(bool mute) {
@@ -4076,12 +4092,13 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) final : public ReadOnlyCompi
     RootedObject elementRoot;
     RootedString elementAttributeNameRoot;
     RootedScript introductionScriptRoot;
+    RootedScript scriptOrModuleRoot;
 
   public:
     explicit CompileOptions(JSContext* cx, JSVersion version = JSVERSION_UNKNOWN);
     CompileOptions(JSContext* cx, const ReadOnlyCompileOptions& rhs)
       : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
-        introductionScriptRoot(cx)
+        introductionScriptRoot(cx), scriptOrModuleRoot(cx)
     {
         copyPODOptions(rhs);
 
@@ -4091,11 +4108,12 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) final : public ReadOnlyCompi
         elementRoot = rhs.element();
         elementAttributeNameRoot = rhs.elementAttributeName();
         introductionScriptRoot = rhs.introductionScript();
+        scriptOrModuleRoot = rhs.scriptOrModule();
     }
 
     CompileOptions(JSContext* cx, const TransitiveCompileOptions& rhs)
       : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
-        introductionScriptRoot(cx)
+        introductionScriptRoot(cx), scriptOrModuleRoot(cx)
     {
         copyPODTransitiveOptions(rhs);
 
@@ -4105,11 +4123,13 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) final : public ReadOnlyCompi
         elementRoot = rhs.element();
         elementAttributeNameRoot = rhs.elementAttributeName();
         introductionScriptRoot = rhs.introductionScript();
+        scriptOrModuleRoot = rhs.scriptOrModule();
     }
 
     JSObject* element() const override { return elementRoot; }
     JSString* elementAttributeName() const override { return elementAttributeNameRoot; }
     JSScript* introductionScript() const override { return introductionScriptRoot; }
+    JSScript* scriptOrModule() const override { return scriptOrModuleRoot; }
 
     CompileOptions& setFile(const char* f) { filename_ = f; return *this; }
     CompileOptions& setLine(unsigned l) { lineno = l; return *this; }
@@ -4124,6 +4144,10 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) final : public ReadOnlyCompi
     }
     CompileOptions& setIntroductionScript(JSScript* s) {
         introductionScriptRoot = s;
+        return *this;
+    }
+    CompileOptions& setScriptOrModule(JSScript* s) {
+        scriptOrModuleRoot = s;
         return *this;
     }
     CompileOptions& setMutedErrors(bool mute) {
@@ -4536,24 +4560,20 @@ extern JS_PUBLIC_API(JS::Value)
 GetScriptedCallerPrivate(JSContext* cx);
 
 /**
- * A hook that's called whenever a script or module which has a private value
- * set with SetScriptPrivate() or SetModulePrivate() is finalized. This can be
- * used to clean up the private state. The private value is passed as an
- * argument.
+ * Hooks called when references to a script private value are created or
+ * destroyed. This allows use of a reference counted object as the
+ * script private.
  */
-using ScriptPrivateFinalizeHook = void (*)(JSFreeOp*, const JS::Value&);
-
-/**
- * Get the script private finalize hook for the runtime.
- */
-extern JS_PUBLIC_API(ScriptPrivateFinalizeHook)
-GetScriptPrivateFinalizeHook(JSRuntime* rt);
+using ScriptPrivateReferenceHook = void (*)(const JS::Value&);
 
 /**
  * Set the script private finalize hook for the runtime to the given function.
  */
 extern JS_PUBLIC_API(void)
-SetScriptPrivateFinalizeHook(JSRuntime* rt, ScriptPrivateFinalizeHook func);
+SetScriptPrivateReferenceHooks(
+  JSRuntime* rt,
+  ScriptPrivateReferenceHook addRefHook,
+  ScriptPrivateReferenceHook releaseHook);
 
 /*
  * Perform the ModuleInstantiate operation on the given source text module

@@ -423,7 +423,7 @@ JSObject*
 CallModuleResolveHook(JSContext* cx, HandleValue referencingPrivate, HandleString specifier);
 
 JSObject*
-StartDynamicModuleImport(JSContext* cx, HandleValue referencingPrivate, HandleValue specifier);
+StartDynamicModuleImport(JSContext* cx, HandleObject referencingScriptSource, HandleValue specifier);
 
 bool
 FinishDynamicModuleImport(JSContext* cx, HandleValue referencingPrivate, HandleString specifier,

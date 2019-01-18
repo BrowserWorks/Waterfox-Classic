@@ -5174,7 +5174,7 @@ BaselineCompiler::emit_JSOP_IMPORTMETA()
     return true;
 }
 
-typedef JSObject* (*StartDynamicModuleImportFn)(JSContext*, HandleValue, HandleValue);
+typedef JSObject* (*StartDynamicModuleImportFn)(JSContext*, HandleObject, HandleValue);
 static const VMFunction StartDynamicModuleImportInfo =
     FunctionInfo<StartDynamicModuleImportFn>(js::StartDynamicModuleImport,
                                                 "StartDynamicModuleImport");
@@ -5182,14 +5182,14 @@ static const VMFunction StartDynamicModuleImportInfo =
 bool
 BaselineCompiler::emit_JSOP_DYNAMIC_IMPORT()
 {
-    RootedValue referencingPrivate(cx, FindScriptOrModulePrivateForScript(script));
+    RootedObject referencingScriptSource(cx, script->sourceObject());
 
     // Put specifier value in R0.
     frame.popRegsAndSync(1);
 
     prepareVMCall();
     pushArg(R0);
-    pushArg(referencingPrivate);
+    pushArg(ImmGCPtr(referencingScriptSource));
     if (!callVM(StartDynamicModuleImportInfo)) {
         return false;
     }

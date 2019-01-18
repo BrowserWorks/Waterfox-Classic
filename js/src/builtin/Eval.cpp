@@ -288,7 +288,8 @@ EvalKernel(JSContext* cx, HandleValue v, EvalType evalType, AbstractFramePtr cal
         options.setIsRunOnce(true)
                .setNoScriptRval(false)
                .setMutedErrors(mutedErrors)
-               .maybeMakeStrictMode(evalType == DIRECT_EVAL && IsStrictEvalPC(pc));
+               .maybeMakeStrictMode(evalType == DIRECT_EVAL && IsStrictEvalPC(pc))
+               .setScriptOrModule(maybeScript);
 
         if (introducerFilename) {
             options.setFileAndLine(filename, 1);
@@ -307,9 +308,9 @@ EvalKernel(JSContext* cx, HandleValue v, EvalType evalType, AbstractFramePtr cal
                                                   ? SourceBufferHolder::GiveOwnership
                                                   : SourceBufferHolder::NoOwnership;
         SourceBufferHolder srcBuf(chars, linearStr->length(), ownership);
-        JSScript* compiled = frontend::CompileEvalScript(cx, cx->tempLifoAlloc(),
-                                                         env, enclosing,
-                                                         options, srcBuf);
+        RootedScript compiled(cx, frontend::CompileEvalScript(cx, cx->tempLifoAlloc(),
+                                                              env, enclosing,
+                                                              options, srcBuf));
         if (!compiled)
             return false;
 

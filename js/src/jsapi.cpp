@@ -3899,7 +3899,8 @@ JS::OwningCompileOptions::OwningCompileOptions(JSContext* cx)
     : ReadOnlyCompileOptions(),
       elementRoot(cx),
       elementAttributeNameRoot(cx),
-      introductionScriptRoot(cx)
+      introductionScriptRoot(cx),
+      scriptOrModuleRoot(cx)
 {
 }
 
@@ -3919,6 +3920,7 @@ JS::OwningCompileOptions::copy(JSContext* cx, const ReadOnlyCompileOptions& rhs)
     setElement(rhs.element());
     setElementAttributeName(rhs.elementAttributeName());
     setIntroductionScript(rhs.introductionScript());
+    setScriptOrModule(rhs.scriptOrModule());
 
     return setFileAndLine(cx, rhs.filename(), rhs.lineno) &&
            setSourceMapURL(cx, rhs.sourceMapURL()) &&
@@ -3988,7 +3990,7 @@ JS::OwningCompileOptions::setIntroducerFilename(JSContext* cx, const char* s)
 
 JS::CompileOptions::CompileOptions(JSContext* cx, JSVersion version)
     : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
-      introductionScriptRoot(cx)
+      introductionScriptRoot(cx), scriptOrModuleRoot(cx)
 {
     this->version = (version != JSVERSION_UNKNOWN) ? version : cx->findVersion();
 
@@ -4873,7 +4875,8 @@ JS::CompileModule(JSContext* cx, const ReadOnlyCompileOptions& options,
 JS_PUBLIC_API(void)
 JS::SetModulePrivate(JSObject* module, const JS::Value& value)
 {
-    module->as<ModuleObject>().scriptSourceObject()->setPrivate(value);
+    JSRuntime* rt = module->zone()->runtimeFromMainThread();
+    module->as<ModuleObject>().scriptSourceObject()->setPrivate(rt, value);
 }
 
 JS_PUBLIC_API(JS::Value)
@@ -4885,7 +4888,8 @@ JS::GetModulePrivate(JSObject* module)
 JS_PUBLIC_API(void)
 JS::SetScriptPrivate(JSScript* script, const JS::Value& value)
 {
-    script->sourceObject()->setPrivate(value);
+    JSRuntime* rt = script->zone()->runtimeFromMainThread();
+    script->sourceObject()->setPrivate(rt, value);
 }
 
 JS_PUBLIC_API(JS::Value)
@@ -4904,21 +4908,17 @@ JS::GetScriptedCallerPrivate(JSContext* cx) {
     return UndefinedValue();
   }
 
-  return FindScriptOrModulePrivateForScript(iter.script());
-}
-
-JS_PUBLIC_API(JS::ScriptPrivateFinalizeHook)
-JS::GetScriptPrivateFinalizeHook(JSRuntime* rt)
-{
-    AssertHeapIsIdle();
-    return rt->scriptPrivateFinalizeHook;
+  return iter.script()->sourceObject()->canonicalPrivate();
 }
 
 JS_PUBLIC_API(void)
-JS::SetScriptPrivateFinalizeHook(JSRuntime* rt, JS::ScriptPrivateFinalizeHook func)
-{
-    AssertHeapIsIdle();
-    rt->scriptPrivateFinalizeHook = func;
+JS::SetScriptPrivateReferenceHooks(
+  JSRuntime* rt,
+  JS::ScriptPrivateReferenceHook addRefHook,
+  JS::ScriptPrivateReferenceHook releaseHook) {
+  AssertHeapIsIdle();
+  rt->scriptPrivateAddRefHook = addRefHook;
+  rt->scriptPrivateReleaseHook = releaseHook;
 }
 
 JS_PUBLIC_API(bool)

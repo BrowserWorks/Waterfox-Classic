@@ -3263,26 +3263,6 @@ js::GetModuleObjectForScript(JSScript* script)
     return nullptr;
 }
 
-Value
-js::FindScriptOrModulePrivateForScript(JSScript* script)
-{
-    MOZ_ASSERT(script);
-    ScriptSourceObject* sso = script->sourceObject();
-    while (sso) {
-        ScriptSourceObject* sso = script->sourceObject();
-        Value value = sso->canonicalPrivate();
-        if (!value.isUndefined()) {
-            return value;
-        }
-
-        ScriptSourceObject* parent = sso->unwrappedIntroductionSourceObject();
-        MOZ_ASSERT(parent != sso);
-        sso = parent;
-    }
-
-    return UndefinedValue();
-}
-
 bool
 js::GetThisValueForDebuggerMaybeOptimizedOut(JSContext* cx, AbstractFramePtr frame, jsbytecode* pc,
                                              MutableHandleValue res)

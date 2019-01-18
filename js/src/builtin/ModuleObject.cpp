@@ -1718,8 +1718,17 @@ js::CallModuleResolveHook(JSContext* cx, HandleValue referencingPrivate, HandleS
 }
 
 JSObject*
-js::StartDynamicModuleImport(JSContext* cx, HandleValue referencingPrivate, HandleValue specifierArg)
+js::StartDynamicModuleImport(JSContext* cx,
+                             HandleObject referencingScriptSource,
+                             HandleValue specifierArg)
 {
+    RootedValue referencingPrivate(cx);
+    if (referencingScriptSource) {
+        ScriptSourceObject* sso =
+            &UncheckedUnwrap(referencingScriptSource)->as<ScriptSourceObject>();
+        referencingPrivate = sso->canonicalPrivate();
+    }
+
     RootedObject promiseConstructor(cx, JS::GetPromiseConstructor(cx));
     if (!promiseConstructor) {
         return nullptr;

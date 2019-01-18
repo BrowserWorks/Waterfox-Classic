@@ -12776,12 +12776,11 @@ IonBuilder::jsop_importmeta()
 AbortReasonOr<Ok>
 IonBuilder::jsop_dynamic_import()
 {
-    Value referencingPrivate = FindScriptOrModulePrivateForScript(script());
-    MConstant* ref = constant(referencingPrivate);
+    JSObject* referencingScriptSource = script()->sourceObject();
 
     MDefinition* specifier = current->pop();
 
-    MDynamicImport* ins = MDynamicImport::New(alloc(), ref, specifier);
+    MDynamicImport* ins = MDynamicImport::New(alloc(), referencingScriptSource, specifier);
     current->add(ins);
     current->push(ins);
     return resumeAfter(ins);
