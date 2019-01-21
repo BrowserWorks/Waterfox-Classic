@@ -328,6 +328,10 @@ JSScript* nsJSUtils::ExecutionContext::GetScript() {
   mScriptUsed = true;
 #endif
 
+  return MaybeGetScript();
+}
+
+JSScript* nsJSUtils::ExecutionContext::MaybeGetScript() {
   return mScript;
 }
 

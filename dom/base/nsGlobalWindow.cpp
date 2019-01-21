@@ -13096,10 +13096,11 @@ nsGlobalWindow::RunTimeoutHandler(Timeout* aTimeout,
         nsJSUtils::ExecutionContext exec(aes.cx(), global);
         rv = exec.Compile(options, handler->GetHandlerText());
 
-        if (rv == NS_OK) {
+        JSScript* script = exec.MaybeGetScript();
+        if (script) {
           LoadedScript* initiatingScript = handler->GetInitiatingScript();
           if (initiatingScript) {
-            initiatingScript->AssociateWithScript(exec.GetScript());
+            initiatingScript->AssociateWithScript(script);
           }
 
           rv = exec.ExecScript();

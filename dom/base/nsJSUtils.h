@@ -173,6 +173,9 @@ public:
     // Get a successfully compiled script.
     JSScript* GetScript();
 
+    // Get the compiled script if present, or nullptr.
+    JSScript* MaybeGetScript();
+
     // Execute the compiled script and ignore the return value.
     MOZ_MUST_USE nsresult ExecScript();
 
