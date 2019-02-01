@@ -581,8 +581,8 @@ public:
   RefPtr<mozilla::GenericPromise>
   StartFetchingModuleAndDependencies(ModuleLoadRequest* aParent, nsIURI* aURI);
 
-  nsresult AssociateSourceElementsForModuleTree(JSContext* aCx,
-                                                ModuleLoadRequest* aRequest);
+  nsresult InitDebuggerDataForModuleTree(JSContext* aCx,
+                                         ModuleLoadRequest* aRequest);
 
   void RunScriptWhenSafe(ScriptLoadRequest* aRequest);
 
