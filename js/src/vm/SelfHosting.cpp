@@ -40,6 +40,7 @@
 #include "builtin/Stream.h"
 #include "builtin/TypedObject.h"
 #include "builtin/WeakMapObject.h"
+#include "frontend/BytecodeCompiler.h"
 #include "gc/Marking.h"
 #include "gc/Policy.h"
 #include "jit/AtomicOperations.h"
@@ -3046,6 +3047,26 @@ CloneString(JSContext* cx, JSFlatString* selfHostedString)
            : NewStringCopyNDontDeflate<CanGC>(cx, chars.twoByteRange().begin().get(), len);
 }
 
+// Returns the ScriptSourceObject to use for cloned self-hosted scripts in the
+// current compartment.
+static ScriptSourceObject* SelfHostingScriptSourceObject(JSContext* cx) {
+  if (ScriptSourceObject* sso = cx->compartment()->selfHostingScriptSource) {
+    return sso;
+  }
+
+  CompileOptions options(cx);
+  FillSelfHostingCompileOptions(options);
+
+  ScriptSourceObject* sourceObject =
+      frontend::CreateScriptSourceObject(cx, options);
+  if (!sourceObject) {
+    return nullptr;
+  }
+
+  cx->compartment()->selfHostingScriptSource.set(sourceObject);
+  return sourceObject;
+}
+
 static JSObject*
 CloneObject(JSContext* cx, HandleNativeObject selfHostedObject)
 {
@@ -3079,9 +3100,14 @@ CloneObject(JSContext* cx, HandleNativeObject selfHostedObject)
             Handle<GlobalObject*> global = cx->global();
             Rooted<LexicalEnvironmentObject*> globalLexical(cx, &global->lexicalEnvironment());
             RootedScope emptyGlobalScope(cx, &global->emptyGlobalScope());
+            Rooted<ScriptSourceObject*> sourceObject(
+                cx, SelfHostingScriptSourceObject(cx));
+            if (!sourceObject) {
+                return nullptr;
+            }
             MOZ_ASSERT(!CanReuseScriptForClone(cx->compartment(), selfHostedFunction, global));
             clone = CloneFunctionAndScript(cx, selfHostedFunction, globalLexical, emptyGlobalScope,
-                                           kind);
+                                           sourceObject, kind);
             // To be able to re-lazify the cloned function, its name in the
             // self-hosting compartment has to be stored on the clone.
             if (clone && hasName) {
@@ -3207,6 +3233,11 @@ JSRuntime::cloneSelfHostedFunctionScript(JSContext* cx, HandlePropertyName name,
     if (!sourceScript)
         return false;
 
+    Rooted<ScriptSourceObject*> sourceObject(cx, SelfHostingScriptSourceObject(cx));
+    if (!sourceObject) {
+        return false;
+    }
+
     // Assert that there are no intervening scopes between the global scope
     // and the self-hosted script. Toplevel lexicals are explicitly forbidden
     // by the parser when parsing self-hosted code. The fact they have the
@@ -3214,8 +3245,10 @@ JSRuntime::cloneSelfHostedFunctionScript(JSContext* cx, HandlePropertyName name,
     // invariants.
     MOZ_ASSERT(sourceScript->outermostScope()->enclosing()->kind() == ScopeKind::Global);
     RootedScope emptyGlobalScope(cx, &cx->global()->emptyGlobalScope());
-    if (!CloneScriptIntoFunction(cx, emptyGlobalScope, targetFun, sourceScript))
+    if (!CloneScriptIntoFunction(cx, emptyGlobalScope, targetFun, sourceScript,
+                                 sourceObject)) {
         return false;
+    }
     MOZ_ASSERT(!targetFun->isInterpretedLazy());
 
     MOZ_ASSERT(sourceFun->nargs() == targetFun->nargs());

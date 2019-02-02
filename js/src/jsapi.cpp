@@ -3609,22 +3609,22 @@ CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject env, Handle
         return nullptr;
     }
 
+    // Only allow cloning normal, interpreted functions.
     RootedFunction fun(cx, &funobj->as<JSFunction>());
+    if (fun->isNative() || fun->isBoundFunction() ||
+        fun->kind() != JSFunction::NormalFunction || fun->isExtended() ||
+        fun->isSelfHostedBuiltin()) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                                  JSMSG_CANT_CLONE_OBJECT);
+        return nullptr;
+    }
+
     if (fun->isInterpretedLazy()) {
         AutoCompartment ac(cx, funobj);
         if (!JSFunction::getOrCreateScript(cx, fun))
             return nullptr;
     }
-
-    // Only allow cloning normal, interpreted functions.
-    if (fun->isNative() ||
-        fun->isBoundFunction() ||
-        fun->kind() != JSFunction::NormalFunction ||
-        fun->isExtended())
-    {
-        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
-        return nullptr;
-    }
+    RootedScript script(cx, fun->nonLazyScript());
 
     if (!IsFunctionCloneable(fun)) {
         JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BAD_CLONE_FUNOBJ_SCOPE);
@@ -3632,22 +3632,19 @@ CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject env, Handle
     }
 
     if (CanReuseScriptForClone(cx->compartment(), fun, env)) {
-        // If the script is to be reused, either the script can already handle
-        // non-syntactic scopes, or there is only the standard global lexical
-        // scope.
-#ifdef DEBUG
-        // Fail here if we OOM during debug asserting.
-        // CloneFunctionReuseScript will delazify the script anyways, so we
-        // are not creating an extra failure condition for DEBUG builds.
-        if (!JSFunction::getOrCreateScript(cx, fun))
-            return nullptr;
-        MOZ_ASSERT(scope->as<GlobalScope>().isSyntactic() ||
-                   fun->nonLazyScript()->hasNonSyntacticScope());
-#endif
         return CloneFunctionReuseScript(cx, fun, env, fun->getAllocKind());
     }
 
-    JSFunction* clone = CloneFunctionAndScript(cx, fun, env, scope, fun->getAllocKind());
+    Rooted<ScriptSourceObject*> sourceObject(cx, script->sourceObject());
+    if (cx->compartment() != sourceObject->compartment()) {
+        sourceObject = ScriptSourceObject::clone(cx, sourceObject);
+        if (!sourceObject) {
+            return nullptr;
+        }
+    }
+
+    JSFunction* clone = CloneFunctionAndScript(cx, fun, env, scope, sourceObject,
+                                               fun->getAllocKind());
 
 #ifdef DEBUG
     // The cloned function should itself be cloneable.

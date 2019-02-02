@@ -3478,7 +3478,8 @@ Rebase(JSScript* dst, JSScript* src, T* srcp)
 }
 
 static JSObject*
-CloneInnerInterpretedFunction(JSContext* cx, HandleScope enclosingScope, HandleFunction srcFun)
+CloneInnerInterpretedFunction(JSContext* cx, HandleScope enclosingScope,
+                              HandleFunction srcFun, Handle<ScriptSourceObject*> sourceObject)
 {
     /* NB: Keep this in sync with XDRInterpretedFunction. */
     RootedObject cloneProto(cx);
@@ -3509,7 +3510,8 @@ CloneInnerInterpretedFunction(JSContext* cx, HandleScope enclosingScope, HandleF
     JSScript::AutoDelazify srcScript(cx, srcFun);
     if (!srcScript)
         return nullptr;
-    JSScript* cloneScript = CloneScriptIntoFunction(cx, enclosingScope, clone, srcScript);
+    JSScript* cloneScript = CloneScriptIntoFunction(cx, enclosingScope, clone,
+                                                    srcScript, sourceObject);
     if (!cloneScript)
         return nullptr;
 
@@ -3576,6 +3578,7 @@ js::detail::CopyScript(JSContext* cx, HandleScript src, HandleScript dst,
         GCPtrObject* vector = src->objects()->vector;
         RootedObject obj(cx);
         RootedObject clone(cx);
+        Rooted<ScriptSourceObject*> sourceObject(cx, dst->sourceObject());
         for (unsigned i = 0; i < nobjects; i++) {
             obj = vector[i];
             clone = nullptr;
@@ -3599,7 +3602,8 @@ js::detail::CopyScript(JSContext* cx, HandleScript src, HandleScript dst,
 
                     Scope* enclosing = innerFun->nonLazyScript()->enclosingScope();
                     RootedScope enclosingClone(cx, scopes[FindScopeIndex(src, *enclosing)]);
-                    clone = CloneInnerInterpretedFunction(cx, enclosingClone, innerFun);
+                    clone = CloneInnerInterpretedFunction(cx, enclosingClone, innerFun,
+                                                          sourceObject);
                 }
             } else {
                 clone = DeepCloneObjectLiteral(cx, obj, TenuredObject);
@@ -3708,34 +3712,12 @@ js::detail::CopyScript(JSContext* cx, HandleScript src, HandleScript dst,
 }
 
 static JSScript*
-CreateEmptyScriptForClone(JSContext* cx, HandleScript src)
+CreateEmptyScriptForClone(JSContext* cx, HandleScript src,
+                          Handle<ScriptSourceObject*> sourceObject)
 {
-    /*
-     * Wrap the script source object as needed. Self-hosted scripts may be
-     * in another runtime, so lazily create a new script source object to
-     * use for them.
-     */
-    RootedScriptSource sourceObject(cx);
-    if (cx->runtime()->isSelfHostingCompartment(src->compartment())) {
-        if (!cx->compartment()->selfHostingScriptSource) {
-            CompileOptions options(cx);
-            FillSelfHostingCompileOptions(options);
-
-            ScriptSourceObject* obj = frontend::CreateScriptSourceObject(cx, options);
-            if (!obj)
-                return nullptr;
-            cx->compartment()->selfHostingScriptSource.set(obj);
-        }
-        sourceObject = cx->compartment()->selfHostingScriptSource;
-    } else {
-        sourceObject = src->sourceObject();
-        if (cx->compartment() != sourceObject->compartment()) {
-            sourceObject = ScriptSourceObject::clone(cx, sourceObject);
-            if (!sourceObject) {
-                return nullptr;
-            }
-        }
-    }
+    MOZ_ASSERT(cx->compartment() == sourceObject->compartment());
+    MOZ_ASSERT_IF(cx->runtime()->isSelfHostingCompartment(src->compartment()),
+                  sourceObject == cx->compartment()->selfHostingScriptSource);
 
     CompileOptions options(cx);
     options.setMutedErrors(src->mutedErrors())
@@ -3752,7 +3734,15 @@ js::CloneGlobalScript(JSContext* cx, ScopeKind scopeKind, HandleScript src)
 {
     MOZ_ASSERT(scopeKind == ScopeKind::Global || scopeKind == ScopeKind::NonSyntactic);
 
-    RootedScript dst(cx, CreateEmptyScriptForClone(cx, src));
+    Rooted<ScriptSourceObject*> sourceObject(cx, src->sourceObject());
+    if (cx->compartment() != sourceObject->compartment()) {
+        sourceObject = ScriptSourceObject::clone(cx, sourceObject);
+        if (!sourceObject) {
+            return nullptr;
+        }
+    }
+
+    RootedScript dst(cx, CreateEmptyScriptForClone(cx, src, sourceObject));
     if (!dst)
         return nullptr;
 
@@ -3771,12 +3761,12 @@ js::CloneGlobalScript(JSContext* cx, ScopeKind scopeKind, HandleScript src)
 
 JSScript*
 js::CloneScriptIntoFunction(JSContext* cx, HandleScope enclosingScope, HandleFunction fun,
-                            HandleScript src)
+                            HandleScript src, Handle<ScriptSourceObject*> sourceObject)
 {
     MOZ_ASSERT(fun->isInterpreted());
     MOZ_ASSERT(!fun->hasScript() || fun->hasUncompiledScript());
 
-    RootedScript dst(cx, CreateEmptyScriptForClone(cx, src));
+    RootedScript dst(cx, CreateEmptyScriptForClone(cx, src, sourceObject));
     if (!dst)
         return nullptr;
 

@@ -92,7 +92,9 @@ CloneFunctionObjectIfNotSingleton(JSContext* cx, HandleFunction fun, HandleObjec
     if (!script)
         return nullptr;
     RootedScope enclosingScope(cx, script->enclosingScope());
-    return CloneFunctionAndScript(cx, fun, parent, enclosingScope, kind, proto);
+    Rooted<ScriptSourceObject*> sourceObject(cx, script->sourceObject());
+    return CloneFunctionAndScript(cx, fun, parent, enclosingScope, sourceObject,
+                                  kind, proto);
 }
 
 } /* namespace js */
