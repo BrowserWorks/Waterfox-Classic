@@ -2890,7 +2890,7 @@ CodeGenerator::emitLambdaInit(Register output, Register envChain,
 
 typedef bool (*SetFunNameFn)(JSContext*, HandleFunction, HandleValue, FunctionPrefixKind);
 static const VMFunction SetFunNameInfo =
-    FunctionInfo<SetFunNameFn>(js::SetFunctionNameIfNoOwnName, "SetFunName");
+    FunctionInfo<SetFunNameFn>(js::SetFunctionName, "SetFunName");
 
 void
 CodeGenerator::visitSetFunName(LSetFunName* lir)

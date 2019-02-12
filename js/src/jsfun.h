@@ -71,8 +71,8 @@ class JSFunction : public js::NativeObject
                                        decompilable nor constructible. */
         HAS_INFERRED_NAME = 0x0100, /* function had no explicit name, but a name was
                                        set by SetFunctionName at compile time or
-                                       SetFunctionNameIfNoOwnName at runtime. See
-                                       atom_ for more info about this flag. */
+                                       SetFunctionName at runtime. See atom_ for
+                                       more info about this flag. */
         INTERPRETED_LAZY = 0x0200,  /* function is interpreted but doesn't have a script yet */
         RESOLVED_LENGTH  = 0x0400,  /* f.length has been resolved (see fun_resolve). */
         RESOLVED_NAME    = 0x0800,  /* f.name has been resolved (see fun_resolve). */
@@ -160,8 +160,7 @@ class JSFunction : public js::NativeObject
     //      guessed name was set.
     //   f. HAS_INFERRED_NAME can be set for cloned singleton function, even
     //      though the clone shouldn't receive an inferred name. See the
-    //      comments in NewFunctionClone() and SetFunctionNameIfNoOwnName()
-    //      for details.
+    //      comments in NewFunctionClone() and SetFunctionName() for details.
     //
     // 2. If the function is a bound function:
     //   a. To store the initial value of the "name" property.
@@ -776,8 +775,8 @@ IdToFunctionName(JSContext* cx, HandleId id,
                  FunctionPrefixKind prefixKind = FunctionPrefixKind::None);
 
 extern bool
-SetFunctionNameIfNoOwnName(JSContext* cx, HandleFunction fun, HandleValue name,
-                           FunctionPrefixKind prefixKind);
+SetFunctionName(JSContext* cx, HandleFunction fun, HandleValue name,
+                FunctionPrefixKind prefixKind);
 
 extern JSFunction*
 DefineFunction(JSContext* cx, HandleObject obj, HandleId id, JSNative native,

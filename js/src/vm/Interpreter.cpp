@@ -3673,7 +3673,7 @@ CASE(JSOP_SETFUNNAME)
     FunctionPrefixKind prefixKind = FunctionPrefixKind(GET_UINT8(REGS.pc));
     ReservedRooted<Value> name(&rootValue0, REGS.sp[-1]);
     ReservedRooted<JSFunction*> fun(&rootFunction0, &REGS.sp[-2].toObject().as<JSFunction>());
-    if (!SetFunctionNameIfNoOwnName(cx, fun, name, prefixKind))
+    if (!SetFunctionName(cx, fun, name, prefixKind))
         goto error;
 
     REGS.sp--;

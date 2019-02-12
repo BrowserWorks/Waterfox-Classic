@@ -696,10 +696,13 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     // is called at compile time.
     MOZ_MUST_USE bool emitDefault(ParseNode* defaultExpr, ParseNode* pattern);
 
-    MOZ_MUST_USE bool setOrEmitSetFunName(ParseNode* maybeFun, HandleAtom name);
+    MOZ_MUST_USE bool emitAnonymousFunctionWithName(ParseNode* node,
+                                                    HandleAtom name);
+
+    MOZ_MUST_USE bool emitAnonymousFunctionWithComputedName(
+        ParseNode* node, FunctionPrefixKind prefixKind);
 
     MOZ_MUST_USE bool setFunName(JSFunction* fun, JSAtom* name);
-    MOZ_MUST_USE bool emitSetClassConstructorName(JSAtom* name);
     MOZ_MUST_USE bool emitInitializer(ParseNode* initializer, ParseNode* pattern);
     MOZ_MUST_USE bool emitInitializerInBranch(ParseNode* initializer, ParseNode* pattern);
 
@@ -804,7 +807,20 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     // iteration count). The stack after iteration will look like |ARRAY INDEX|.
     MOZ_MUST_USE bool emitSpread(bool allowSelfHosted = false);
 
-    MOZ_MUST_USE bool emitClass(ParseNode* pn);
+    enum class ClassNameKind {
+        // The class name is defined through its BindingIdentifier, if present.
+        BindingName,
+
+        // The class is anonymous and has a statically inferred name.
+        InferredName,
+
+        // The class is anonymous and has a dynamically computed name.
+        ComputedName
+    };
+
+    MOZ_MUST_USE bool emitClass(
+        ParseNode* pn, ClassNameKind nameKind = ClassNameKind::BindingName,
+        HandleAtom nameForAnonymousClass = nullptr);
     MOZ_MUST_USE bool emitSuperPropLHS(ParseNode* superBase, bool isCall = false);
     MOZ_MUST_USE bool emitSuperGetProp(ParseNode* pn, bool isCall = false);
     MOZ_MUST_USE bool emitSuperElemOperands(ParseNode* pn,
