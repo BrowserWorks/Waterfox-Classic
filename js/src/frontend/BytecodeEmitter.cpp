@@ -3041,15 +3041,29 @@ BytecodeEmitter::emitAnonymousFunctionWithComputedName(ParseNode* node,
 
   if (node->isKind(ParseNodeKind::Function)) {
     if (!emitTree(node)) {
+      //            [stack] # !isAsync || !needsHomeObject
       //            [stack] NAME FUN
+      //            [stack] # isAsync && needsHomeObject
+      //            [stack] NAME UNWRAPPED WRAPPED
       return false;
     }
-    if (!emitDupAt(1)) {
+    unsigned depth = 1;
+    FunctionBox* funbox = node->pn_funbox;
+    if (funbox->isAsync() && funbox->needsHomeObject()) {
+      depth = 2;
+    }
+    if (!emitDupAt(depth)) {
+      //            [stack] # !isAsync || !needsHomeObject
       //            [stack] NAME FUN NAME
+      //            [stack] # isAsync && needsHomeObject
+      //            [stack] NAME UNWRAPPED WRAPPED NAME
       return false;
     }
     if (!emit2(JSOP_SETFUNNAME, uint8_t(prefixKind))) {
+      //            [stack] # !isAsync || !needsHomeObject
       //            [stack] NAME FUN
+      //            [stack] # isAsync && needsHomeObject
+      //            [stack] NAME UNWRAPPED WRAPPED
       return false;
     }
     return true;
