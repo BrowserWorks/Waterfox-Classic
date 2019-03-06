@@ -1501,11 +1501,7 @@ pref("javascript.options.dump_stack_on_debuggee_would_run", false);
 pref("javascript.options.streams", false);
 
 // Dynamic module import.
-#ifdef NIGHTLY_BUILD
 pref("javascript.options.dynamicImport", true);
-#else
-pref("javascript.options.dynamicImport", false);
-#endif
 
 // advanced prefs
 pref("advanced.mailftp",                    false);
