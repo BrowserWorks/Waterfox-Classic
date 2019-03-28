@@ -22,6 +22,7 @@
 #include "mozilla/TemplateLib.h"
 #include "mozilla/TypeTraits.h"
 
+#include <algorithm> // remove_if
 #include <new> // for placement new
 
 /* Silence dire "bugs in previous versions of MSVC have been fixed" warnings */
@@ -808,6 +809,20 @@ public:
   void erase(T* aBegin, T* aEnd);
 
   /**
+   * Removes all elements that satisfy the predicate, shifting existing elements
+   * lower to fill erased gaps.
+   */
+  template <typename Pred>
+  void eraseIf(Pred aPred);
+
+  /**
+   * Removes all elements that compare equal to |aU|, shifting existing elements
+   * lower to fill erased gaps.
+   */
+  template <typename U>
+  void eraseIfEqual(const U& aU);
+
+  /**
    * Measure the size of the vector's heap-allocated storage.
    */
   size_t sizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const;
@@ -1340,6 +1355,26 @@ Vector<T, N, AP>::erase(T* aBegin, T* aEnd)
     *aBegin++ = Move(*aEnd++);
   }
   shrinkBy(aEnd - aBegin);
+}
+
+template <typename T, size_t N, class AP>
+template <typename Pred>
+void Vector<T, N, AP>::eraseIf(Pred aPred) {
+  // remove_if finds the first element to be erased, and then efficiently move-
+  // assigns elements to effectively overwrite elements that satisfy the
+  // predicate. It returns the new end pointer, after which there are only
+  // moved-from elements ready to be destroyed, so we just need to shrink the
+  // vector accordingly.
+  T* newEnd = std::remove_if(begin(), end(),
+                             [&aPred](const T& aT) { return aPred(aT); });
+  MOZ_ASSERT(newEnd <= end());
+  shrinkBy(end() - newEnd);
+}
+
+template <typename T, size_t N, class AP>
+template <typename U>
+void Vector<T, N, AP>::eraseIfEqual(const U& aU) {
+  return eraseIf([&aU](const T& aT) { return aT == aU; });
 }
 
 template<typename T, size_t N, class AP>
