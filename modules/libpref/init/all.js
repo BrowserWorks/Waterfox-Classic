@@ -4973,7 +4973,7 @@ pref("html5.flushtimer.initialdelay", 120);
 pref("html5.flushtimer.subsequentdelay", 120);
 
 // Push/Pop/Replace State prefs
-pref("browser.history.maxStateObjectSize", 655360);
+pref("browser.history.maxStateObjectSize", 2097152);
 
 pref("browser.meta_refresh_when_inactive.disabled", false);
 
