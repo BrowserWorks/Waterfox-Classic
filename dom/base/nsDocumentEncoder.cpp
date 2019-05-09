@@ -363,8 +363,15 @@ nsDocumentEncoder::SerializeNodeStart(nsINode* aNode,
                                       nsAString& aStr,
                                       nsINode* aOriginalNode)
 {
-  if (mNeedsPreformatScanning && aNode->IsElement()) {
-    mSerializer->ScanElementForPreformat(aNode->AsElement());
+  if (mNeedsPreformatScanning) {
+    if (aNode->IsElement()) {
+      mSerializer->ScanElementForPreformat(aNode->AsElement());
+    } else if (aNode->IsText()) {
+      const nsCOMPtr<nsINode> parent = aNode->GetParent();
+      if (parent && parent->IsElement()) {
+        mSerializer->ScanElementForPreformat(parent->AsElement());
+      }
+    }
   }
 
   if (!IsVisibleNode(aNode))
@@ -444,8 +451,15 @@ nsresult
 nsDocumentEncoder::SerializeNodeEnd(nsINode* aNode,
                                     nsAString& aStr)
 {
-  if (mNeedsPreformatScanning && aNode->IsElement()) {
-    mSerializer->ForgetElementForPreformat(aNode->AsElement());
+  if (mNeedsPreformatScanning) {
+    if (aNode->IsElement()) {
+      mSerializer->ForgetElementForPreformat(aNode->AsElement());
+    } else if (aNode->IsText()) {
+      const nsCOMPtr<nsINode> parent = aNode->GetParent();
+      if (parent && parent->IsElement()) {
+        mSerializer->ForgetElementForPreformat(parent->AsElement());
+      }
+    }
   }
 
   if (!IsVisibleNode(aNode))
