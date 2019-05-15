@@ -478,13 +478,13 @@ ModuleEnvironmentObject::create(JSContext* cx, HandleModuleObject module)
 }
 
 ModuleObject&
-ModuleEnvironmentObject::module()
+ModuleEnvironmentObject::module() const
 {
     return getReservedSlot(MODULE_SLOT).toObject().as<ModuleObject>();
 }
 
 IndirectBindingMap&
-ModuleEnvironmentObject::importBindings()
+ModuleEnvironmentObject::importBindings() const
 {
     return module().importBindings();
 }
@@ -1495,19 +1495,26 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
         *accessResult = ACCESS_GENERIC;
         LiveEnvironmentVal* maybeLiveEnv = DebugEnvironments::hasLiveEnvironment(*env);
 
-        if (env->is<ModuleEnvironmentObject>()) {
-            /* Everything is aliased and stored in the environment object. */
-            return true;
-        }
-
-        /* Handle unaliased formals, vars, lets, and consts at function scope. */
-        if (env->is<CallObject>()) {
-            CallObject& callobj = env->as<CallObject>();
-            RootedFunction fun(cx, &callobj.callee());
-            RootedScript script(cx, JSFunction::getOrCreateScript(cx, fun));
-            AutoKeepTypeScripts keepTypes(cx);
-            if (!script->ensureHasTypes(cx, keepTypes) || !script->ensureHasAnalyzedArgsUsage(cx))
-                return false;
+        // Handle unaliased formals, vars, lets, and consts at function or module
+        // scope.
+        if (env->is<CallObject>() || env->is<ModuleEnvironmentObject>()) {
+            RootedScript script(cx);
+            if (env->is<CallObject>()) {
+                CallObject& callobj = env->as<CallObject>();
+                RootedFunction fun(cx, &callobj.callee());
+                script = JSFunction::getOrCreateScript(cx, fun);
+                AutoKeepTypeScripts keepTypes(cx);
+                if (!script->ensureHasTypes(cx, keepTypes) ||
+                    !script->ensureHasAnalyzedArgsUsage(cx)) {
+                    return false;
+                }
+          } else {
+              script = env->as<ModuleEnvironmentObject>().module().maybeScript();
+              if (!script) {
+                  *accessResult = ACCESS_LOST;
+                  return true;
+              }
+          }
 
             BindingIter bi(script);
             while (bi && NameToId(bi.name()->asPropertyName()) != id)
@@ -1765,6 +1772,10 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
     {
         if (isFunctionEnvironment(env))
             return env.as<CallObject>().callee().nonLazyScript()->bodyScope();
+        if (env.is<ModuleEnvironmentObject>()) {
+            JSScript* script = env.as<ModuleEnvironmentObject>().module().maybeScript();
+            return script ? script->bodyScope() : nullptr;
+        }
         if (isNonExtensibleLexicalEnvironment(env))
             return &env.as<LexicalEnvironmentObject>().scope();
         if (env.is<VarEnvironmentObject>())
