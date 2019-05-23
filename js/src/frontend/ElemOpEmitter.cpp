@@ -197,10 +197,24 @@ ElemOpEmitter::emitDelete()
 }
 
 bool
-ElemOpEmitter::emitAssignment()
+ElemOpEmitter::emitAssignment(EmitSetFunctionName emitSetFunName)
 {
     MOZ_ASSERT(isSimpleAssignment() || isCompoundAssignment());
     MOZ_ASSERT(state_ == State::Rhs);
+
+    if (emitSetFunName == EmitSetFunctionName::Yes) {
+        // JSOP_*SETELEM_SUPER has a different stack ordering.
+        MOZ_ASSERT(!isSuper());
+        //              [stack] obj, id, val
+        if (!bce_->emitDupAt(1)) {
+            //            [stack] obj, id, val, id
+            return false;
+        }
+        if (!bce_->emit2(JSOP_SETFUNNAME, uint8_t(FunctionPrefixKind::None))) {
+            //            [stack] obj, id, val
+            return false;
+        }
+    }
 
     JSOp setOp = isSuper()
                  ? bce_->sc->strict() ? JSOP_STRICTSETELEM_SUPER : JSOP_SETELEM_SUPER

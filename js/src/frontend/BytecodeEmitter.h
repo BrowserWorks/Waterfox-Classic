@@ -561,6 +561,12 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     MOZ_MUST_USE bool emitDeclarationList(ParseNode* decls);
     MOZ_MUST_USE bool emitSingleDeclaration(ParseNode* decls, ParseNode* decl,
                                             ParseNode* initializer);
+    // emitSetFunName should be of type ElemOpEmitter::EmitSetFunctionName, but
+    // that's not possible due to C++ declaration order.
+    MOZ_MUST_USE bool emitAssignmentRhs(ParseNode* rhs,
+                                        HandleAtom anonFunctionName,
+                                        bool* emitSetFunName);
+    MOZ_MUST_USE bool emitAssignmentRhs(uint8_t offset);
 
     MOZ_MUST_USE bool emitNewInit(JSProtoKey key);
     MOZ_MUST_USE bool emitSingletonInitialiser(ParseNode* pn);
