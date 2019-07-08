@@ -121,6 +121,10 @@ TryEmitter::emitCatch()
             return false;
     }
 
+  if (!bce_->emit1(JSOP_EXCEPTION)) {
+    return false;
+  }
+
 #ifdef DEBUG
     state_ = State::Catch;
 #endif

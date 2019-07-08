@@ -2934,12 +2934,10 @@ BytecodeEmitter::emitIteratorCloseInScope(EmitterScope& currentScope,
         if (!emit1(JSOP_POP))                             // ... RET ITER RESULT
             return false;
 
-        if (!tryCatch->emitCatch())                       // ... RET ITER RESULT
+        if (!tryCatch->emitCatch())                       // ... RET ITER RESULT EXC
             return false;
 
         // Just ignore the exception thrown by call and await.
-        if (!emit1(JSOP_EXCEPTION))                       // ... RET ITER RESULT EXC
-            return false;
         if (!emit1(JSOP_POP))                             // ... RET ITER RESULT
             return false;
 
@@ -4304,10 +4302,6 @@ BytecodeEmitter::emitCatch(ParseNode* pn)
 {
     // We must be nested under a try-finally statement.
     TryFinallyControl& controlInfo = innermostNestableControl->as<TryFinallyControl>();
-
-    /* Pick up the pending exception and bind it to the catch variable. */
-    if (!emit1(JSOP_EXCEPTION))
-        return false;
 
     /*
      * Dup the exception object if there is a guard for rethrowing to use
@@ -6548,12 +6542,12 @@ BytecodeEmitter::emitYieldStar(ParseNode* iter)
     if (!emitYieldOp(JSOP_YIELD))                         // ITER RECEIVED
         return false;
 
-    if (!tryCatch.emitCatch())                            // ITER RESULT
+    if (!tryCatch.emitCatch())                            // ITER RESULT EXCEPTION
         return false;
 
-    stackDepth = startDepth;                              // ITER RESULT
-    if (!emit1(JSOP_EXCEPTION))                           // ITER RESULT EXCEPTION
-        return false;
+    // The exception was already pushed by emitCatch().
+    MOZ_ASSERT(stackDepth == startDepth + 1);
+
     if (!emitDupAt(2))                                    // ITER RESULT EXCEPTION ITER
         return false;
     if (!emit1(JSOP_DUP))                                 // ITER RESULT EXCEPTION ITER ITER
