@@ -398,24 +398,35 @@ BytecodeEmitter::emitCall(JSOp op, uint16_t argc, ParseNode* pn)
 }
 
 bool
-BytecodeEmitter::emitDupAt(unsigned slotFromTop)
+BytecodeEmitter::emitDupAt(unsigned slotFromTop, unsigned count)
 {
     MOZ_ASSERT(slotFromTop < unsigned(stackDepth));
 
-    if (slotFromTop == 0)
+    MOZ_ASSERT(slotFromTop + 1 >= count);
+
+    if (slotFromTop == 0 && count == 1) {
         return emit1(JSOP_DUP);
+    }
+
+    if (slotFromTop == 1 && count == 2) {
+      return emit1(JSOP_DUP2);
+    }
 
     if (slotFromTop >= JS_BIT(24)) {
         reportError(nullptr, JSMSG_TOO_MANY_LOCALS);
         return false;
     }
 
-    ptrdiff_t off;
-    if (!emitN(JSOP_DUPAT, 3, &off))
-        return false;
+    for (unsigned i = 0; i < count; i++) {
+        ptrdiff_t off;
+        if (!emitN(JSOP_DUPAT, 3, &off)) {
+            return false;
+        }
 
-    jsbytecode* pc = code(off);
-    SET_UINT24(pc, slotFromTop);
+        jsbytecode* pc = code(off);
+        SET_UINT24(pc, slotFromTop);
+    }
+
     return true;
 }
 
@@ -2897,9 +2908,7 @@ BytecodeEmitter::emitIteratorCloseInScope(EmitterScope& currentScope,
             return false;
         if (!tryCatch->emitTry())                         // ... RET ITER UNDEF
             return false;
-        if (!emitDupAt(2))                                // ... RET ITER UNDEF RET
-            return false;
-        if (!emitDupAt(2))                                // ... RET ITER UNDEF RET ITER
+        if (!emitDupAt(2, 2))                             // ... RET ITER UNDEF RET ITER
             return false;
     }
 
