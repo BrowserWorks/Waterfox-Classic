@@ -3804,9 +3804,7 @@ bool BytecodeEmitter::emitAssignmentRhs(ParseNode* rhs,
     if (anonFunctionName) {
       return emitAnonymousFunctionWithName(rhs, anonFunctionName);
     }
-    // If anonFunctionName is null, that means we don't have a compiletime
-    // name, and should emit JSOP_SETFUNNAME (which happens later).
-    *emitSetFunName = true;
+    return emitAnonymousFunctionWithComputedName(rhs, FunctionPrefixKind::None);
   }
   return emitTree(rhs);
 }
@@ -4085,8 +4083,6 @@ BytecodeEmitter::emitAssignment(ParseNode* lhs, JSOp compoundOp, ParseNode* rhs)
         // We threw above, so nothing to do here.
         break;
       case ParseNodeKind::Elem: {
-        MOZ_ASSERT((!anonFunctionName && rhs && rhs->isDirectRHSAnonFunction()) ==
-                   (emitSetFunName == ElemOpEmitter::EmitSetFunctionName::Yes));
         if (!eoe->emitAssignment(emitSetFunName)) {       // VAL
             return false;
         }
