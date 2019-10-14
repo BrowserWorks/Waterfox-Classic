@@ -1741,7 +1741,11 @@ js::StartDynamicModuleImport(JSContext* cx,
 
     JS::ModuleDynamicImportHook importHook = cx->runtime()->moduleDynamicImportHook;
     if (!importHook) {
-        JS_ReportErrorASCII(cx, "Dynamic module import is disabled");
+        // Dynamic import can be disabled by a pref and is not supported in all
+        // contexts (e.g. web workers).
+        JS_ReportErrorASCII(
+            cx,
+            "Dynamic module import is disabled or not supported in this context");
         if (!RejectPromiseWithPendingError(cx, promise)) {
             return nullptr;
         }
