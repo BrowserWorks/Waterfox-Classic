@@ -1,4 +1,4 @@
-twisted==10.2.0
+twisted==19.7.0
 
 # websocket adapter for twisted, might be built into twisted someday
 txws==0.9.1
