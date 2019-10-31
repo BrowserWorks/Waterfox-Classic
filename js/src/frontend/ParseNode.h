@@ -125,11 +125,16 @@ class ObjectBox;
     F(BitNot) \
     F(Await) \
     \
-    /* \
-     * Binary operators. \
-     * These must be in the same order as TOK_OR and friends in TokenStream.h. \
-     */ \
+    /*                                                             \
+     * Binary operators.                                           \
+     * This list must be kept in the same order in several places: \
+     *   - The binary operators in ParseNode.h                     \
+     *   - the binary operators in TokenKind.h                     \
+     *   - the precedence list in Parser.cpp                       \
+     *   - the JSOp code list in BytecodeEmitter.cpp               \
+     */                                                            \
     F(Pipeline) \
+    F(CoalesceExpr) \
     F(Or) \
     F(And) \
     F(BitOr) \
@@ -327,9 +332,15 @@ IsTypeofKind(ParseNodeKind kind)
  * ModAssign,
  * PowAssign
  * Conditional ternary  (cond ? trueExpr : falseExpr)
- *                          pn_kid1: cond, pn_kid2: then, pn_kid3: else
- * Or,      list        pn_head; list of pn_count subexpressions
- * And,                 All of these operators are left-associative except (**).
+ *                          pn_kid1: cond,
+ *                          pn_kid2: then,
+ *                          pn_kid3: else
+ *                          list pn_head; list of pn_count subexpressions
+ * All of these operators are left-associative except (**).
+ * PipelineExpr,
+ * CoalesceExpr
+ * Or,
+ * And,
  * BitOr,
  * BitXor,
  * BitAnd,

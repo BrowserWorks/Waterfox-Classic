@@ -327,6 +327,7 @@ ContainsHoistedDeclaration(JSContext* cx, ParseNode* node, bool* result)
       case ParseNodeKind::PostIncrement:
       case ParseNodeKind::PreDecrement:
       case ParseNodeKind::PostDecrement:
+      case ParseNodeKind::CoalesceExpr:
       case ParseNodeKind::Or:
       case ParseNodeKind::And:
       case ParseNodeKind::BitOr:
@@ -757,10 +758,14 @@ FoldAndOr(JSContext* cx, ParseNode** nodePtr, Parser<FullParseHandler, char16_t>
 {
     ParseNode* node = *nodePtr;
 
-    MOZ_ASSERT(node->isKind(ParseNodeKind::And) || node->isKind(ParseNodeKind::Or));
+    MOZ_ASSERT(node->isKind(ParseNodeKind::And) ||
+               node->isKind(ParseNodeKind::CoalesceExpr) ||
+               node->isKind(ParseNodeKind::Or));
+
     MOZ_ASSERT(node->isArity(PN_LIST));
 
-    bool isOrNode = node->isKind(ParseNodeKind::Or);
+    bool isOrNode = node->isKind(ParseNodeKind::Or) ||
+                    node->isKind(ParseNodeKind::CoalesceExpr);
     ParseNode** elem = &node->pn_head;
     do {
         if (!Fold(cx, elem, parser, inGenexpLambda))

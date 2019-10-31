@@ -2623,7 +2623,8 @@ ASTSerializer::leftAssociate(ParseNode* pn, MutableHandleValue dst)
     MOZ_ASSERT(pn->pn_count >= 1);
 
     ParseNodeKind kind = pn->getKind();
-    bool lor = kind == ParseNodeKind::Or;
+    bool lor =
+      kind == ParseNodeKind::Or || kind == ParseNodeKind::CoalesceExpr;
     bool logop = lor || (kind == ParseNodeKind::And);
 
     ParseNode* head = pn->pn_head;

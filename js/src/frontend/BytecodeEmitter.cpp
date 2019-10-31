@@ -48,6 +48,7 @@ using namespace js;
 using namespace js::gc;
 using namespace js::frontend;
 
+using mozilla::ArrayLength;
 using mozilla::AssertedCast;
 using mozilla::DebugOnly;
 using mozilla::Maybe;
@@ -3293,6 +3294,7 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
       case ParseNodeKind::CatchList:
       // Strict equality operations and logical operators are well-behaved and
       // perform no conversions.
+      case ParseNodeKind::CoalesceExpr:
       case ParseNodeKind::Or:
       case ParseNodeKind::And:
       case ParseNodeKind::StrictEq:
@@ -9853,9 +9855,14 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn, ValueUsage valueUsage /* = ValueUs
     return true;
 }
 
+// This list must be kept in the same order in several places:
+//   - The binary operators in ParseNode.h ,
+//   - the binary operators in TokenKind.h
+//   - the precedence list in Parser.cpp
 static const JSOp ParseNodeKindToJSOp[] = {
     // JSOP_NOP is for pipeline operator which does not emit its own JSOp
     // but has highest precedence in binary operators
+    JSOP_NOP,
     JSOP_NOP,
     JSOP_OR,
     JSOP_AND,
@@ -9883,12 +9890,17 @@ static const JSOp ParseNodeKindToJSOp[] = {
     JSOP_POW
 };
 
-static inline JSOp
-BinaryOpParseNodeKindToJSOp(ParseNodeKind pnk)
-{
-    MOZ_ASSERT(pnk >= ParseNodeKind::BinOpFirst);
-    MOZ_ASSERT(pnk <= ParseNodeKind::BinOpLast);
-    return ParseNodeKindToJSOp[size_t(pnk) - size_t(ParseNodeKind::BinOpFirst)];
+static inline JSOp BinaryOpParseNodeKindToJSOp(ParseNodeKind pnk) {
+  MOZ_ASSERT(pnk >= ParseNodeKind::BinOpFirst);
+  MOZ_ASSERT(pnk <= ParseNodeKind::BinOpLast);
+  int parseNodeFirst = size_t(ParseNodeKind::BinOpFirst);
+#ifdef DEBUG
+  int jsopArraySize = ArrayLength(ParseNodeKindToJSOp);
+  int parseNodeKindListSize =
+      size_t(ParseNodeKind::BinOpLast) - parseNodeFirst + 1;
+  MOZ_ASSERT(jsopArraySize == parseNodeKindListSize);
+#endif
+  return ParseNodeKindToJSOp[size_t(pnk) - parseNodeFirst];
 }
 
 bool
@@ -9933,7 +9945,9 @@ bool
 BytecodeEmitter::emitLogical(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isArity(PN_LIST));
-    MOZ_ASSERT(pn->isKind(ParseNodeKind::Or) || pn->isKind(ParseNodeKind::And));
+    MOZ_ASSERT(pn->isKind(ParseNodeKind::Or) ||
+               pn->isKind(ParseNodeKind::CoalesceExpr) ||
+               pn->isKind(ParseNodeKind::And));
 
     /*
      * JSOP_OR converts the operand on the stack to boolean, leaves the original
@@ -9951,7 +9965,10 @@ BytecodeEmitter::emitLogical(ParseNode* pn)
     ParseNode* pn2 = pn->pn_head;
     if (!emitTree(pn2))
         return false;
-    JSOp op = pn->isKind(ParseNodeKind::Or) ? JSOP_OR : JSOP_AND;
+    JSOp op = (pn->isKind(ParseNodeKind::Or) ||
+               pn->isKind(ParseNodeKind::CoalesceExpr))
+                  ? JSOP_OR
+                  : JSOP_AND;
     JumpList jump;
     if (!emitJump(op, &jump))
         return false;
@@ -11239,6 +11256,7 @@ BytecodeEmitter::emitTree(ParseNode* pn, ValueUsage valueUsage /* = ValueUsage::
             return false;
         break;
 
+      case ParseNodeKind::CoalesceExpr:
       case ParseNodeKind::Or:
       case ParseNodeKind::And:
         if (!emitLogical(pn))

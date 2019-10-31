@@ -155,8 +155,16 @@
      * Binary operators tokens, Or thru Pow. These must be in the same \
      * order as F(OR) and friends in FOR_EACH_PARSE_NODE_KIND in ParseNode.h. \
      */ \
+     /* \
+      * Binary operators.                                                 \
+      * This list must be kept in the same order in several places:       \
+      *   - the binary operators in ParseNode.h                           \
+      *   - the precedence list in Parser.cpp                             \
+      *   - the JSOp code list in BytecodeEmitter.cpp                     \
+     */ \
     macro(Pipeline,     "'|>'") \
     range(BinOpFirst,   Pipeline) \
+    macro(Coalesce,     "'\?\?'")  /* escapes to avoid trigraphs warning */ \
     macro(Or,           "'||'")   /* logical or */ \
     macro(And,          "'&&'")   /* logical and */ \
     macro(BitOr,        "'|'")    /* bitwise-or */ \

@@ -1381,8 +1381,8 @@ enum FirstCharKind {
     LastCharKind = Other
 };
 
-// OneChar: 40,  41,  44,  58,  59,  63,  91,  93,  123, 125, 126:
-//          '(', ')', ',', ':', ';', '?', '[', ']', '{', '}', '~'
+// OneChar: 40,  41,  44,  58,  59,  91,  93,  123, 125, 126:
+//          '(', ')', ',', ':', ';', '[', ']', '{', '}', '~'
 // Ident:   36, 65..90, 95, 97..122: '$', 'A'..'Z', '_', 'a'..'z'
 // Dot:     46: '.'
 // Equals:  61: '='
@@ -1399,7 +1399,6 @@ enum FirstCharKind {
 #define T_LP        size_t(TokenKind::Lp)
 #define T_RP        size_t(TokenKind::Rp)
 #define T_SEMI      size_t(TokenKind::Semi)
-#define T_HOOK      size_t(TokenKind::Hook)
 #define T_LB        size_t(TokenKind::Lb)
 #define T_RB        size_t(TokenKind::Rb)
 #define T_LC        size_t(TokenKind::Lc)
@@ -1414,7 +1413,7 @@ static const uint8_t firstCharKinds[] = {
 /*  30+ */ _______, _______,   Space, _______,  String, _______,   Ident, _______, _______,  String,
 /*  40+ */    T_LP,    T_RP, _______, _______, T_COMMA,_______,  _______, _______,BasePrefix,  Dec,
 /*  50+ */     Dec,     Dec,     Dec,     Dec,     Dec,     Dec,     Dec,    Dec,  T_COLON,  T_SEMI,
-/*  60+ */ _______, _______, _______,  T_HOOK, _______,   Ident,   Ident,   Ident,   Ident,   Ident,
+/*  60+ */ _______, _______, _______, _______, _______,   Ident,   Ident,   Ident,   Ident,   Ident,
 /*  70+ */   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,
 /*  80+ */   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,
 /*  90+ */   Ident,    T_LB, _______,    T_RB, _______,   Ident, Templat,   Ident,   Ident,   Ident,
@@ -1428,7 +1427,6 @@ static const uint8_t firstCharKinds[] = {
 #undef T_LP
 #undef T_RP
 #undef T_SEMI
-#undef T_HOOK
 #undef T_LB
 #undef T_RB
 #undef T_LC
@@ -1938,6 +1936,10 @@ TokenStreamSpecific<CharT, AnyCharsAccess>::getTokenInternal(TokenKind* ttp, Mod
             tp->type = TokenKind::And;
         else
             tp->type = matchChar('=') ? TokenKind::BitAndAssign : TokenKind::BitAnd;
+        goto out;
+
+      case '?':
+        tp->type = matchChar('?') ? TokenKind::Coalesce : TokenKind::Hook;
         goto out;
 
       case '!':
