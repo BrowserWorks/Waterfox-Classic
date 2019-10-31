@@ -8016,6 +8016,8 @@ Precedence(ParseNodeKind pnk) {
     return PrecedenceTable[size_t(pnk) - size_t(ParseNodeKind::BinOpFirst)];
 }
 
+enum class EnforcedParentheses : uint8_t { CoalesceExpr, AndOrExpr, None };
+
 template <class ParseHandler, typename CharT>
 MOZ_ALWAYS_INLINE typename ParseHandler::Node
 Parser<ParseHandler, CharT>::orExpr(InHandling inHandling, YieldHandling yieldHandling,
@@ -8032,6 +8034,7 @@ Parser<ParseHandler, CharT>::orExpr(InHandling inHandling, YieldHandling yieldHa
     ParseNodeKind kindStack[PRECEDENCE_CLASSES];
     int depth = 0;
     Node pn;
+    EnforcedParentheses unparenthesizedExpression = EnforcedParentheses::None;
     for (;;) {
         pn = unaryExpr(yieldHandling, tripledotHandling, possibleError, invoked);
         if (!pn)
@@ -8047,13 +8050,47 @@ Parser<ParseHandler, CharT>::orExpr(InHandling inHandling, YieldHandling yieldHa
         if (tok == TokenKind::In ? inHandling == InAllowed : TokenKindIsBinaryOp(tok)) {
             // We're definitely not in a destructuring context, so report any
             // pending expression error now.
-            if (possibleError && !possibleError->checkForExpressionError())
-                return null();
-            // Report an error for unary expressions on the LHS of **.
-            if (tok == TokenKind::Pow && handler.isUnparenthesizedUnaryExpression(pn)) {
-                error(JSMSG_BAD_POW_LEFTSIDE);
+            if (possibleError && !possibleError->checkForExpressionError()) {
                 return null();
             }
+            switch (tok) {
+              // Report an error for unary expressions on the LHS of **.
+              case TokenKind::Pow:
+                if (handler.isUnparenthesizedUnaryExpression(pn)) {
+                  error(JSMSG_BAD_POW_LEFTSIDE);
+                  return null();
+                }
+                break;
+
+              case TokenKind::Or:
+              case TokenKind::And:
+                // In the case that the `??` is on the left hand side of the
+                // expression: Disallow Mixing of ?? and other logical operators (||
+                // and &&) unless one expression is parenthesized
+                if (unparenthesizedExpression == EnforcedParentheses::CoalesceExpr) {
+                  error(JSMSG_BAD_COALESCE_MIXING);
+                  return null();
+                }
+                // If we have not detected a mixing error at this point, record that
+                // we have an unparenthesized expression, in case we have one later.
+                unparenthesizedExpression = EnforcedParentheses::AndOrExpr;
+                break;
+
+              case TokenKind::Coalesce:
+                if (unparenthesizedExpression == EnforcedParentheses::AndOrExpr) {
+                  error(JSMSG_BAD_COALESCE_MIXING);
+                  return null();
+                }
+                // If we have not detected a mixing error at this point, record that
+                // we have an unparenthesized expression, in case we have one later.
+                unparenthesizedExpression = EnforcedParentheses::CoalesceExpr;
+                break;
+
+              default:
+                // do nothing in other cases
+                break;
+           }
+
             pnk = BinaryOpTokenKindToParseNodeKind(tok);
         } else {
             tok = TokenKind::Eof;
@@ -8074,6 +8111,7 @@ Parser<ParseHandler, CharT>::orExpr(InHandling inHandling, YieldHandling yieldHa
             depth--;
             ParseNodeKind combiningPnk = kindStack[depth];
             pn = handler.appendOrCreateList(combiningPnk, nodeStack[depth], pn, pc);
+
             if (!pn)
                 return null();
         }
