@@ -78,7 +78,7 @@ enum BinaryOperator {
     /* binary */
     BINOP_BITOR, BINOP_BITXOR, BINOP_BITAND,
     /* misc */
-    BINOP_IN, BINOP_INSTANCEOF, BINOP_PIPELINE,
+    BINOP_IN, BINOP_INSTANCEOF, BINOP_PIPELINE, BINOP_COALESCE,
 
     BINOP_LIMIT
 };
@@ -155,6 +155,7 @@ static const char* const binopNames[] = {
     "in",         /* BINOP_IN */
     "instanceof", /* BINOP_INSTANCEOF */
     "|>",         /* BINOP_PIPELINE */
+    "??",         /* BINOP_COALESCE */
 };
 
 static const char* const unopNames[] = {
@@ -1963,6 +1964,8 @@ ASTSerializer::binop(ParseNodeKind kind)
         return BINOP_INSTANCEOF;
       case ParseNodeKind::Pipeline:
         return BINOP_PIPELINE;
+      case ParseNodeKind::CoalesceExpr:
+        return BINOP_COALESCE;
       default:
         return BINOP_ERR;
     }
@@ -2623,9 +2626,8 @@ ASTSerializer::leftAssociate(ParseNode* pn, MutableHandleValue dst)
     MOZ_ASSERT(pn->pn_count >= 1);
 
     ParseNodeKind kind = pn->getKind();
-    bool lor =
-      kind == ParseNodeKind::Or || kind == ParseNodeKind::CoalesceExpr;
-    bool logop = lor || (kind == ParseNodeKind::And);
+    bool lor = kind == ParseNodeKind::Or;
+    bool logop = lor || kind == ParseNodeKind::And;
 
     ParseNode* head = pn->pn_head;
     RootedValue left(cx);
@@ -2854,6 +2856,7 @@ ASTSerializer::expression(ParseNode* pn, MutableHandleValue dst)
                builder.conditionalExpression(test, cons, alt, &pn->pn_pos, dst);
       }
 
+      case ParseNodeKind::CoalesceExpr:
       case ParseNodeKind::Or:
       case ParseNodeKind::And:
         return leftAssociate(pn, dst);
