@@ -292,6 +292,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitIsArray(MIsArray* ins);
     void visitIsTypedArray(MIsTypedArray* ins);
     void visitIsObject(MIsObject* ins);
+    void visitIsNullOrUndefined(MIsNullOrUndefined* ins);
     void visitHasClass(MHasClass* ins);
     void visitObjectClassToString(MObjectClassToString* ins);
     void visitWasmAddOffset(MWasmAddOffset* ins);

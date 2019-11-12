@@ -388,6 +388,7 @@ class CodeGenerator final : public CodeGeneratorSpecific
     void visitIsTypedArray(LIsTypedArray* lir);
     void visitIsObject(LIsObject* lir);
     void visitIsObjectAndBranch(LIsObjectAndBranch* lir);
+    void visitIsNullOrUndefined(LIsNullOrUndefined* ins);
     void visitHasClass(LHasClass* lir);
     void visitObjectClassToString(LObjectClassToString* lir);
     void visitWasmParameter(LWasmParameter* lir);

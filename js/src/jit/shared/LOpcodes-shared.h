@@ -390,6 +390,7 @@
     _(IsTypedArray)                 \
     _(IsObject)                     \
     _(IsObjectAndBranch)            \
+    _(IsNullOrUndefined)            \
     _(HasClass)                     \
     _(ObjectClassToString)          \
     _(RecompileCheck)               \
