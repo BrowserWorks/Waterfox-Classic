@@ -355,6 +355,7 @@ class BaselineCompiler : public BaselineCompilerSpecific
     MOZ_MUST_USE bool emitToBoolean();
     MOZ_MUST_USE bool emitTest(bool branchIfTrue);
     MOZ_MUST_USE bool emitAndOr(bool branchIfTrue);
+    MOZ_MUST_USE bool emitCoalesce();
     MOZ_MUST_USE bool emitCall();
     MOZ_MUST_USE bool emitSpreadCall();
 
