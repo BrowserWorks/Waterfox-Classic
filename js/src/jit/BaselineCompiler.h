@@ -257,7 +257,8 @@ namespace jit {
     _(JSOP_OBJWITHPROTO)       \
     _(JSOP_FUNWITHPROTO)       \
     _(JSOP_CLASSCONSTRUCTOR)   \
-    _(JSOP_DERIVEDCONSTRUCTOR)
+    _(JSOP_DERIVEDCONSTRUCTOR) \
+    _(JSOP_COALESCE)
 
 class BaselineCompiler : public BaselineCompilerSpecific
 {
