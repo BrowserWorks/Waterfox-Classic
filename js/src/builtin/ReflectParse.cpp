@@ -567,8 +567,9 @@ class NodeBuilder
     MOZ_MUST_USE bool updateExpression(HandleValue expr, bool incr, bool prefix, TokenPos* pos,
                                        MutableHandleValue dst);
 
-    MOZ_MUST_USE bool logicalExpression(bool lor, HandleValue left, HandleValue right, TokenPos* pos,
-                                        MutableHandleValue dst);
+   MOZ_MUST_USE bool logicalExpression(ParseNodeKind pnk, HandleValue left,
+                                       HandleValue right, TokenPos* pos,
+                                       MutableHandleValue dst);
 
     MOZ_MUST_USE bool conditionalExpression(HandleValue test, HandleValue cons, HandleValue alt,
                                             TokenPos* pos, MutableHandleValue dst);
@@ -1082,13 +1083,29 @@ NodeBuilder::updateExpression(HandleValue expr, bool incr, bool prefix, TokenPos
                    dst);
 }
 
-bool
-NodeBuilder::logicalExpression(bool lor, HandleValue left, HandleValue right, TokenPos* pos,
-                               MutableHandleValue dst)
-{
+bool NodeBuilder::logicalExpression(ParseNodeKind pnk, HandleValue left,
+                                    HandleValue right, TokenPos* pos,
+                                    MutableHandleValue dst) {
     RootedValue opName(cx);
-    if (!atomValue(lor ? "||" : "&&", &opName))
-        return false;
+    switch (pnk) {
+      case ParseNodeKind::Or:
+        if (!atomValue("||", &opName)) {
+          return false;
+        }
+        break;
+      case ParseNodeKind::CoalesceExpr:
+        if (!atomValue("??", &opName)) {
+          return false;
+        }
+        break;
+      case ParseNodeKind::And:
+        if (!atomValue("&&", &opName)) {
+          return false;
+        }
+        break;
+      default:
+        MOZ_CRASH("Unexpected ParseNodeKind: Must be `Or`, `And`, or `Coalesce`");
+    }
 
     RootedValue cb(cx, callbacks[AST_LOGICAL_EXPR]);
     if (!cb.isNull())
@@ -2625,9 +2642,10 @@ ASTSerializer::leftAssociate(ParseNode* pn, MutableHandleValue dst)
     MOZ_ASSERT(pn->isArity(PN_LIST));
     MOZ_ASSERT(pn->pn_count >= 1);
 
-    ParseNodeKind kind = pn->getKind();
-    bool lor = kind == ParseNodeKind::Or;
-    bool logop = lor || kind == ParseNodeKind::And;
+    ParseNodeKind pnk = pn->getKind();
+    bool lor = pnk == ParseNodeKind::Or;
+    bool coalesce = pnk == ParseNodeKind::CoalesceExpr;
+    bool logop = lor || coalesce || pnk == ParseNodeKind::And;
 
     ParseNode* head = pn->pn_head;
     RootedValue left(cx);
@@ -2641,8 +2659,9 @@ ASTSerializer::leftAssociate(ParseNode* pn, MutableHandleValue dst)
         TokenPos subpos(pn->pn_pos.begin, next->pn_pos.end);
 
         if (logop) {
-            if (!builder.logicalExpression(lor, left, right, &subpos, &left))
-                return false;
+            if (!builder.logicalExpression(pnk, left, right, &subpos, &left)) {
+              return false;
+            }
         } else {
             BinaryOperator op = binop(pn->getKind());
             LOCAL_ASSERT(op > BINOP_ERR && op < BINOP_LIMIT);
