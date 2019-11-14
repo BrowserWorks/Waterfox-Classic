@@ -5,11 +5,10 @@
 
  var list = 
      [
-  "js-input/webkit/PerformanceTests/Speedometer/index.html",
-  "blueprint/sample.html",
+  "blueprint/elements.html",
   "blueprint/forms.html",
   "blueprint/grid.html",
-  "blueprint/elements.html",
+  "blueprint/sample.html",
   "js-input/3d-thingy.html",
   "js-input/crypto-otp.html",
   "js-input/sunspider/3d-cube.html",
@@ -37,7 +36,9 @@
   "js-input/sunspider/string-fasta.html",
   "js-input/sunspider/string-tagcloud.html",
   "js-input/sunspider/string-unpack-code.html",
-  "js-input/sunspider/string-validate-input.html"
+  "js-input/sunspider/string-validate-input.html",
+  "talos/tests/perf-reftest-singletons/bloom-basic.html",
+  "webkit/PerformanceTests/Speedometer/index.html",
      ];
  var defaultInterval = 2000;
  var idx = 0;
@@ -49,11 +50,16 @@
  };
  function loadURL () {
      var interval = defaultInterval;
-     if (idx == 0) {
+     var testURL = list[idx++];
+     if (testURL.includes("webkit")) {
          interval = 90000;
      }
      w.close();
-     w = window.open(list[idx++]);
+     w = window.open(testURL);
+
+     // Prevent the perf-reftest-singletons from calling alert()
+     w.tpRecordTime = function() { };
+
      if (idx < list.length) {
      window.setTimeout(loadURL, interval);
      } else {
