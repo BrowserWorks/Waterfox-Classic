@@ -3330,6 +3330,9 @@ ScriptLoader::HandleLoadError(ScriptLoadRequest *aRequest, nsresult aResult)
       if (aRequest->isInList()) {
         RefPtr<ScriptLoadRequest> req = mDynamicImportRequests.Steal(aRequest);
         modReq->Cancel();
+        // FinishDynamicImport must happen exactly once for each dynamic import
+        // request. If the load is aborted we do it when we remove the request
+        // from mDynamicImportRequests.
         FinishDynamicImport(modReq, aResult);
       }
     } else {
@@ -3551,8 +3554,12 @@ ScriptLoader::ParsingComplete(bool aTerminated)
     for (ScriptLoadRequest* req = mDynamicImportRequests.getFirst(); req;
          req = req->getNext()) {
       req->Cancel();
+      // FinishDynamicImport must happen exactly once for each dynamic import
+      // request. If the load is aborted we do it when we remove the request
+      // from mDynamicImportRequests.
       FinishDynamicImport(req->AsModuleRequest(), NS_ERROR_ABORT);
     }
+    mDynamicImportRequests.Clear();
 
     if (mParserBlockingRequest) {
       mParserBlockingRequest->Cancel();
