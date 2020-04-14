@@ -7289,18 +7289,16 @@ Parser<ParseHandler, CharT>::classDefinition(YieldHandling yieldHandling,
 
         bool isStatic = false;
         if (tt == TokenKind::Static) {
-            if (!tokenStream.peekToken(&tt))
-                return null();
-            if (tt == TokenKind::RightCurly) {
-                tokenStream.consumeKnownToken(tt);
-                error(JSMSG_UNEXPECTED_TOKEN, "property name", TokenKindToDesc(tt));
+            if (!tokenStream.peekToken(&tt)) {
                 return null();
             }
 
-            if (tt != TokenKind::LeftParen)
+            if (tt != TokenKind::LeftParen && tt != TokenKind::Assign &&
+                tt != TokenKind::Semi && tt != TokenKind::RightCurly) {
                 isStatic = true;
-            else
+            } else {
                 anyChars.ungetToken();
+            }
         } else {
             anyChars.ungetToken();
         }
