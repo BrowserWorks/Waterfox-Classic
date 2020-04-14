@@ -1846,9 +1846,11 @@ ExpressionDecompiler::decompilePC(jsbytecode* pc, uint8_t defIndex)
       case JSOP_CALL_IGNORES_RV:
       case JSOP_CALLITER:
       case JSOP_FUNCALL:
-      case JSOP_FUNAPPLY:
-        return decompilePCForStackOperand(pc, -int32_t(GET_ARGC(pc) + 2)) &&
-               write("(...)");
+      case JSOP_FUNAPPLY: {
+        uint16_t argc = GET_ARGC(pc);
+        return decompilePCForStackOperand(pc, -int32_t(argc + 2)) &&
+               write(argc ? "(...)" : "()");
+      }
       case JSOP_SPREADCALL:
         return decompilePCForStackOperand(pc, -3) &&
                write("(...)");
@@ -1893,6 +1895,10 @@ ExpressionDecompiler::decompilePC(jsbytecode* pc, uint8_t defIndex)
                write(")");
 
       case JSOP_SUPERCALL:
+        if (GET_ARGC(pc) == 0) {
+          return write("super()");
+        }
+        [[fallthrough]];
       case JSOP_SPREADSUPERCALL:
         return write("super(...)");
       case JSOP_SUPERFUN:
@@ -1904,10 +1910,12 @@ ExpressionDecompiler::decompilePC(jsbytecode* pc, uint8_t defIndex)
       case JSOP_STRICTSPREADEVAL:
         return write("eval(...)");
 
-      case JSOP_NEW:
+      case JSOP_NEW: {
+        uint16_t argc = GET_ARGC(pc);
         return write("(new ") &&
-               decompilePCForStackOperand(pc, -int32_t(GET_ARGC(pc) + 3)) &&
-               write("(...))");
+               decompilePCForStackOperand(pc, -int32_t(argc + 3)) &&
+               write(argc ? "(...))" : "())");
+      }
 
       case JSOP_SPREADNEW:
         return write("(new ") &&
