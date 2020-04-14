@@ -446,6 +446,18 @@ BytecodeEmitter::emitPopN(unsigned n)
 }
 
 bool
+BytecodeEmitter::emitPickN(uint8_t n)
+{
+    MOZ_ASSERT(n != 0);
+
+    if (n == 1) {
+      return emit1(JSOP_SWAP);
+    }
+
+    return emit2(JSOP_PICK, n);
+}
+
+bool
 BytecodeEmitter::emitCheckIsObj(CheckIsObjectKind kind)
 {
     return emit2(JSOP_CHECKISOBJ, uint8_t(kind));
@@ -3259,7 +3271,7 @@ BytecodeEmitter::emitDestructuringOpsArray(ParseNode* pattern, DestructuringFlav
 
         // Pick the DONE value to the top of the stack.
         if (emitted) {
-            if (!emit2(JSOP_PICK, emitted))                       // ... OBJ ITER *LREF DONE
+            if (!emitPickN(emitted))                       // ... OBJ ITER *LREF DONE
                 return false;
         }
 
@@ -3813,7 +3825,7 @@ bool BytecodeEmitter::emitAssignmentRhs(ParseNode* rhs,
 // top of the stack and we need to dig one deeper to get the right RHS value.
 bool BytecodeEmitter::emitAssignmentRhs(uint8_t offset) {
   if (offset != 1) {
-    return emit2(JSOP_PICK, offset - 1);
+    return emitPickN(offset - 1);
   }
 
   return true;

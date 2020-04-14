@@ -465,6 +465,9 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     // Helper to emit JSOP_POP or JSOP_POPN.
     MOZ_MUST_USE bool emitPopN(unsigned n);
 
+    // Helper to emit JSOP_SWAP or JSOP_PICK.
+    MOZ_MUST_USE bool emitPickN(uint8_t n);
+
     // Helper to emit JSOP_CHECKISOBJ.
     MOZ_MUST_USE bool emitCheckIsObj(CheckIsObjectKind kind);
 
