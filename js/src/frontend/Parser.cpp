@@ -8315,6 +8315,15 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
       case TokenKind::Assign:       kind = ParseNodeKind::Assign;       break;
       case TokenKind::AddAssign:    kind = ParseNodeKind::AddAssign;    break;
       case TokenKind::SubAssign:    kind = ParseNodeKind::SubAssign;    break;
+      case TokenKind::CoalesceAssign:
+          kind = ParseNodeKind::CoalesceAssignExpr;
+          break;
+      case TokenKind::OrAssign:
+          kind = ParseNodeKind::OrAssignExpr;
+          break;
+      case TokenKind::AndAssign:
+          kind = ParseNodeKind::AndAssignExpr;
+          break;
       case TokenKind::BitOrAssign:  kind = ParseNodeKind::BitOrAssign;  break;
       case TokenKind::BitXorAssign: kind = ParseNodeKind::BitXorAssign; break;
       case TokenKind::BitAndAssign: kind = ParseNodeKind::BitAndAssign; break;
@@ -8359,11 +8368,24 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
     } else if (handler.isPropertyAccess(lhs)) {
         // Permitted: no additional testing/fixup needed.
     } else if (handler.isFunctionCall(lhs)) {
-        if (!strictModeErrorAt(exprPos.begin, JSMSG_BAD_LEFTSIDE_OF_ASS))
+        // We don't have to worry about backward compatibility issues with the new
+        // compound assignment operators, so we always throw here. Also that way we
+        // don't have to worry if |f() &&= expr| should always throw an error or
+        // only if |f()| returns true.
+        if (kind == ParseNodeKind::CoalesceAssignExpr ||
+            kind == ParseNodeKind::OrAssignExpr ||
+            kind == ParseNodeKind::AndAssignExpr) {
+            errorAt(exprPos.begin, JSMSG_BAD_LEFTSIDE_OF_ASS);
             return null();
+        }
 
-        if (possibleError)
+        if (!strictModeErrorAt(exprPos.begin, JSMSG_BAD_LEFTSIDE_OF_ASS)) {
+            return null();
+        }
+
+        if (possibleError) {
             possibleError->setPendingDestructuringErrorAt(exprPos, JSMSG_BAD_DESTRUCT_TARGET);
+        }
     } else {
         errorAt(exprPos.begin, JSMSG_BAD_LEFTSIDE_OF_ASS);
         return null();

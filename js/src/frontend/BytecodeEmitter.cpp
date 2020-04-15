@@ -458,6 +458,18 @@ BytecodeEmitter::emitPickN(uint8_t n)
 }
 
 bool
+BytecodeEmitter::emitUnpickN(uint8_t n)
+{
+    MOZ_ASSERT(n != 0);
+
+    if (n == 1) {
+      return emit1(JSOP_SWAP);
+    }
+
+    return emit2(JSOP_UNPICK, n);
+}
+
+bool
 BytecodeEmitter::emitCheckIsObj(CheckIsObjectKind kind)
 {
     return emit2(JSOP_CHECKISOBJ, uint8_t(kind));
@@ -1151,6 +1163,9 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
       case ParseNodeKind::Assign:
       case ParseNodeKind::AddAssign:
       case ParseNodeKind::SubAssign:
+      case ParseNodeKind::CoalesceAssignExpr:
+      case ParseNodeKind::OrAssignExpr:
+      case ParseNodeKind::AndAssignExpr:
       case ParseNodeKind::BitOrAssign:
       case ParseNodeKind::BitXorAssign:
       case ParseNodeKind::BitAndAssign:
@@ -3843,6 +3858,11 @@ CompoundAssignmentParseNodeKindToJSOp(ParseNodeKind pnk)
       case ParseNodeKind::DivAssign:    return JSOP_DIV;
       case ParseNodeKind::ModAssign:    return JSOP_MOD;
       case ParseNodeKind::PowAssign:    return JSOP_POW;
+      case ParseNodeKind::CoalesceAssignExpr:
+      case ParseNodeKind::OrAssignExpr:
+      case ParseNodeKind::AndAssignExpr:
+        // Short-circuit assignment operators are handled elsewhere.
+        [[fallthrough]];
       default: MOZ_CRASH("unexpected compound assignment op");
     }
 }
@@ -4245,6 +4265,243 @@ BytecodeEmitter::emitSingletonInitialiser(ParseNode* pn)
         return false;
 
     return emitObjectOp(objbox, JSOP_OBJECT);
+}
+
+bool BytecodeEmitter::emitShortCircuitAssignment(ParseNode* pn) {
+  MOZ_ASSERT(pn->isArity(PN_BINARY));
+  MOZ_ASSERT(pn->isKind(ParseNodeKind::CoalesceAssignExpr) ||
+             pn->isKind(ParseNodeKind::OrAssignExpr) ||
+             pn->isKind(ParseNodeKind::AndAssignExpr));
+
+  JSOp op;
+  switch (pn->getKind()) {
+    case ParseNodeKind::CoalesceAssignExpr:
+      op = JSOP_COALESCE;
+      break;
+    case ParseNodeKind::OrAssignExpr:
+      op = JSOP_OR;
+      break;
+    case ParseNodeKind::AndAssignExpr:
+      op = JSOP_AND;
+      break;
+    default:
+      MOZ_CRASH("Unexpected ParseNodeKind");
+  }
+
+  ParseNode* lhs = pn->pn_left;
+  ParseNode* rhs = pn->pn_right;
+
+  // |name| is used within NameOpEmitter, so its lifetime must surpass |noe|.
+  RootedAtom name(cx);
+
+  // Select the appropriate emitter based on the left-hand side.
+  Maybe<NameOpEmitter> noe;
+  Maybe<PropOpEmitter> poe;
+  Maybe<ElemOpEmitter> eoe;
+
+  int32_t depth = stackDepth;
+
+  // Number of values pushed onto the stack in addition to the lhs value.
+  int32_t numPushed;
+
+  // Evaluate the left-hand side expression and compute any stack values needed
+  // for the assignment.
+  switch (lhs->getKind()) {
+    case ParseNodeKind::Name: {
+      name = lhs->as<NameNode>().name();
+      noe.emplace(this, name, NameOpEmitter::Kind::CompoundAssignment);
+
+      if (!noe->prepareForRhs()) {
+        //          [stack] ENV? LHS
+        return false;
+      }
+
+      numPushed = noe->emittedBindOp();
+      break;
+    }
+
+    case ParseNodeKind::Dot: {
+      PropertyAccess* prop = &lhs->as<PropertyAccess>();
+      bool isSuper = prop->isSuper();
+
+      poe.emplace(this, PropOpEmitter::Kind::CompoundAssignment,
+                  isSuper ? PropOpEmitter::ObjKind::Super
+                          : PropOpEmitter::ObjKind::Other);
+
+      if (!poe->prepareForObj()) {
+        return false;
+      }
+
+      if (isSuper) {
+        UnaryNode* base = &prop->expression().as<UnaryNode>();
+        if (!emitGetThisForSuperBase(base)) {
+          //        [stack] THIS SUPERBASE
+          return false;
+        }
+      } else {
+        if (!emitTree(&prop->expression())) {
+          //        [stack] OBJ
+          return false;
+        }
+      }
+
+      if (!poe->emitGet(prop->key().pn_atom)) {
+        //          [stack] # if Super
+        //          [stack] THIS SUPERBASE LHS
+        //          [stack] # otherwise
+        //          [stack] OBJ LHS
+        return false;
+      }
+
+      if (!poe->prepareForRhs()) {
+        //          [stack] # if Super
+        //          [stack] THIS SUPERBASE LHS
+        //          [stack] # otherwise
+        //          [stack] OBJ LHS
+        return false;
+      }
+
+      numPushed = 1 + isSuper;
+      break;
+    }
+
+    case ParseNodeKind::Elem: {
+      PropertyByValue* elem = &lhs->as<PropertyByValue>();
+      bool isSuper = elem->isSuper();
+
+      eoe.emplace(this, ElemOpEmitter::Kind::CompoundAssignment,
+                  isSuper ? ElemOpEmitter::ObjKind::Super
+                          : ElemOpEmitter::ObjKind::Other);
+
+      if (!emitElemObjAndKey(elem, isSuper, *eoe)) {
+        //          [stack] # if Super
+        //          [stack] THIS KEY
+        //          [stack] # otherwise
+        //          [stack] OBJ KEY
+        return false;
+      }
+
+      if (!eoe->emitGet()) {
+        //          [stack] # if Super
+        //          [stack] THIS KEY SUPERBASE LHS
+        //          [stack] # otherwise
+        //          [stack] OBJ KEY LHS
+        return false;
+      }
+
+      if (!eoe->prepareForRhs()) {
+        //          [stack] # if Super
+        //          [stack] THIS KEY SUPERBASE LHS
+        //          [stack] # otherwise
+        //          [stack] OBJ KEY LHS
+        return false;
+      }
+
+      numPushed = 2 + isSuper;
+      break;
+    }
+
+    default:
+      MOZ_CRASH();
+  }
+
+  MOZ_ASSERT(stackDepth == depth + numPushed + 1);
+
+  // Test for the short-circuit condition.
+  JumpList jump;
+  if (!emitJump(op, &jump)) {
+    //              [stack] ... LHS
+    return false;
+  }
+
+  // The short-circuit condition wasn't fulfilled, pop the left-hand side value
+  // which was kept on the stack.
+  if (!emit1(JSOP_POP)) {
+    //              [stack] ...
+    return false;
+  }
+
+  // TODO: Open spec issue about setting inferred function names.
+  // <https://github.com/tc39/proposal-logical-assignment/issues/23>
+  if (!emitTree(rhs)) {
+    //              [stack] ... RHS
+    return false;
+  }
+
+  // Perform the actual assignment.
+  switch (lhs->getKind()) {
+    case ParseNodeKind::Name: {
+      if (!noe->emitAssignment()) {
+        //          [stack] RHS
+        return false;
+      }
+      break;
+    }
+
+    case ParseNodeKind::Dot: {
+      PropertyAccess* prop = &lhs->as<PropertyAccess>();
+
+      if (!poe->emitAssignment(prop->key().pn_atom)) {
+        //          [stack] RHS
+        return false;
+      }
+      break;
+    }
+
+    case ParseNodeKind::Elem: {
+      if (!eoe->emitAssignment()) {
+        //          [stack] RHS
+        return false;
+      }
+      break;
+    }
+
+    default:
+      MOZ_CRASH();
+  }
+
+  MOZ_ASSERT(stackDepth == depth + 1);
+
+  // Join with the short-circuit jump and pop anything left on the stack.
+  if (numPushed > 0) {
+    JumpList jumpAroundPop;
+    if (!emitJump(JSOP_GOTO, &jumpAroundPop)) {
+      //            [stack] RHS
+      return false;
+    }
+
+    if (!emitJumpTargetAndPatch(jump)) {
+      //            [stack] ... LHS
+      return false;
+    }
+
+    // Reconstruct the stack depth after the jump.
+    stackDepth = depth + 1 + numPushed;
+
+    // Move the left-hand side value to the bottom and pop the rest.
+    if (!emitUnpickN(numPushed)) {
+      //            [stack] LHS ...
+      return false;
+    }
+    if (!emitPopN(numPushed)) {
+      //            [stack] LHS
+      return false;
+    }
+
+    if (!emitJumpTargetAndPatch(jumpAroundPop)) {
+      //            [stack] LHS | RHS
+      return false;
+    }
+  } else {
+    if (!emitJumpTargetAndPatch(jump)) {
+      //            [stack] LHS | RHS
+      return false;
+    }
+  }
+
+  MOZ_ASSERT(stackDepth == depth + 1);
+
+  return true;
 }
 
 bool
@@ -9434,6 +9691,14 @@ BytecodeEmitter::emitTree(ParseNode* pn, ValueUsage valueUsage /* = ValueUsage::
                             pn->pn_right))
         {
             return false;
+        }
+        break;
+
+      case ParseNodeKind::CoalesceAssignExpr:
+      case ParseNodeKind::OrAssignExpr:
+      case ParseNodeKind::AndAssignExpr:
+        if (!emitShortCircuitAssignment(pn)) {
+          return false;
         }
         break;
 

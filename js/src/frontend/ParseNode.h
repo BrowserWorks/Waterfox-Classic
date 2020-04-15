@@ -172,6 +172,9 @@ class ObjectBox;
     F(Assign) \
     F(AddAssign) \
     F(SubAssign) \
+    F(CoalesceAssignExpr) \
+    F(OrAssignExpr) \
+    F(AndAssignExpr) \
     F(BitOrAssign) \
     F(BitXorAssign) \
     F(BitAndAssign) \
@@ -328,6 +331,9 @@ IsTypeofKind(ParseNodeKind kind)
  * Assign   binary      pn_left: lvalue, pn_right: rvalue
  * AddAssign,   binary  pn_left: lvalue, pn_right: rvalue
  * SubAssign,           pn_op: JSOP_ADD for +=, etc.
+ * CoalesceAssignExpr,
+ * OrAssignExpr,
+ * AndAssignExpr,
  * BitOrAssign,
  * BitXorAssign,
  * BitAndAssign,

@@ -356,6 +356,9 @@ ContainsHoistedDeclaration(JSContext* cx, ParseNode* node, bool* result)
       case ParseNodeKind::Assign:
       case ParseNodeKind::AddAssign:
       case ParseNodeKind::SubAssign:
+      case ParseNodeKind::CoalesceAssignExpr:
+      case ParseNodeKind::OrAssignExpr:
+      case ParseNodeKind::AndAssignExpr:
       case ParseNodeKind::BitOrAssign:
       case ParseNodeKind::BitXorAssign:
       case ParseNodeKind::BitAndAssign:
@@ -1834,6 +1837,9 @@ Fold(JSContext* cx, ParseNode** pnp, Parser<FullParseHandler, char16_t>& parser,
       case ParseNodeKind::Assign:
       case ParseNodeKind::AddAssign:
       case ParseNodeKind::SubAssign:
+      case ParseNodeKind::CoalesceAssignExpr:
+      case ParseNodeKind::OrAssignExpr:
+      case ParseNodeKind::AndAssignExpr:
       case ParseNodeKind::BitOrAssign:
       case ParseNodeKind::BitAndAssign:
       case ParseNodeKind::BitXorAssign:
