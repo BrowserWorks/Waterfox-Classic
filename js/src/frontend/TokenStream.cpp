@@ -1912,11 +1912,7 @@ TokenStreamSpecific<CharT, AnyCharsAccess>::getTokenInternal(TokenKind* ttp, Mod
 
       case '|':
         if (matchChar('|'))
-#ifdef NIGHTLY_BUILD
             tp->type = matchChar('=') ? TokenKind::OrAssign : TokenKind::Or;
-#else
-            tp->type = TokenKind::Or;
-#endif
 #ifdef ENABLE_PIPELINE_OPERATOR
         else if (matchChar('>'))
             tp->type = TokenKind::Pipeline;
@@ -1931,11 +1927,7 @@ TokenStreamSpecific<CharT, AnyCharsAccess>::getTokenInternal(TokenKind* ttp, Mod
 
       case '&':
         if (matchChar('&'))
-#ifdef NIGHTLY_BUILD
             tp->type = matchChar('=') ? TokenKind::AndAssign : TokenKind::And;
-#else
-            tp->type = TokenKind::And;
-#endif
         else
             tp->type = matchChar('=') ? TokenKind::BitAndAssign : TokenKind::BitAnd;
         goto out;
@@ -1955,12 +1947,8 @@ TokenStreamSpecific<CharT, AnyCharsAccess>::getTokenInternal(TokenKind* ttp, Mod
                 tp->type = TokenKind::OptionalChain;
             }
         } else if (matchChar('?')) {
-#ifdef NIGHTLY_BUILD
             tp->type = matchChar('=') ? TokenKind::CoalesceAssign
                                       : TokenKind::Coalesce;
-#else
-            tp->type = TokenKind::Coalesce;
-#endif
         } else {
             tp->type = TokenKind::Hook;
         }
