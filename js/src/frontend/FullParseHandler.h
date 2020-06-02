@@ -808,9 +808,11 @@ class FullParseHandler
     }
 
     ParseNode* newAssignment(ParseNodeKind kind, ParseNode* lhs, ParseNode* rhs) {
-        if (kind == ParseNodeKind::Assign && lhs->isKind(ParseNodeKind::Name) &&
-            !lhs->isInParens())
-        {
+        if ((kind == ParseNodeKind::Assign ||
+             kind == ParseNodeKind::CoalesceAssignExpr ||
+             kind == ParseNodeKind::OrAssignExpr ||
+             kind == ParseNodeKind::AndAssignExpr) &&
+            lhs->isKind(ParseNodeKind::Name) && !lhs->isInParens()) {
             checkAndSetIsDirectRHSAnonFunction(rhs);
         }
 
