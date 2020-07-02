@@ -45,6 +45,7 @@ def cargo_info(cargo):
     )
 
 @depends(rustc_info, cargo_info)
+@imports(_from='mozboot.util', _import='MINIMUM_RUST_VERSION')
 @imports(_from='textwrap', _import='dedent')
 def rust_compiler(rustc_info, cargo_info):
     if not rustc_info:
@@ -56,7 +57,7 @@ def rust_compiler(rustc_info, cargo_info):
         You can install rust by running './mach bootstrap'
         or by directly running the installer from https://rustup.rs/
         '''))
-    rustc_min_version = Version('1.47.0')
+    rustc_min_version = Version(MINIMUM_RUST_VERSION)
     cargo_min_version = rustc_min_version
 
     version = rustc_info.version
