@@ -736,11 +736,12 @@ static inline bool IsUnscopableDotName(JSContext* cx, HandleId id) {
 #ifdef DEBUG
 static bool IsInternalDotName(JSContext* cx, HandleId id) {
   return JSID_IS_ATOM(id, cx->names().dotThis) ||
-         JSID_IS_ATOM(id, cx->names().dotGenerator); /* || The following aren't currently implemented in Waterfox
+         JSID_IS_ATOM(id, cx->names().dotGenerator) /* || The following aren't currently implemented in Waterfox
          JSID_IS_ATOM(id, cx->names().dotInitializers) ||
          JSID_IS_ATOM(id, cx->names().dotFieldKeys) ||
          JSID_IS_ATOM(id, cx->names().dotStaticInitializers) ||
-         JSID_IS_ATOM(id, cx->names().dotStaticFieldKeys); */
+         JSID_IS_ATOM(id, cx->names().dotStaticFieldKeys) */ ||
+         JSID_IS_ATOM(id, cx->names().starNamespaceStar);
 }
 #endif
 

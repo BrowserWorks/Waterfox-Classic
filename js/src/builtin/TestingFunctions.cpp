@@ -3876,6 +3876,10 @@ GetModuleEnvironmentNames(JSContext* cx, unsigned argc, Value* vp)
     if (!JS_Enumerate(cx, env, &ids))
         return false;
 
+    // The "*namespace*" binding is a detail of current implementation so hide
+    // it to give stable results in tests.
+    ids.eraseIfEqual(NameToId(cx->names().starNamespaceStar));
+
     uint32_t length = ids.length();
     RootedArrayObject array(cx, NewDenseFullyAllocatedArray(cx, length));
     if (!array)

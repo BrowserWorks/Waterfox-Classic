@@ -1300,7 +1300,7 @@ ModuleBuilder::buildTables()
                         return false;
                 }
             }
-        } else if (exp->importName() == cx_->names().star) {
+        } else if (exp->importName() == cx_->names().star && !exp->exportName()) {
             if (!starExportEntries_.append(exp))
                 return false;
         } else {
