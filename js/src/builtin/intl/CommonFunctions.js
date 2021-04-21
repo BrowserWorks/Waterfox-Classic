@@ -1025,7 +1025,7 @@ function BestAvailableLocaleIgnoringDefault(availableLocales, locale) {
  */
 function LookupMatcher(availableLocales, requestedLocales) {
     // Step 1.
-    var result = new Record();
+    var result = new_Record();
 
     // Step 2.
     for (var i = 0; i < requestedLocales.length; i++) {
@@ -1165,7 +1165,7 @@ function ResolveLocale(availableLocales, requestedLocales, options, relevantExte
     var extension = r.extension;
 
     // Step 5.
-    var result = new Record();
+    var result = new_Record();
 
     // Step 6.
     result.dataLocale = foundLocale;

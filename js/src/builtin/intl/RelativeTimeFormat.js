@@ -119,7 +119,7 @@ function InitializeRelativeTimeFormat(relativeTimeFormat, locales, options) {
         options = ToObject(options);
 
     // Step 6.
-    let opt = new Record();
+    let opt = new_Record();
 
     // Steps 7-8.
     let matcher = GetOption(options, "localeMatcher", "string", ["lookup", "best fit"], "best fit");
