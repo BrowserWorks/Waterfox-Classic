@@ -795,9 +795,6 @@ case "$target" in
         MOZ_OPTIMIZE_FLAGS="-O2"
         MOZ_FIX_LINK_PATHS=
         LDFLAGS="$LDFLAGS -LARGEADDRESSAWARE -NXCOMPAT"
-        if test -z "$DEVELOPER_OPTIONS"; then
-            LDFLAGS="$LDFLAGS -RELEASE"
-        fi
         LDFLAGS="$LDFLAGS -DYNAMICBASE"
         RCFLAGS="-nologo"
     fi
