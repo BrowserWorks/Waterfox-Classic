@@ -726,9 +726,6 @@ MessageChannel::Clear()
     }
 
     // Free up any memory used by pending messages.
-    for (MessageTask* task : mPending) {
-        task->Clear();
-    }
     mPending.clear();
 
     mMaybeDeferredPendingCount = 0;
@@ -1880,6 +1877,7 @@ NS_IMPL_ISUPPORTS_INHERITED(MessageChannel::MessageTask, CancelableRunnable, nsI
 
 MessageChannel::MessageTask::MessageTask(MessageChannel* aChannel, Message&& aMessage)
   : CancelableRunnable(StringFromIPCMessageType(aMessage.type()))
+  , mMonitor(aChannel->mMonitor)
   , mChannel(aChannel)
   , mMessage(Move(aMessage))
   , mScheduled(false)
@@ -1889,14 +1887,9 @@ MessageChannel::MessageTask::MessageTask(MessageChannel* aChannel, Message&& aMe
 nsresult
 MessageChannel::MessageTask::Run()
 {
-    if (!mChannel) {
-        return NS_OK;
-    }
+    mMonitor->AssertNotCurrentThreadOwns();
 
-    mChannel->AssertWorkerThread();
-    mChannel->mMonitor->AssertNotCurrentThreadOwns();
-
-    MonitorAutoLock lock(*mChannel->mMonitor);
+    MonitorAutoLock lock(*mMonitor);
 
     // In case we choose not to run this message, we may need to be able to Post
     // it again.
@@ -1906,7 +1899,8 @@ MessageChannel::MessageTask::Run()
         return NS_OK;
     }
 
-    mChannel->RunMessage(*this);
+    Channel()->AssertWorkerThread();
+    Channel()->RunMessage(*this);
     return NS_OK;
 }
 
@@ -1914,23 +1908,20 @@ MessageChannel::MessageTask::Run()
 nsresult
 MessageChannel::MessageTask::Cancel()
 {
-    if (!mChannel) {
-        return NS_OK;
-    }
+    mMonitor->AssertNotCurrentThreadOwns();
 
-    mChannel->AssertWorkerThread();
-    mChannel->mMonitor->AssertNotCurrentThreadOwns();
-
-    MonitorAutoLock lock(*mChannel->mMonitor);
+    MonitorAutoLock lock(*mMonitor);
 
     if (!isInList()) {
         return NS_OK;
     }
-    remove();
 
+    Channel()->AssertWorkerThread();
     if (!IsAlwaysDeferred(Msg())) {
-        mChannel->mMaybeDeferredPendingCount--;
+        Channel()->mMaybeDeferredPendingCount--;
     }
+
+    remove();
 
     return NS_OK;
 }
@@ -1938,6 +1929,7 @@ MessageChannel::MessageTask::Cancel()
 void
 MessageChannel::MessageTask::Post()
 {
+    mMonitor->AssertCurrentThreadOwns();
     MOZ_RELEASE_ASSERT(!mScheduled);
     MOZ_RELEASE_ASSERT(isInList());
 
@@ -1945,21 +1937,13 @@ MessageChannel::MessageTask::Post()
 
     RefPtr<MessageTask> self = this;
     nsCOMPtr<nsIEventTarget> eventTarget =
-        mChannel->mListener->GetMessageEventTarget(mMessage);
+        Channel()->mListener->GetMessageEventTarget(mMessage);
 
     if (eventTarget) {
         eventTarget->Dispatch(self.forget(), NS_DISPATCH_NORMAL);
-    } else {
-        mChannel->mWorkerLoop->PostTask(self.forget());
+    } else if (Channel()->mWorkerLoop) {
+        Channel()->mWorkerLoop->PostTask(self.forget());
     }
-}
-
-void
-MessageChannel::MessageTask::Clear()
-{
-    mChannel->AssertWorkerThread();
-
-    mChannel = nullptr;
 }
 
 NS_IMETHODIMP
