@@ -456,15 +456,13 @@ WebrtcGmpVideoEncoder::ReleaseGmp_g(RefPtr<WebrtcGmpVideoEncoder>& aEncoder)
   aEncoder->Close_g();
 }
 
-int32_t
-WebrtcGmpVideoEncoder::ReleaseGmp()
-{
+int32_t WebrtcGmpVideoEncoder::ReleaseGmp() {
   LOGD(("GMP Released:"));
+  RegisterEncodeCompleteCallback(nullptr);
   if (mGMPThread) {
-    mGMPThread->Dispatch(
-        WrapRunnableNM(&WebrtcGmpVideoEncoder::ReleaseGmp_g,
-                       RefPtr<WebrtcGmpVideoEncoder>(this)),
-        NS_DISPATCH_NORMAL);
+    mGMPThread->Dispatch(WrapRunnableNM(&WebrtcGmpVideoEncoder::ReleaseGmp_g,
+                                        RefPtr<WebrtcGmpVideoEncoder>(this)),
+                         NS_DISPATCH_NORMAL);
   }
   return WEBRTC_VIDEO_CODEC_OK;
 }
