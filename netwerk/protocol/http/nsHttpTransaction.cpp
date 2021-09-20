@@ -218,12 +218,21 @@ nsHttpTransaction::~nsHttpTransaction()
 
     // Force the callbacks and connection to be released right now
     mCallbacks = nullptr;
-    mConnection = nullptr;
 
     delete mResponseHead;
     delete mForTakeResponseHead;
     delete mChunkedDecoder;
     ReleaseBlockingTransaction();
+
+    nsTArray<nsCOMPtr<nsISupports>> arrayToRelease;
+    if (mConnection) {
+        arrayToRelease.AppendElement(mConnection.forget());
+    }
+    if (!arrayToRelease.IsEmpty()) {
+        RefPtr<ReleaseOnSocketThread> r =
+            new ReleaseOnSocketThread(std::move(arrayToRelease));
+        r->Dispatch();
+    }
 }
 
 nsresult
