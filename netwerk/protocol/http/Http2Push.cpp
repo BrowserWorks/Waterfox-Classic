@@ -268,7 +268,7 @@ Http2PushedStream::ReadSegments(nsAHttpSegmentReader *reader,
     // present
     mSocketTransport->GetOriginAttributes(&originAttributes);
     CreatePushHashKey(mHeaderScheme, mHeaderHost, originAttributes,
-                      mSession->Serial(), mHeaderPath,
+                      Session()->Serial(), mHeaderPath,
                       mOrigin, mHashKey);
 
     LOG3(("Http2PushStream 0x%X hash key %s\n", mStreamID, mHashKey.get()));
@@ -310,7 +310,7 @@ Http2PushedStream::AdjustInitialWindow()
     Http2Stream::AdjustInitialWindow();
     // Http2PushedStream::ReadSegments is needed to call TransmitFrame()
     // and actually get this information into the session bytestream
-    mSession->TransactionHasDataToWrite(this);
+    Session()->TransactionHasDataToWrite(this);
   }
   // Otherwise, when we get hooked up, the initial window will get bumped
   // anyway, so we're good to go.
@@ -336,7 +336,7 @@ Http2PushedStream::GetHashKey(nsCString &key)
 void
 Http2PushedStream::ConnectPushedStream(Http2Stream *stream)
 {
-  mSession->ConnectPushedStream(stream);
+  Session()->ConnectPushedStream(stream);
 }
 
 bool

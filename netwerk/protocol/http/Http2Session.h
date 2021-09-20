@@ -31,14 +31,23 @@ class Http2PushedStream;
 class Http2Stream;
 class nsHttpTransaction;
 
-class Http2Session final : public ASpdySession
-                         , public nsAHttpConnection
-                         , public nsAHttpSegmentReader
-                         , public nsAHttpSegmentWriter
-{
+// b23b147c-c4f8-4d6e-841a-09f29a010de7
+#define NS_HTTP2SESSION_IID                          \
+  {                                                  \
+    0xb23b147c, 0xc4f8, 0x4d6e, {                    \
+      0x84, 0x1a, 0x09, 0xf2, 0x9a, 0x01, 0x0d, 0xe7 \
+    }                                                \
+  }
+
+class Http2Session final : public ASpdySession,
+                           public nsAHttpConnection,
+                           public nsAHttpSegmentReader,
+                           public nsAHttpSegmentWriter {
   ~Http2Session();
 
-public:
+ public:
+  NS_DECLARE_STATIC_IID_ACCESSOR(NS_HTTP2SESSION_IID)
+
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSAHTTPTRANSACTION
   NS_DECL_NSAHTTPCONNECTION(mConnection)
@@ -557,7 +566,14 @@ private:
   nsDataHashtable<nsCStringHashKey, uint32_t> mTunnelHash;
 };
 
+<<<<<<< HEAD
 } // namespace net
 } // namespace mozilla
+=======
+NS_DEFINE_STATIC_IID_ACCESSOR(Http2Session, NS_HTTP2SESSION_IID);
+
+}  // namespace net
+}  // namespace mozilla
+>>>>>>> f53b04080a7b (Bug 1667102 - Add some diagnostic assertions, r=necko-reviewers,dragana,a=RyanVM)
 
 #endif // mozilla_net_Http2Session_h

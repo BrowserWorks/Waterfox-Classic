@@ -155,7 +155,7 @@ public:
 
   virtual ~Http2Stream();
 
-  Http2Session *Session() { return mSession; }
+  Http2Session* Session();
 
   static MOZ_MUST_USE nsresult MakeOriginURL(const nsACString &origin,
                                              RefPtr<nsStandardURL> &url);
@@ -191,7 +191,7 @@ protected:
   uint32_t mStreamID;
 
   // The session that this stream is a subset of
-  Http2Session *mSession;
+  nsWeakPtr mSession;
 
   // These are temporary state variables to hold the argument to
   // Read/WriteSegments so it can be accessed by On(read/write)segment
