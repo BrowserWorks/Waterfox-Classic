@@ -247,6 +247,9 @@ public:
   virtual void
   Callback(nsresult aStatus, const Sequence<RefPtr<File>>& aFiles) override
   {
+    if (!mInputElement->GetOwnerGlobal()) {
+      return;
+    }
     nsTArray<OwningFileOrDirectory> array;
     for (uint32_t i = 0; i < aFiles.Length(); ++i) {
       OwningFileOrDirectory* element = array.AppendElement();
@@ -686,6 +689,11 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
   // So, we can safely send one by ourself.
   mInput->SetFilesOrDirectories(newFilesOrDirectories, true);
 
+  // mInput(HTMLInputElement) has no scriptGlobalObject, don't create
+  // DispatchChangeEventCallback
+  if (!mInput->GetOwnerGlobal()) {
+    return NS_OK;
+  }
   RefPtr<DispatchChangeEventCallback> dispatchChangeEventCallback =
     new DispatchChangeEventCallback(mInput);
 
