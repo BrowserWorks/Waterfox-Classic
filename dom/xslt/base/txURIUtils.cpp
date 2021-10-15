@@ -70,6 +70,9 @@ URIUtils::ResetWithSource(nsIDocument *aNewDoc, nsINode *aSourceNode)
     aNewDoc->Reset(channel, loadGroup);
     aNewDoc->SetPrincipal(sourcePrincipal);
     aNewDoc->SetBaseURI(sourceDoc->GetDocBaseURI());
+    aNewDoc->SetSandboxFlags(sourceDoc->GetSandboxFlags());
+    aNewDoc->SetReferrerInfo(sourceDoc->GetReferrerInfo());
+    aNewDoc->SetEmbedderPolicy(sourceDoc->GetEmbedderPolicy());
 
     // Copy charset
     aNewDoc->SetDocumentCharacterSetSource(
