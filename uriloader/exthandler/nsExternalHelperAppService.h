@@ -117,6 +117,8 @@ public:
    */
   virtual bool GetMIMETypeFromOSForExtension(const nsACString& aExtension,
                                              nsACString& aMIMEType);
+  // Internal method. Only called directly from tests.
+  static nsresult EscapeURI(nsIURI* aURI, nsIURI** aResult);
 
 protected:
   virtual ~nsExternalHelperAppService();
