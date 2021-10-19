@@ -90,15 +90,22 @@ enum EscapeMask {
   esc_Query          = 1u << 8,
   esc_Ref            = 1u << 9,
   /** special flags **/
-  esc_Minimal        = esc_Scheme | esc_Username | esc_Password | esc_Host | esc_FilePath | esc_Param | esc_Query | esc_Ref,
-  esc_Forced         = 1u << 10, /* forces escaping of existing escape sequences */
-  esc_OnlyASCII      = 1u << 11, /* causes non-ascii octets to be skipped */
-  esc_OnlyNonASCII   = 1u << 12, /* causes _graphic_ ascii octets (0x20-0x7E)
-                                    * to be skipped when escaping. causes all
-                                    * ascii octets (<= 0x7F) to be skipped when unescaping */
-  esc_AlwaysCopy     = 1u << 13, /* copy input to result buf even if escaping is unnecessary */
-  esc_Colon          = 1u << 14, /* forces escape of colon */
-  esc_SkipControl    = 1u << 15  /* skips C0 and DEL from unescaping */
+  esc_Minimal = esc_Scheme | esc_Username | esc_Password | esc_Host |
+                esc_FilePath | esc_Param | esc_Query | esc_Ref,
+  esc_Forced = 1u << 10,    /* forces escaping of existing escape sequences */
+  esc_OnlyASCII = 1u << 11, /* causes non-ascii octets to be skipped */
+  esc_OnlyNonASCII =
+      1u << 12, /* causes _graphic_ ascii octets (0x20-0x7E)
+                 * to be skipped when escaping. causes all
+                 * ascii octets (<= 0x7F) to be skipped when unescaping */
+  esc_AlwaysCopy =
+      1u << 13, /* copy input to result buf even if escaping is unnecessary */
+  esc_Colon = 1u << 14,       /* forces escape of colon */
+  esc_SkipControl = 1u << 15, /* skips C0 and DEL from unescaping */
+  esc_Spaces = 1u << 16,      /* forces escape of spaces */
+  esc_ExtHandler = 1u << 17   /* For escaping external protocol handler urls.
+                               * Escapes everything except:
+                               * a-z, 0-9 and !#$&'()*+,-./:;=?@[]_~ */
 };
 
 /**

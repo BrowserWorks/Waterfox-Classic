@@ -955,6 +955,25 @@ NS_IMETHODIMP nsExternalHelperAppService::LoadUrl(nsIURI * aURL)
 static const char kExternalProtocolPrefPrefix[]  = "network.protocol-handler.external.";
 static const char kExternalProtocolDefaultPref[] = "network.protocol-handler.external-default";
 
+// static
+nsresult nsExternalHelperAppService::EscapeURI(nsIURI* aURI, nsIURI** aResult) {
+  MOZ_ASSERT(aURI);
+  MOZ_ASSERT(aResult);
+
+  nsAutoCString spec;
+  aURI->GetSpec(spec);
+
+  if (spec.Find("%00") != -1) return NS_ERROR_MALFORMED_URI;
+
+  nsAutoCString escapedSpec;
+  nsresult rv = NS_EscapeURL(spec, esc_AlwaysCopy | esc_ExtHandler, escapedSpec,
+                             fallible);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsCOMPtr<nsIIOService> ios(do_GetIOService());
+  return ios->NewURI(escapedSpec, nullptr, nullptr, aResult);
+}
+
 NS_IMETHODIMP 
 nsExternalHelperAppService::LoadURI(nsIURI *aURI,
                                     nsIInterfaceRequestor *aWindowContext)
@@ -971,24 +990,13 @@ nsExternalHelperAppService::LoadURI(nsIURI *aURI,
     return NS_OK;
   }
 
-  nsAutoCString spec;
-  aURI->GetSpec(spec);
-
-  if (spec.Find("%00") != -1)
-    return NS_ERROR_MALFORMED_URI;
-
-  spec.ReplaceSubstring("\"", "%22");
-  spec.ReplaceSubstring("`", "%60");
-  
-  nsCOMPtr<nsIIOService> ios(do_GetIOService());
-  nsCOMPtr<nsIURI> uri;
-  nsresult rv = ios->NewURI(spec, nullptr, nullptr, getter_AddRefs(uri));
+  nsCOMPtr<nsIURI> escapedURI;
+  nsresult rv = EscapeURI(aURI, getter_AddRefs(escapedURI));
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsAutoCString scheme;
-  uri->GetScheme(scheme);
-  if (scheme.IsEmpty())
-    return NS_OK; // must have a scheme
+  escapedURI->GetScheme(scheme);
+  if (scheme.IsEmpty()) return NS_OK;  // must have a scheme
 
   // Deny load if the prefs say to do so
   nsAutoCString externalPref(kExternalProtocolPrefPrefix);
@@ -1019,13 +1027,13 @@ nsExternalHelperAppService::LoadURI(nsIURI *aURI,
   // a helper app or the system default, we just launch the URI.
   if (!alwaysAsk && (preferredAction == nsIHandlerInfo::useHelperApp ||
                      preferredAction == nsIHandlerInfo::useSystemDefault))
-    return handler->LaunchWithURI(uri, aWindowContext);
+    return handler->LaunchWithURI(escapedURI, aWindowContext);
   
   nsCOMPtr<nsIContentDispatchChooser> chooser =
     do_CreateInstance("@mozilla.org/content-dispatch-chooser;1", &rv);
   NS_ENSURE_SUCCESS(rv, rv);
   
-  return chooser->Ask(handler, aWindowContext, uri,
+  return chooser->Ask(handler, aWindowContext, escapedURI,
                       nsIContentDispatchChooser::REASON_CANNOT_HANDLE);
 }
 
