@@ -6,6 +6,18 @@
 
 #include "nsStructuredCloneContainer.h"
 
+#include <cstddef>
+#include <utility>
+#include "ErrorList.h"
+#include "js/RootingAPI.h"
+#include "js/StructuredClone.h"
+#include "js/Value.h"
+#include "mozilla/Assertions.h"
+#include "mozilla/Base64.h"
+#include "mozilla/CheckedInt.h"
+#include "mozilla/DebugOnly.h"
+#include "mozilla/ErrorResult.h"
+#include "mozilla/fallible.h"
 #include "nsCOMPtr.h"
 #include "nsIGlobalObject.h"
 #include "nsIVariant.h"
@@ -139,6 +151,11 @@ nsStructuredCloneContainer::GetDataAsBase64(nsAString &aOut)
 
   auto iter = Data().Iter();
   size_t size = Data().Size();
+  CheckedInt<nsAutoCString::size_type> sizeCheck(size);
+  if (!sizeCheck.isValid()) {
+    return NS_ERROR_FAILURE;
+  }
+
   nsAutoCString binaryData;
   binaryData.SetLength(size);
   Data().ReadBytes(iter, binaryData.BeginWriting(), size);
