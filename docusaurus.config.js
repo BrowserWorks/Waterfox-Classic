@@ -84,13 +84,13 @@ const siteConfig = {
         src: 'img/logo.svg',
       },
     },
-    algolia: {
+/*     algolia: {
         apiKey: '2df980e7ffc95c19552790f7cad32666',
         indexName: 'fbflipper',
         algoliaOptions: {
           hitsPerPage: 5,
         },
-      },
+      }, */
     prism: {
       additionalLanguages: [
         'groovy',
