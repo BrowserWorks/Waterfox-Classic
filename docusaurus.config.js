@@ -11,10 +11,10 @@ const repoUrl = 'https://github.com/WaterfoxCo/Waterfox-Classic';
 const siteConfig = {
   title: 'Waterfox Classic',
   tagline: 'The web browser for legacy systems.',
-  url: 'https://classic.waterfox.net/',
-  baseUrl: '/',
+  url: 'https://waterfoxco.github.io/',
+  baseUrl: '/waterfox-classic/',
+  organizationName: "WaterfoxCo",
   projectName: 'Waterfox Classic',
-  // TODO: T69061026 enable once sandy docs are complete: external_domain: 'classic.waterfox.net',
   themeConfig: {
     navbar: {
       title: 'Waterfox Classic',
