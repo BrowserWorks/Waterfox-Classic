@@ -13,8 +13,10 @@ const siteConfig = {
   tagline: 'The web browser for legacy systems.',
   url: 'https://waterfoxco.github.io/',
   baseUrl: '/waterfox-classic/',
+	onBrokenLinks: "ignore",
+	onBrokenMarkdownLinks: "warn",
   organizationName: "WaterfoxCo",
-  projectName: 'Waterfox Classic',
+  projectName: 'Waterfox-Classic',
   themeConfig: {
     navbar: {
       title: 'Waterfox Classic',
