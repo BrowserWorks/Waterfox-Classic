@@ -1,0 +1,31 @@
+{
+  "scripts": {
+    "start": "docusaurus start --port 3001",
+    "build": "docusaurus build",
+    "publish-gh-pages": "docusaurus deploy",
+    "write-translations": "docusaurus write-translations",
+    "version": "docusaurus version",
+    "rename-version": "docusaurus rename-version"
+  },
+  "devDependencies": {
+    "@docusaurus/core": "^2.0.0-beta.9",
+    "@docusaurus/plugin-client-redirects": "2.0.0-beta.8",
+    "@docusaurus/preset-classic": "^2.0.0-beta.8",
+    "mermaid": "^8.13.3",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  },
+  "dependencies": {
+    "browserslist": "^4.16.5"
+  },
+  "resolutions": {
+    "kind-of": "6.0.3",
+    "chokidar": "^3.1.5",
+    "dns-packet": "^5.2.2",
+    "browserslist": "^4.16.5",
+    "ws": "8.2.0",
+    "trim": "1.0.1",
+    "immer": "^9.0.6"
+  },
+  "license": "MIT"
+}

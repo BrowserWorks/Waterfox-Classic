@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800px" height="600px" viewBox="0 0 800 600" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Flat firefox</title>
+    <defs>
+        <path d="M21,27.9914285 C21,23.5778844 24.5789895,20 29.0051037,20 L772.994896,20 C777.415993,20 781,23.5740818 781,27.9914285 L781,569.995056 C781,572.206926 779.205874,574 777.002057,574 L24.9979428,574 C22.7899399,574 21,572.20829 21,569.995056 L21,27.9914285 Z" id="path-1"></path>
+        <filter x="-2.9%" y="-2.5%" width="105.8%" height="107.9%" filterUnits="objectBoundingBox" id="filter-2">
+            <feOffset dx="0" dy="8" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="6" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.19 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+        <path d="M297,31 C298.660478,31 299.500263,31.1504373 301.767323,31.1504373 C308.5,31.1504373 314.159094,34.2727497 315.5,45 C316.5,53 320,59 327,59 L327,59 L781,59 L781,101 L21,101 L21,59 L91,59 C98,59 101.5,53 102.5,45 C103.840906,34.2727497 109.5,31.1504373 116.232677,31.1504373 C118.499737,31.1504373 119.339522,31 121,31 Z" id="path-3"></path>
+        <filter x="-0.3%" y="-4.3%" width="100.5%" height="105.7%" filterUnits="objectBoundingBox" id="filter-4">
+            <feOffset dx="0" dy="-1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.02 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+        <rect id="path-5" x="20" y="7" width="648" height="24" rx="2"></rect>
+        <filter x="-0.1%" y="-2.1%" width="100.2%" height="108.3%" filterUnits="objectBoundingBox" id="filter-6">
+            <feOffset dx="0" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.05 0" type="matrix" in="shadowOffsetOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="Flat-firefox" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="bg-white">
+            <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+            <use fill="#FFFFFF" fill-rule="evenodd" xlink:href="#path-1"></use>
+        </g>
+        <path d="M21,24.0029779 C21,21.7921942 22.7941261,20 24.9979428,20 L777.002057,20 C779.21006,20 781,21.7862013 781,24.0029779 L781,101 L21,101 L21,24.0029779 Z" id="bg" fill="#DEDEE3"></path>
+        <g id="traffic-lights" transform="translate(32.000000, 34.000000)">
+            <circle id="Oval-3" fill="#FF6155" cx="6" cy="6" r="6"></circle>
+            <circle id="Oval-3-Copy" fill="#FFBF18" cx="26" cy="6" r="6"></circle>
+            <circle id="Oval-3-Copy-2" fill="#14CB37" cx="46" cy="6" r="6"></circle>
+        </g>
+        <g id="tab-bg">
+            <use fill="black" fill-opacity="1" filter="url(#filter-4)" xlink:href="#path-3"></use>
+            <use fill="#F2F2F3" fill-rule="evenodd" xlink:href="#path-3"></use>
+        </g>
+        <g id="search-bar" transform="translate(27.000000, 61.000000)">
+            <g id="Rectangle-3">
+                <use fill="black" fill-opacity="1" filter="url(#filter-6)" xlink:href="#path-5"></use>
+                <use fill="#FFFFFF" fill-rule="evenodd" xlink:href="#path-5"></use>
+            </g>
+            <g id="Group-5" transform="translate(686.000000, 0.000000)">
+                <path d="M52.4947588,23 C53.279896,23 53.9246343,23.5938747 53.9938486,24.3626108 L54,24.5 C54,25.3284271 53.3328702,26 52.4947588,26 L39.5052412,26 C38.6739194,26 38,25.3342028 38,24.5 C38,23.6715729 38.6671298,23 39.5052412,23 L52.4947588,23 Z M52.4947588,18 C53.279896,18 53.9246343,18.5938747 53.9938486,19.3626108 L54,19.5 C54,20.3284271 53.3328702,21 52.4947588,21 L39.5052412,21 C38.6739194,21 38,20.3342028 38,19.5 C38,18.6715729 38.6671298,18 39.5052412,18 L52.4947588,18 Z M52.4947588,13 C53.279896,13 53.9246343,13.5938747 53.9938486,14.3626108 L54,14.5 C54,15.3284271 53.3328702,16 52.4947588,16 L39.5052412,16 C38.6739194,16 38,15.3342028 38,14.5 C38,13.6715729 38.6671298,13 39.5052412,13 L52.4947588,13 Z" id="Combined-Shape" fill="#76787B" opacity="0.800000012"></path>
+                <rect id="Rectangle-8" fill="#D4D4D4" opacity="0.5" x="24.0714286" y="0" width="1" height="38"></rect>
+                <path d="M3.07142857,15 L7.07142857,19 L3.07142857,23 L-2.27373675e-13,23 L4.07142857,19 L0.0714285714,15 L3.07142857,15 Z M8.07142857,15 L12.0714286,19 L8.07142857,23 L5,23 L9.07142857,19 L5.07142857,15 L8.07142857,15 Z" id="Combined-Shape" fill="#76787B" fill-rule="nonzero" opacity="0.800000012"></path>
+            </g>
+            <circle id="Oval" stroke="#979797" fill="#D8D8D8" cx="44" cy="19" r="6.5"></circle>
+            <g id="Group" transform="translate(0.000000, 3.000000)">
+                <circle id="Oval" fill="#E0E0E3" cx="16" cy="16" r="16"></circle>
+                <path d="M15.2386673,8.58961006 C16.0213457,7.80693164 17.2924557,7.80215162 18.0735042,8.58320021 L18.0735042,8.58320021 L18.1910851,8.71121017 C18.8569725,9.50139357 18.8103889,10.6747427 18.0670944,11.4180372 L18.0670944,11.4180372 L15.4832028,14.001 L22.004576,14.0010192 C22.5543335,14.0010192 23,14.4443724 23,15.0103881 L23,16.9916503 C23,17.5491094 22.5443235,18.0010192 22.004576,18.0010192 L15.8322028,18.001 L18.0670944,20.2359035 C18.8103889,20.979198 18.8569725,22.1525471 18.1910851,22.9427305 L18.0735042,23.0707405 C17.2924557,23.8517891 16.0213457,23.847009 15.2386673,23.0643306 L8.88079478,16.7064581 C8.64134528,16.4670086 8.54683511,16.1380649 8.60104653,15.8270985 C8.54663376,15.5165772 8.64109,15.1871873 8.88079478,14.9474825 L8.88079478,14.9474825 Z" id="Combined-Shape" fill="#76787B" opacity="0.800000012"></path>
+            </g>
+            <g id="Group-2" transform="translate(55.000000, 11.000000)">
+                <rect id="Rectangle-5" fill="#D4D4D4" x="40" y="0" width="1" height="16"></rect>
+                <text id="Search-or-enter-addr" opacity="0.800000012" font-family="HelveticaNeue, Helvetica Neue" font-size="12" font-weight="normal" letter-spacing="0.349999994" fill="#777777">
+                    <tspan x="46" y="13">Search or enter addres</tspan>
+                    <tspan x="176.388" y="13">s</tspan>
+                </text>
+                <text id="Waterfox" opacity="0.800000012" font-family="HelveticaNeue, Helvetica Neue" font-size="9" font-weight="normal" letter-spacing="0.163636366" fill="#008FD4">
+                    <tspan x="0" y="12">Waterfox</tspan>
+                </text>
+            </g>
+            <g id="refresh" transform="translate(634.000000, 11.000000)">
+                <path d="M19.8570041,4.14299592 C18.9282106,3.42631675 17.7638911,3 16.5,3 C13.4624339,3 11,5.46243388 11,8.5 C11,11.5375661 13.4624339,14 16.5,14 C18.6373427,14 20.4899349,12.780838 21.4002904,11 L18.950542,11 C18.3103922,11.6273514 17.4390115,12 16.5,12 C14.5670034,12 13,10.4329966 13,8.5 C13,6.56700338 14.5670034,5 16.5,5 C17.2107588,5 17.8720348,5.21186162 18.4241214,5.57587856 L16,8 L22,8 L22,2 L19.8570041,4.14299592 L19.8570041,4.14299592 Z" id="Combined-Shape" fill="#76787B" opacity="0.800000012"></path>
+                <rect id="Rectangle-5-Copy" fill="#D4D4D4" x="0" y="0" width="1" height="16"></rect>
+            </g>
+        </g>
+        <path d="M333,41 L333,45 L337,45 L337,47 L333,47 L333,51 L331,51 L331,46.999 L327,47 L327,45 L331,44.999 L331,41 L333,41 Z" id="new-tab-icon" fill="#929396" opacity="0.800000012"></path>
+        <g id="Tab" transform="translate(113.000000, 37.000000)">
+            <circle id="circle" fill="#D8D8D8" opacity="0.600000024" cx="9" cy="9" r="9"></circle>
+            <text id="New-Tab" opacity="0.800000012" font-family="HelveticaNeue, Helvetica Neue" font-size="11" font-weight="normal" letter-spacing="0.200000003" fill="#0091D4">
+                <tspan x="32" y="14">New Tab</tspan>
+            </text>
+            <path d="M186.5,4.5 L186.5,8.5 L190.5,8.5 L190.5,9.5 L186.5,9.5 L186.5,13.5 L185.5,13.5 L185.5,9.49887498 L181.5,9.49987498 L181.5,8.49987502 L185.5,8.49887502 L185.5,4.5 L186.5,4.5 Z" id="Combined-Shape-Copy-4" stroke="#979797" fill="#929396" opacity="0.800000012" transform="translate(186.000000, 9.000000) rotate(-315.000000) translate(-186.000000, -9.000000) "></path>
+        </g>
+        <g id="Group-3" transform="translate(244.000000, 285.000000)">
+            <text id="Search" font-family="Helvetica" font-size="27" font-weight="normal" fill="#D2D2D7">
+                <tspan x="115.72583" y="40">Search</tspan>
+            </text>
+            <path d="M286.004437,2 C293.651756,2 300.582949,5.06581443 305.635581,10.0362743 C310.692799,15.0112466 313.868269,21.8942006 313.995981,29.5217262 C313.993297,37.4647924 310.88396,44.5683614 305.842107,49.6950541 C300.774945,54.8474815 293.758361,58 286.004437,58 L286.004437,58 L29.9955625,58 C22.2644025,58 15.2651749,54.8665698 10.19892,49.7995655 C5.13312223,44.7330183 2,37.7332875 2,30 C2,22.267641 5.13310231,15.2672988 10.1994465,10.2002051 C15.2652423,5.13365991 22.2638439,2 29.9955625,2 L29.9955625,2 Z" id="Rectangle" stroke="#D2D2D7" stroke-width="4" opacity="0.200000003"></path>
+        </g>
+    </g>
+</svg>
