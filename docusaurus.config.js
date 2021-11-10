@@ -11,8 +11,8 @@ const repoUrl = 'https://github.com/WaterfoxCo/Waterfox-Classic';
 const siteConfig = {
   title: 'Waterfox Classic',
   tagline: 'The web browser for legacy systems.',
-  url: 'https://waterfoxco.github.io/',
-  baseUrl: '/waterfox-classic/',
+  url: 'https://classic.waterfox.net',
+  baseUrl: '/',
 	onBrokenLinks: "ignore",
 	onBrokenMarkdownLinks: "warn",
   organizationName: "WaterfoxCo",
