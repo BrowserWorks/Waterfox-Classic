@@ -23,25 +23,25 @@ export default function Index() {
               that require use of XPCOM and XUL extensions.
             </h2>
             <h3>
-              ⚠️ Waterfox Classic has many unpatched security vulnerabilities. Use at your own discretion.
+              ⚠️ Waterfox Classic has many unpatched <a href="https://github.com/WaterfoxCo/Waterfox-Classic/wiki/Unpatched-Security-Advisories">security advisories</a>. Use at your own discretion.
             </h3>
               <div>
                 <p className="landing-btn landing-btn-left landing-btn-label">
                   Download
                 </p>
                 <a
-                  className="landing-btn landing-btn-middle primary"
-                  href="https://www.facebook.com/fbflipper/public/mac">
+                  className="landing-btn landing-btn-middle primary mac-btn"
+                  href="https://github.com/WaterfoxCo/Waterfox-Classic/releases/latest">
                   Mac
                 </a>
                 <a
-                  className="landing-btn landing-btn-middle primary"
-                  href="https://www.facebook.com/fbflipper/public/linux">
+                  className="landing-btn landing-btn-middle primary linux-btn"
+                  href="https://github.com/WaterfoxCo/Waterfox-Classic/releases/latest">
                   Linux
                 </a>
                 <a
-                  className="landing-btn landing-btn-right primary"
-                  href="https://www.facebook.com/fbflipper/public/windows">
+                  className="landing-btn landing-btn-right primary win-btn"
+                  href="https://github.com/WaterfoxCo/Waterfox-Classic/releases/latest">
                   Windows
                 </a>
               </div>
