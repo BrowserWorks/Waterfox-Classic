@@ -196,8 +196,8 @@ protected:
   // These are temporary state variables to hold the argument to
   // Read/WriteSegments so it can be accessed by On(read/write)segment
   // further up the stack.
-  RefPtr<nsAHttpSegmentReader> mSegmentReader;
-  nsAHttpSegmentWriter* mSegmentWriter;
+  nsAHttpSegmentReader        *mSegmentReader;
+  nsAHttpSegmentWriter        *mSegmentWriter;
 
   nsCString     mOrigin;
   nsCString     mHeaderHost;

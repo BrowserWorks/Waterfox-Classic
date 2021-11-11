@@ -122,8 +122,6 @@ Http2Stream::ReadSegments(nsAHttpSegmentReader *reader,
 {
   LOG3(("Http2Stream %p ReadSegments reader=%p count=%d state=%x",
         this, reader, count, mUpstreamState));
-  // Reader is nullptr when this is a push stream.
-  MOZ_DIAGNOSTIC_ASSERT(!reader || (reader == mSession));
 
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
