@@ -566,9 +566,14 @@ private:
   nsDataHashtable<nsCStringHashKey, uint32_t> mTunnelHash;
 };
 
+<<<<<<< HEAD
+} // namespace net
+} // namespace mozilla
+=======
 NS_DEFINE_STATIC_IID_ACCESSOR(Http2Session, NS_HTTP2SESSION_IID);
 
 }  // namespace net
 }  // namespace mozilla
+>>>>>>> f53b04080a7b (Bug 1667102 - Add some diagnostic assertions, r=necko-reviewers,dragana,a=RyanVM)
 
 #endif // mozilla_net_Http2Session_h
