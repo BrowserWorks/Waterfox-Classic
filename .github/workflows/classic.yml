@@ -28,6 +28,8 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('**/browser/config/version_display.txt') }}
       - name: Build
         run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | RUSTUP_INIT_SKIP_PATH_CHECK=yes sh -s -- -y
+          source $HOME/.cargo/env
           rustup default 1.55.0-x86_64-unknown-linux-gnu
           ./mach build
       - name: Package
