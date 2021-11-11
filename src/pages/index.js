@@ -45,6 +45,7 @@ export default function Index() {
                   Windows
                 </a>
               </div>
+              <p className="releaseinfo"></p>
             <div className="slideshow">
               <img src={useBaseUrl('img/browser.svg')} className="splashScreen" />
               {/* <img
