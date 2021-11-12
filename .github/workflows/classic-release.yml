@@ -86,7 +86,7 @@ jobs:
     name: 🐧 Build for Linux
     runs-on: ubuntu-18.04
     container:
-      image: ghcr.io/waterfoxco/waterfox_docker_img:latest
+      image: ghcr.io/waterfoxco/waterfox-classic_docker_img:latest
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
@@ -298,7 +298,7 @@ jobs:
     name: Generate Linux Update Files
     runs-on: ubuntu-18.04
     container:
-      image: ghcr.io/waterfoxco/waterfox_docker_img:latest
+      image: ghcr.io/waterfoxco/waterfox-classic_docker_img:latest
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
