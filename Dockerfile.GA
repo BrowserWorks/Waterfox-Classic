@@ -1,7 +1,7 @@
 FROM centos:7
 ENV llvm_ver="7.0"
 ENV nasm_ver="2.15.05"
-ENV git_ver="2.33.0"
+ENV git_ver="2.33.1"
 ENV rust_ver="1.56.1"
 ENV PATH="/opt/rh/llvm-toolset-${llvm_ver}/root/usr/bin:/root/.cargo/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/opt/rh/llvm-toolset-${llvm_ver}/root/usr/lib64:${LD_LIBRARY_PATH}"
