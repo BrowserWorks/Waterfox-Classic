@@ -1,7 +1,7 @@
 FROM centos:7
 ENV llvm_ver="7.0"
 ENV nasm_ver="2.15.05"
-ENV git_ver="2.33.0"
+ENV git_ver="2.33.1"
 ENV rust_ver="1.56.1"
 ENV PATH="/opt/rh/llvm-toolset-${llvm_ver}/root/usr/bin:/root/.cargo/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/opt/rh/llvm-toolset-${llvm_ver}/root/usr/lib64:${LD_LIBRARY_PATH}"
@@ -47,11 +47,6 @@ RUN make all
 RUN make install
 RUN git --version
 WORKDIR "$HOME"
-# Install packages for releases based on 78+
-RUN cargo install cbindgen
-RUN wget -qO- https://rpm.nodesource.com/setup_14.x | bash -
-RUN yum install -y nodejs
-RUN node --version
 # Cleanup
 RUN rm -rf ./git_pkg/*
 RUN rm -rf ./nasm/*
