@@ -63,9 +63,9 @@ jobs:
           popd
         shell: bash
 
-      - name: 'Get Previous tag'
-          id: previoustag
-          uses: "WyriHaximus/github-action-get-previous-tag@v1"
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: 🪟 Upload Windows Installer
         uses: ncipollo/release-action@v1
@@ -102,9 +102,9 @@ jobs:
         run: |
           ./mach package
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
-      - name: 'Get Previous tag'
-          id: previoustag
-          uses: "WyriHaximus/github-action-get-previous-tag@v1"
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: 🐧 Upload Linux Installer
         uses: ncipollo/release-action@v1
         with:
@@ -212,9 +212,9 @@ jobs:
           sed -i '' -e "s/SIZE/$SIZE/g" ./objdir-classic/dist/update/update.xml
           sed -i '' -e "s/HASH/"$SHA512"/g" ./objdir-classic/dist/update/update.xml
 
-      - name: 'Get Previous tag'
-          id: previoustag
-          uses: "WyriHaximus/github-action-get-previous-tag@v1"
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: 🍎 Upload macOS Artifacts
         uses: ncipollo/release-action@v1
         with:
@@ -270,9 +270,9 @@ jobs:
           Write-Output $env:BUILD_DIR
           c:\\mozilla-build\\start-shell.bat "$env:BUILD_DIR/build/github-actions/update.sh"
 
-      - name: 'Get Previous tag'
-          id: previoustag
-          uses: "WyriHaximus/github-action-get-previous-tag@v1"
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: 🪟 Upload Window MAR
         uses: ncipollo/release-action@v1
         with:
@@ -314,9 +314,9 @@ jobs:
           chmod +x ./build/github-actions/update.sh
           ./build/github-actions/update.sh
 
-      - name: 'Get Previous tag'
-          id: previoustag
-          uses: "WyriHaximus/github-action-get-previous-tag@v1"
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: 🐧 Upload Linux MAR
         uses: ncipollo/release-action@v1
         with:
@@ -394,9 +394,9 @@ jobs:
           sha256sum Waterfox*.dmg | tee -a "$checksumFile"
           sha256sum Waterfox*.exe | tee -a "$checksumFile"
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
-      - name: 'Get Previous tag'
-          id: previoustag
-          uses: "WyriHaximus/github-action-get-previous-tag@v1"
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: Upload SHASUM
         uses: ncipollo/release-action@v1
         with:
