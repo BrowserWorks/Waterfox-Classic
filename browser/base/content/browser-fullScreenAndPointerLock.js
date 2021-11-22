@@ -111,8 +111,17 @@ var PointerlockFsWarning = {
     this._timeoutHide.start();
   },
 
-  close() {
-    if (!this._element) {
+  /**
+   * Close the full screen or pointerlock warning.
+   * @param {('fullscreen-warning'|'pointerlock-warning')} elementId - Id of the
+   * warning element to close. If the id does not match the currently shown
+   * warning this is a no-op.
+   */
+  close(elementId) {
+    if (!elementId) {
+      throw new Error("Must pass id of warning element to close");
+    }
+    if (!this._element || this._element.id != elementId) {
       return;
     }
     // Cancel any pending timeout
@@ -238,7 +247,7 @@ var PointerLock = {
         break;
       }
       case "PointerLock:Exited": {
-        PointerlockFsWarning.close();
+        PointerlockFsWarning.close("pointerlock-warning");
         break;
       }
     }
@@ -411,7 +420,7 @@ var FullScreen = {
 
     // If we have a current pointerlock warning shown then hide it
     // before transition.
-    PointerlockFsWarning.close();
+    PointerlockFsWarning.close("pointerlock-warning");
 
     // If it is a remote browser, send a message to ask the content
     // to enter fullscreen state. We don't need to do so if it is an
@@ -469,7 +478,7 @@ var FullScreen = {
     window.messageManager
           .broadcastAsyncMessage("DOMFullscreen:CleanUp");
 
-    PointerlockFsWarning.close();
+    PointerlockFsWarning.close("fullscreen-warning");
     gBrowser.tabContainer.removeEventListener("TabOpen", this.exitDomFullScreen);
     gBrowser.tabContainer.removeEventListener("TabClose", this.exitDomFullScreen);
     gBrowser.tabContainer.removeEventListener("TabSelect", this.exitDomFullScreen);
