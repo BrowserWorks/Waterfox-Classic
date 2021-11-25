@@ -14,7 +14,6 @@ jobs:
     runs-on: windows-2016
     env:
       MOZ_NOSPAM: 1
-      NASM: /c/PROGRA~1/NASM/nasm.exe
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
@@ -33,7 +32,7 @@ jobs:
           rustup default 1.56.1-pc-windows-msvc
       - name: Set system PATH variable
         shell: bash
-        run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
+        run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims;C:\\ProgramData\\scoop\\shims\\wget/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
       - name: Cache for Windows
         uses: actions/cache@v2
         with:
@@ -224,7 +223,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: ./objdir-*/dist/waterfox-classic/*.dmg,./objdir-*/dist/update/*.mar,
+          artifacts: ./objdir-*/dist/waterfox-classic/*.dmg,./objdir-*/dist/update/*.mar
           tag: ${{ steps.previoustag.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
