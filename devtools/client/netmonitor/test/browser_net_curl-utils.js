@@ -215,20 +215,43 @@ function testEscapeStringWin() {
   let doubleQuotes = "Quote: \"Time is an illusion. Lunchtime doubly so.\"";
   is(CurlUtils.escapeStringWin(doubleQuotes),
     '"Quote: ""Time is an illusion. Lunchtime doubly so."""',
-    "Double quotes should be escaped.");
+    "Double quotes should be escaped."
+  );
 
-  let percentSigns = "%AppData%";
-  is(CurlUtils.escapeStringWin(percentSigns), '""%"AppData"%""',
-    "Percent signs should be escaped.");
+  const percentSigns = "%AppData%";
+  is(
+    CurlUtils.escapeStringWin(percentSigns),
+    '""%"AppData"%""',
+    "Percent signs should be escaped."
+  );
 
-  let backslashes = "\\A simple string\\";
-  is(CurlUtils.escapeStringWin(backslashes), '"\\\\A simple string\\\\"',
-    "Backslashes should be escaped.");
+  const backslashes = "\\A simple string\\";
+  is(
+    CurlUtils.escapeStringWin(backslashes),
+    '"\\\\A simple string\\\\"',
+    "Backslashes should be escaped."
+  );
 
-  let newLines = "line1\r\nline2\r\nline3";
-  is(CurlUtils.escapeStringWin(newLines),
-    '"line1"^\u000d\u000A"line2"^\u000d\u000A"line3"',
-    "Newlines should be escaped.");
+  const newLines = "line1\r\nline2\r\nline3";
+  is(
+    CurlUtils.escapeStringWin(newLines),
+    '"line1"^\u000d\u000A\u000d\u000A"line2"^\u000d\u000A\u000d\u000A"line3"',
+    "Newlines should be escaped."
+  );
+
+  const dollarSignCommand = "$(calc.exe)";
+  is(
+    CurlUtils.escapeStringWin(dollarSignCommand),
+    '"`$(calc.exe)"',
+    "Dollar sign should be escaped."
+  );
+
+  const tickSignCommand = "`$(calc.exe)";
+  is(
+    CurlUtils.escapeStringWin(tickSignCommand),
+    '"```$(calc.exe)"',
+    "Both the tick and dollar signs should be escaped."
+  );
 }
 
 function* createCurlData(selected, getLongString) {
