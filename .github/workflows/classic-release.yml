@@ -32,7 +32,7 @@ jobs:
           rustup default 1.56.1-pc-windows-msvc
       - name: Set system PATH variable
         shell: bash
-        run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims;C:\\ProgramData\\scoop\\shims\\wget/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
+        run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
       - name: Cache for Windows
         uses: actions/cache@v2
         with:
@@ -49,7 +49,7 @@ jobs:
 
       - name: Sign
         run: |
-          wget https://github.com/ebourg/jsign/releases/download/4.0/jsign-4.0.jar
+          /c/ProgramData/scoop/shims/wget.exe https://github.com/ebourg/jsign/releases/download/4.0/jsign-4.0.jar
           BROWSER_VERSION=`cat browser/config/version_display.txt`
           pushd objdir-classic/dist/install/sea/
           7z x waterfox-classic-$BROWSER_VERSION.en-US.win64.installer.exe
