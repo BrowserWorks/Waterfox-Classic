@@ -81,7 +81,7 @@ jobs:
           path: ./dist/waterfox*.dmg
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
   build-windows:
-    runs-on: windows-2016
+    runs-on: windows-2019
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2

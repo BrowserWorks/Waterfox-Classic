@@ -11,7 +11,7 @@ env:
 jobs:
   build-windows:
     name: 🪟 Build for Windows
-    runs-on: windows-2016
+    runs-on: windows-2019
     env:
       MOZ_NOSPAM: 1
     steps:
