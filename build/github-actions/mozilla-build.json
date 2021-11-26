@@ -1,8 +1,8 @@
 {
-    "version": "3.3",
+    "version": "3.4",
     "homepage": "https://wiki.mozilla.org/MozillaBuild",
-    "url": "https://ftp.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-3.3.exe#/dl.7z",
-    "hash": "ac86e5794c6a99c25dee0b60720c7cfd9833ec64785c74838723179830749c9c",
+    "url": "https://ftp.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-3.4.exe#/dl.7z",
+    "hash": "cec9ae47a939445783ec9eaa8425654d2417906b59e7d8ff6538d91c8f2b21ce",
     "license": "MPL-2.0",
     "bin": [
         "start-shell.bat"
