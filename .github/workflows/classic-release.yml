@@ -56,7 +56,8 @@ jobs:
       - name: Sign
         run: |
           /c/ProgramData/scoop/shims/wget.exe https://github.com/ebourg/jsign/releases/download/4.0/jsign-4.0.jar
-          ls -la
+          chmod +x ./jsign-4.0.jar
+          chmod 777 ./jsign-4.0.jar
           BROWSER_VERSION=`cat browser/config/version_display.txt`
           pushd objdir-classic/dist/install/sea/
           7z x waterfox-classic-$BROWSER_VERSION.en-US.win64.installer.exe
