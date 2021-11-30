@@ -272,7 +272,7 @@ jobs:
   generate-windows-update:
     needs: [build-windows]
     name: Generate Windows Update Files
-    runs-on: [self-hosted, windows, x64]
+    runs-on: windows-2019
     steps:
       - name: Generate update files
         run: |
