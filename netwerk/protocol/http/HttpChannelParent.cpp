@@ -100,6 +100,8 @@ HttpChannelParent::~HttpChannelParent()
 {
   LOG(("Destroying HttpChannelParent [this=%p]\n", this));
   CleanupBackgroundChannel();
+
+  mEventQ->NotifyReleasingOwner();
 }
 
 void

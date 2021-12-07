@@ -37,8 +37,12 @@ ChannelEventQueue::FlushQueue()
   // Events flushed could include destruction of channel (and our own
   // destructor) unless we make sure its refcount doesn't drop to 0 while this
   // method is running.
-  nsCOMPtr<nsISupports> kungFuDeathGrip(mOwner);
-  mozilla::Unused << kungFuDeathGrip; // Not used in this function
+  nsCOMPtr<nsISupports> kungFuDeathGrip;
+  {
+    MutexAutoLock lock(mMutex);
+    kungFuDeathGrip = mOwner;
+  }
+  mozilla::Unused << kungFuDeathGrip;  // Not used in this function
 
   // Prevent flushed events from flushing the queue recursively
   {
@@ -167,6 +171,10 @@ ChannelEventQueue::ResumeInternal()
       RefPtr<ChannelEventQueue> mQueue;
       nsCOMPtr<nsISupports> mOwner;
     };
+
+    if (!mOwner) {
+      return;
+    }
 
     // Worker thread requires a CancelableRunnable.
     RefPtr<Runnable> event = new CompleteResumeRunnable(this, mOwner);

@@ -204,6 +204,8 @@ HttpChannelChild::~HttpChannelChild()
 {
   LOG(("Destroying HttpChannelChild @%p\n", this));
 
+  mEventQ->NotifyReleasingOwner();
+
   ReleaseMainThreadOnlyReferences();
 }
 
