@@ -124,6 +124,7 @@ StreamFilterParent::~StreamFilterParent()
                                     mOrigListener.forget());
   NS_ReleaseOnMainThreadSystemGroup("StreamFilterParent::mContext",
                                     mContext.forget());
+  mQueue->NotifyReleasingOwner();
 }
 
 bool
