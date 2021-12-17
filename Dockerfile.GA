@@ -2,7 +2,6 @@ FROM centos:7
 ENV llvm_ver="7.0"
 ENV nasm_ver="2.15.05"
 ENV git_ver="2.33.1"
-ENV rust_ver="1.56.1"
 ENV PATH="/opt/rh/llvm-toolset-${llvm_ver}/root/usr/bin:/root/.cargo/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/opt/rh/llvm-toolset-${llvm_ver}/root/usr/lib64:${LD_LIBRARY_PATH}"
 RUN yum -y install "deltarpm" "centos-release-scl-rh" "epel-release"
@@ -21,10 +20,8 @@ RUN yum -y update
 RUN yum -y install "llvm-toolset-${llvm_ver}-clang" "llvm-toolset-${llvm_ver}-llvm-devel"
 RUN clang --version
 RUN yum -y install "ccache" "which" "pkgconfig" "python2-devel" "python36" "alsa-lib-devel" "autoconf213" "pkgconfig(gl)" "pkgconfig(dbus-glib-1)" "libnotify-devel" "libproxy-devel" "startup-notification-devel" "unzip" "zip" "pkgconfig(xt)" "yasm" "pkgconfig(gdk-x11-2.0)" "pkgconfig(glib-2.0)" "pkgconfig(gobject-2.0)" "pkgconfig(gtk+-2.0)" "pkgconfig(gtk+-3.0)" "pkgconfig(gtk+-unix-print-2.0)" "pkgconfig(gtk+-unix-print-3.0)" "libcurl-devel" "pkgconfig(libffi)" "pkgconfig(libpulse)" "pkgconfig(jack)" "libdrm-devel" "pkgconfig(gconf-2.0)" "bzip2" "gcc" "gcc-c++"
-# Install rust
+# Install rustup
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-RUN rustup default ${rust_ver}-x86_64-unknown-linux-gnu
-RUN cargo --version
 # Build nasm
 RUN mkdir -p ~/nasm/
 WORKDIR "$HOME/nasm"

@@ -6,6 +6,7 @@ on:
 
 env:
   ENABLE_ARTIFACTS_MODE: "true"
+  RUST_VER: "1.56.1"
   SHELL: "/bin/bash"
 
 jobs:
@@ -30,10 +31,10 @@ jobs:
           mkdir -p ~\\scoop\\buckets\\my-bucket
           Copy-Item -Path $env:GITHUB_WORKSPACE\\build\\github-actions\\mozilla-build.json -Destination ~\scoop\buckets\my-bucket
           scoop install my-bucket/mozilla-build --global
-          rustup default 1.56.1-pc-windows-msvc
+          rustup default $env:RUST_VER-pc-windows-msvc
       - name: Set system PATH variable
         shell: bash
-        run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
+        run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims;C:\\ProgramData\\scoop\\apps\\llvm\\current\\bin/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
       - name: Cache for Windows
         uses: actions/cache@v2
         with:
@@ -56,6 +57,7 @@ jobs:
 
       - name: Sign
         run: |
+          cd $G_WORKSPACE
           BROWSER_VERSION=`cat browser/config/version_display.txt`
           /c/ProgramData/scoop/shims/wget.exe https://github.com/ebourg/jsign/releases/download/4.0/jsign-4.0.jar -P /c/ProgramData/scoop/shims/
           chmod +x /c/ProgramData/scoop/shims/
@@ -109,6 +111,7 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('**/browser/config/version_display.txt') }}
       - name: Build
         run: |
+          rustup default ${RUST_VER}-x86_64-unknown-linux-gnu
           ./mach build
       - name: Package
         run: |
@@ -148,6 +151,7 @@ jobs:
         run: |
           brew update
           brew install autoconf@2.13 ccache make nasm yasm
+          rustup default ${RUST_VER}-x86_64-apple-darwin
       - name: Download SDK
         run: |
           wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX10.12.sdk.tar.xz
@@ -415,11 +419,11 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: ./dist/*.sha256
+          artifacts: ./dist/waterfox*.sha256
           tag: ${{ steps.previoustag.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
           name: Artifact_Classic_Checksum_${{ github.run_id }}
-          path: ./dist/*.sha256
+          path: ./dist/waterfox*.sha256
