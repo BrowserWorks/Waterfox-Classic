@@ -80,7 +80,6 @@ private:
     nsresult createTxWrapper();
     nsresult startHTMLElement(nsIContent* aElement, bool aXHTML);
     nsresult endHTMLElement(nsIContent* aElement);
-    void processHTTPEquiv(nsIAtom* aHeader, const nsString& aValue);
     nsresult createHTMLElement(nsIAtom* aName,
                                nsIContent** aResult);
 
@@ -105,7 +104,6 @@ private:
     RefPtr<txTransformNotifier> mNotifier;
 
     uint32_t mTreeDepth, mBadChildLevel;
-    nsCString mRefreshString;
 
     txStack mTableStateStack;
     enum TableState {
