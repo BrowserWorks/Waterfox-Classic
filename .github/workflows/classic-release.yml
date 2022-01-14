@@ -278,13 +278,19 @@ jobs:
     name: Generate Windows Update Files
     runs-on: windows-2019
     steps:
+      - name: Install depends
+        run: |
+          iwr -useb get.scoop.sh | iex
+          mkdir -p ~\\scoop\\buckets\\my-bucket
+          Copy-Item -Path $env:GITHUB_WORKSPACE\\build\\github-actions\\mozilla-build.json -Destination ~\scoop\buckets\my-bucket
+          scoop install my-bucket/mozilla-build --global
       - name: Generate update files
         run: |
           $pattern = '[\\]'
           $env:BUILD_DIR = $env:GITHUB_WORKSPACE
           $env:BUILD_DIR = $env:BUILD_DIR -replace $pattern, '/'
           Write-Output $env:BUILD_DIR
-          c:\\mozilla-build\\start-shell.bat "$env:BUILD_DIR/build/github-actions/update.sh"
+          C:\\ProgramData\\scoop\\apps\\mozilla-build\\current\\start-shell.bat "$env:BUILD_DIR/build/github-actions/update.sh"
 
       - name: Get Previous tag
         id: previoustag
