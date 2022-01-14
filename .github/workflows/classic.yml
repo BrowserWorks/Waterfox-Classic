@@ -134,7 +134,7 @@ jobs:
         run: |
           cd ./dist/
           mv ./Artifact_Classic_*_${{ github.run_id }}/waterfox*.* ./
-          checksumFile=$(basename waterfox*.tar.bz2 | sed 's/.tar.bz2//g' | sed 's/$/.sha256/g')
+          checksumFile=$(basename waterfox*.tar.bz2 | sed 's/.tar.bz2//g' | sed 's/.linux-x86_64//g' | sed 's/.en-US//g'| sed 's/$/.sha256/g')
           sha256sum waterfox*.tar.bz2 | tee -a "$checksumFile"
           sha256sum waterfox*.dmg | tee -a "$checksumFile"
           sha256sum waterfox*.zip | tee -a "$checksumFile"
