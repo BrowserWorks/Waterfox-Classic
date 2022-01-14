@@ -30,7 +30,7 @@ cp -r $INSTALLER_PATH update/
 xml=('<?xml version="1.0"?>'
 '<updates>'
 '    <update type="major" appVersion="VERSION"  buildID="BUILDID" detailsURL="https://www.waterfox.net/blog/waterfox-BROWSER_VERSION-release" displayVersion="BROWSER_VERSION" extensionVersion="VERSION" platformVersion="VERSION" version="VERSION">'
-'        <patch type="complete" URL="https://cdn.waterfox.net/releases/PLATFORM/update/waterfox-classic-BROWSER_VERSION.en-US.PLATFORM.complete.xz.mar" hashFunction="SHA512" hashValue="HASH" size="SIZE"/>'
+'        <patch type="complete" URL="https://github.com/WaterfoxCo/Waterfox-Classic/releases/tag/BROWSER_VERSION-classic/waterfox-classic-BROWSER_VERSION.en-US.PLATFORM.complete.xz.mar" hashFunction="SHA512" hashValue="HASH" size="SIZE"/>'
 '    </update>'
 '</updates>')
 
