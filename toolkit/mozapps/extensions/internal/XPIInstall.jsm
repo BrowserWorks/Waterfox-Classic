@@ -1692,6 +1692,12 @@ class AddonInstall {
           return Promise.reject([AddonManager.ERROR_CORRUPT_FILE,
                                  "XPI is incorrectly signed"]);
         }
+        if (this.existingAddon.type != this.addon.type) {
+          return Promise.reject([
+            AddonManager.ERROR_UNEXPECTED_ADDON_TYPE,
+            `Refusing to change addon type from ${this.existingAddon.type} to ${this.addon.type}`,
+          ]);
+        }
       }
     }
 
