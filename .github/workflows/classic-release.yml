@@ -451,16 +451,16 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v2
         with:
-          path: ./artifacts
+          path: ./objdir-*/dist
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
       - name: Dry run AUS
         run: |
           mkdir win64
           mkdir linux64
           mkdir osx64
-          mv ./artifacts/Artifact_Classic_Linux_${{ github.run_id }}/objdir-*/dist/update/update.xml ./linux64/
-          mv ./artifacts/Artifact_Classic_macOS_${{ github.run_id }}/objdir-*/dist/update/update.xml ./osx64/
-          mv ./artifacts/Artifact_Classic_Windows_${{ github.run_id }}/objdir-*/dist/update/update.xml ./win64/
+          mv ./objdir-*/dist/Artifact_Classic_Linux_${{ github.run_id }}/objdir-*/dist/update/update.xml ./linux64/
+          mv ./objdir-*/dist/Artifact_Classic_macOS_${{ github.run_id }}/objdir-*/dist/update/update.xml ./osx64/
+          mv ./objdir-*/dist/Artifact_Classic_Windows_${{ github.run_id }}/objdir-*/dist/update/update.xml ./win64/
           os=(win64 linux64 osx64)
           for o_sys in ${os[@]}
           do
@@ -503,16 +503,16 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v2
         with:
-          path: ./artifacts
+          path: ./objdir-*/dist
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
       - name: Upload to AUS
         run: |
           mkdir win64
           mkdir linux64
           mkdir osx64
-          mv ./artifacts/Artifact_Classic_Linux_${{ github.run_id }}/objdir-*/dist/update/update.xml ./linux64/
-          mv ./artifacts/Artifact_Classic_macOS_${{ github.run_id }}/objdir-*/dist/update/update.xml ./osx64/
-          mv ./artifacts/Artifact_Classic_Windows_${{ github.run_id }}/objdir-*/dist/update/update.xml ./win64/
+          mv ./objdir-*/dist/Artifact_Classic_Linux_${{ github.run_id }}/objdir-*/dist/update/update.xml ./linux64/
+          mv ./objdir-*/dist/Artifact_Classic_macOS_${{ github.run_id }}/objdir-*/dist/update/update.xml ./osx64/
+          mv ./objdir-*/dist/Artifact_Classic_Windows_${{ github.run_id }}/objdir-*/dist/update/update.xml ./win64/
           os=(win64 linux64 osx64)
           for o_sys in ${os[@]}
           do
