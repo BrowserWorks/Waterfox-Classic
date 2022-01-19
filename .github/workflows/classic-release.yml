@@ -444,7 +444,7 @@ jobs:
 
   aus-upload-dryrun:
     runs-on: ubuntu-latest
-    needs: [build-linux, build-mac, build-windows]
+    needs: [generate-linux-update, build-mac, generate-windows-update]
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
