@@ -94,7 +94,9 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: Artifact_Classic_Windows_${{ github.run_id }}
-          path: ./objdir-*/dist/install/sea/*.exe
+          path: |
+            ./objdir-*/dist/install/sea/*.exe
+            ./objdir-*/dist/host/bin/mar
 
   build-linux:
     name: 🐧 Build for Linux
