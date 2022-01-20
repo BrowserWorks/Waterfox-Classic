@@ -305,7 +305,7 @@ jobs:
           $env:BUILD_DIR = $env:GITHUB_WORKSPACE
           $env:BUILD_DIR = $env:BUILD_DIR -replace $pattern, '/'
           Write-Output $env:BUILD_DIR
-          $env:TAG = ${{ steps.previoustag.outputs.tag }}
+          $env:TAG = "${{ steps.previoustag.outputs.tag }}"
           Write-Output $env:TAG
           C:\\ProgramData\\scoop\\apps\\mozilla-build\\current\\start-shell.bat "$env:BUILD_DIR/build/github-actions/update.sh"
 
