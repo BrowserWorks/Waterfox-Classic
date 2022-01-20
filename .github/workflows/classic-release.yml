@@ -175,6 +175,9 @@ jobs:
         with:
           p12-file-base64: ${{ secrets.MACOS_CRT }}
           p12-password: ${{ secrets.MACOS_PWD }}
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: Sign .app
         run: |
           wget https://hg.mozilla.org/releases/mozilla-esr60/raw-file/tip/security/mac/hardenedruntime/codesign.bash https://hg.mozilla.org/releases/mozilla-esr60/raw-file/tip/security/mac/hardenedruntime/production.entitlements.xml
@@ -209,7 +212,7 @@ jobs:
           xml=('<?xml version="1.0"?>'
           '<updates>'
           '    <update type="major" appVersion="VERSION"  buildID="BUILDID" detailsURL="https://www.waterfox.net/blog/waterfox-BROWSER_VERSION-release" displayVersion="BROWSER_VERSION" extensionVersion="VERSION" platformVersion="VERSION" version="VERSION">'
-          '        <patch type="complete" URL="https://github.com/WaterfoxCo/Waterfox-Classic/releases/tag/BROWSER_VERSION-classic/waterfox-classic-BROWSER_VERSION.en-US.osx64.complete.xz.mar" hashFunction="SHA512" hashValue="HASH" size="SIZE"/>'
+          '        <patch type="complete" URL="https://github.com/WaterfoxCo/Waterfox-Classic/releases/TAG/BROWSER_VERSION-classic/waterfox-classic-BROWSER_VERSION.en-US.osx64.complete.xz.mar" hashFunction="SHA512" hashValue="HASH" size="SIZE"/>'
           '    </update>'
           '</updates>')
           for line in "${xml[@]}" ; do echo $line >> ./objdir-classic/dist/update/update.xml ; done
@@ -229,10 +232,8 @@ jobs:
           sed -i '' -e "s/BUILDID/$BUILDID/g" ./objdir-classic/dist/update/update.xml
           sed -i '' -e "s/SIZE/$SIZE/g" ./objdir-classic/dist/update/update.xml
           sed -i '' -e "s/HASH/"$SHA512"/g" ./objdir-classic/dist/update/update.xml
+          sed -i '' -e "s/TAG/${{ steps.previoustag.outputs.tag }}/g" ./objdir-classic/dist/update/update.xml
 
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: 🍎 Upload macOS Artifacts
         uses: ncipollo/release-action@v1
         with:
@@ -288,6 +289,10 @@ jobs:
         with:
           name: Artifact_Classic_Windows_${{ github.run_id }}
 
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+
       - name: Install depends
         run: |
           iwr -useb get.scoop.sh | iex
@@ -300,11 +305,10 @@ jobs:
           $env:BUILD_DIR = $env:GITHUB_WORKSPACE
           $env:BUILD_DIR = $env:BUILD_DIR -replace $pattern, '/'
           Write-Output $env:BUILD_DIR
+          $env:TAG = ${{ steps.previoustag.outputs.tag }}
+          Write-Output $env:TAG
           C:\\ProgramData\\scoop\\apps\\mozilla-build\\current\\start-shell.bat "$env:BUILD_DIR/build/github-actions/update.sh"
 
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
       - name: 🪟 Upload Window MAR
         uses: ncipollo/release-action@v1
         with:
@@ -340,15 +344,17 @@ jobs:
         with:
           name: Artifact_Classic_Linux_${{ github.run_id }}
 
-      - name: Generate update files
-        run: |
-          export BUILD_DIR=$GITHUB_WORKSPACE
-          chmod +x ./build/github-actions/update.sh
-          ./build/github-actions/update.sh
-
       - name: Get Previous tag
         id: previoustag
         uses: WyriHaximus/github-action-get-previous-tag@v1
+
+      - name: Generate update files
+        run: |
+          export BUILD_DIR=$GITHUB_WORKSPACE
+          export TAG=${{ steps.previoustag.outputs.tag }}
+          chmod +x ./build/github-actions/update.sh
+          ./build/github-actions/update.sh
+
       - name: 🐧 Upload Linux MAR
         uses: ncipollo/release-action@v1
         with:
@@ -455,11 +461,17 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
+
       - name: Download all artifacts
         uses: actions/download-artifact@v2
         with:
           path: ./objdir-*/dist
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+
       - name: Dry run AUS
         run: |
           mkdir win64
@@ -510,6 +522,10 @@ jobs:
       AWS_REGION: us-west-2
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+
       - name: Upload to AUS
         run: |
           os=(win64 linux64 osx64)

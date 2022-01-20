@@ -30,7 +30,7 @@ cp -r $INSTALLER_PATH update/
 xml=('<?xml version="1.0"?>'
 '<updates>'
 '    <update type="major" appVersion="VERSION"  buildID="BUILDID" detailsURL="https://www.waterfox.net/blog/waterfox-BROWSER_VERSION-release" displayVersion="BROWSER_VERSION" extensionVersion="VERSION" platformVersion="VERSION" version="VERSION">'
-'        <patch type="complete" URL="https://github.com/WaterfoxCo/Waterfox-Classic/releases/tag/BROWSER_VERSION-classic/waterfox-classic-BROWSER_VERSION.en-US.PLATFORM.complete.xz.mar" hashFunction="SHA512" hashValue="HASH" size="SIZE"/>'
+'        <patch type="complete" URL="https://github.com/WaterfoxCo/Waterfox-Classic/releases/TAG/BROWSER_VERSION-classic/waterfox-classic-BROWSER_VERSION.en-US.PLATFORM.complete.xz.mar" hashFunction="SHA512" hashValue="HASH" size="SIZE"/>'
 '    </update>'
 '</updates>')
 
@@ -66,6 +66,7 @@ then
     sed -i "" "s/SIZE/$SIZE/g" update.xml
     sed -i "" "s/HASH/"$SHA512"/g" update.xml
     sed -i "" "s/PLATFORM/$PLATFORM/g" update.xml
+    sed -i "" "s/TAG/$TAG/g" update.xml
 else
     sed -i "s/BROWSER_VERSION/$BROWSER_VERSION/g" update.xml
     sed -i "s/VERSION/$VERSION/g" update.xml
@@ -73,6 +74,7 @@ else
     sed -i "s/SIZE/$SIZE/g" update.xml
     sed -i "s/HASH/"$SHA512"/g" update.xml
     sed -i "s/PLATFORM/$PLATFORM/g" update.xml
+    sed -i "s/TAG/$TAG/g" update.xml
 fi
 popd
 popd
