@@ -508,7 +508,7 @@ jobs:
           os=(linux64 osx64 win64)
           for i in ${os[@]}
           do
-              aws s3 cp --dryrun --content-type="text/xml" --metadata-directive="REPLACE" blank.xml \
+              aws s3 cp --content-type="text/xml" --metadata-directive="REPLACE" blank.xml \
                   s3://aus.waterfox.net/update/old/$i/$version/en-US/release/update.xml
           done
 
@@ -521,11 +521,6 @@ jobs:
       AWS_EC2_METADATA_DISABLED: true
       AWS_REGION: us-west-2
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    steps:
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
-
       - name: Upload to AUS
         run: |
           os=(win64 linux64 osx64)
@@ -545,15 +540,4 @@ jobs:
                       s3://aus.waterfox.net/update/old/$o_sys/$ver/en-US/release/update.xml
                   fi
               done
-          done
-
-          touch blank.xml
-          echo '<?xml version="1.0"?><updates></updates>' > blank.xml
-          tag=${{ steps.previoustag.outputs.tag }}
-          version=${tag/-classic/}
-          os=(linux64 osx64 win64)
-          for i in ${os[@]}
-          do
-              aws s3 cp --content-type="text/xml" --metadata-directive="REPLACE" blank.xml \
-                  s3://aus.waterfox.net/update/old/$i/$version/en-US/release/update.xml
           done
