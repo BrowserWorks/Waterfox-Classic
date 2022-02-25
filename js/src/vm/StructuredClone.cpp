@@ -630,6 +630,11 @@ ReadStructuredClone(JSContext* cx, JSStructuredCloneData& data,
                     JS::StructuredCloneScope scope, MutableHandleValue vp,
                     const JSStructuredCloneCallbacks* cb, void* cbClosure)
 {
+    if (data.Size() % 8) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                                  JSMSG_SC_BAD_SERIALIZED_DATA, "misaligned");
+        return false;
+    }
     SCInput in(cx, data);
     JSStructuredCloneReader r(in, scope, cb, cbClosure);
     return r.read(vp);
