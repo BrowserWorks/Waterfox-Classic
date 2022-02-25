@@ -521,6 +521,7 @@ jobs:
       AWS_EC2_METADATA_DISABLED: true
       AWS_REGION: us-west-2
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
       - name: Upload to AUS
         run: |
           os=(win64 linux64 osx64)
