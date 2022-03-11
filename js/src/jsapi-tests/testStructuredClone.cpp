@@ -18,10 +18,9 @@ BEGIN_TEST(testStructuredClone_invalidLength) {
   CHECK(buf);
   CHECK(buf->Init(7));
   RootedValue clone(cx);
-  JS::CloneDataPolicy policy;
   CHECK(!JS_ReadStructuredClone(cx, *buf, JS_STRUCTURED_CLONE_VERSION,
                                 JS::StructuredCloneScope::DifferentProcess,
-                                &clone, policy, nullptr, nullptr));
+                                &clone, nullptr, nullptr));
   return true;
 }
 END_TEST(testStructuredClone_invalidLength)
