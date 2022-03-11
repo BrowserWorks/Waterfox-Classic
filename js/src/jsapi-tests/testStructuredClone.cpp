@@ -13,10 +13,9 @@ using namespace js;
 // Skip test, since it will abort with an assert in buf->Init(7).
 #else
 BEGIN_TEST(testStructuredClone_invalidLength) {
-  auto buf = js::MakeUnique<JSStructuredCloneData>(
-      JS::StructuredCloneScope::DifferentProcess);
+  auto buf = js::MakeUnique<JSStructuredCloneData>(0, 0, 7);
   CHECK(buf);
-  CHECK(buf->Init(7));
+  CHECK(buf->Init(0, 7));
   RootedValue clone(cx);
   CHECK(!JS_ReadStructuredClone(cx, *buf, JS_STRUCTURED_CLONE_VERSION,
                                 JS::StructuredCloneScope::DifferentProcess,
