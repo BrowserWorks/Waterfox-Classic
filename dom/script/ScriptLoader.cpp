@@ -762,6 +762,9 @@ HostResolveImportedModule(JSContext* aCx, JS::Handle<JSObject*> aModule,
   if (!string.init(aCx, aSpecifier)) {
     return nullptr;
   }
+  if (!aModule || !aCx) {
+    return nullptr;
+  }
 
   nsCOMPtr<nsIURI> uri = ResolveModuleSpecifier(script, string);
 
@@ -773,6 +776,10 @@ HostResolveImportedModule(JSContext* aCx, JS::Handle<JSObject*> aModule,
   // to have gotten to this point.)
   ModuleScript* ms = script->Loader()->GetFetchedModule(uri);
   MOZ_ASSERT(ms, "Resolved module not found in module map");
+  
+  if (!ms) {
+    return nullptr;
+  }
 
   MOZ_ASSERT(!ms->HasParseError());
   MOZ_ASSERT(ms->ModuleRecord());
