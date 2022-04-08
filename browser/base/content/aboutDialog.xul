@@ -46,7 +46,7 @@
       <vbox id="rightBox" flex="1">
         <hbox align="baseline">
 #expand   <label id="version">__MOZ_APP_VERSION_DISPLAY__</label>
-          <label id="releasenotes" class="text-link" hidden="true" href="https://www.waterfoxproject.org/blog/waterfox-__MOZ_APP_VERSION__-release-download">&releaseNotes.link;</label>
+          <label id="releasenotes" class="text-link" hidden="true" href="https://github.com/WaterfoxCo/Waterfox-Classic/releases/tag/__MOZ_APP_VERSION_DISPLAY__-classic">&releaseNotes.link;</label>
         </hbox>
 
         <label id="distribution" class="text-blurb"/>

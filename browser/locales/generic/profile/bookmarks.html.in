@@ -30,7 +30,7 @@
 #ifndef NIGHTLY_BUILD
         <dl>
             <!-- <p><dt><a href="https://www.mozilla.org/@AB_CD@/firefox/central/" icon="@firefox_icon@">@getting_started@</a></dt> -->
-            <p><dt><A FEEDURL="https://blog.waterfoxproject.org/rss" HREF="https://blog.waterfoxproject.org/">The Waterfox Blog</A></dt>
+            <p><dt><A HREF="https://www.waterfox.net/blog">The Waterfox Blog</A></dt>
         </dl>
     <!-- <p><dt><h3>@firefox_heading@</h3></dt>
         <dl><p>
