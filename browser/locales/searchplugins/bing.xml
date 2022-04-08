@@ -15,6 +15,6 @@
 		<Param name="q" value="{searchTerms}"/>
 		<Param name="PC" value="IS45"/>
 		<Param name="FORM" value="ISCHR1"/>
-		<Param name="PTAG" value="SYS1000000"/>
+		<Param name="PTAG" value="SYS1000001"/>
 	</Url>
 </SearchPlugin>
