@@ -357,14 +357,17 @@ var gSyncPane = {
   },
 
   _openAboutAccounts(action) {
-    let entryPoint = this._getEntryPoint();
-    let params = new URLSearchParams();
-    if (action) {
-      params.set("action", action);
-    }
-    params.set("entrypoint", entryPoint);
+    // let entryPoint = this._getEntryPoint();
+    // let url = "about:accounts?";
+    // let params = new URLSearchParams();
+    // if (action) {
+    //   params.set("action", action);
+    // }
+    // params.set("entrypoint", entryPoint);
 
-    this.replaceTabWithUrl("about:accounts?" + params);
+    this.replaceTabWithUrl(
+      "https://accounts.firefox.com/?context=fx_desktop_v3&entrypoint=preferences&action=email&service=sync"
+      );
   },
 
   openContentInBrowser(url, options) {
