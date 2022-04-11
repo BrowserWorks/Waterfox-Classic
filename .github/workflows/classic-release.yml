@@ -296,7 +296,8 @@ jobs:
 
       - name: Install depends
         run: |
-          iwr -useb get.scoop.sh | iex
+          iwr -useb get.scoop.sh -outfile 'install.ps1'
+          .\install.ps1 -RunAsAdmin
           mkdir -p ~\\scoop\\buckets\\my-bucket
           Copy-Item -Path $env:GITHUB_WORKSPACE\\build\\github-actions\\mozilla-build.json -Destination ~\scoop\buckets\my-bucket
           scoop install my-bucket/mozilla-build --global
