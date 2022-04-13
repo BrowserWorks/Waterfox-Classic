@@ -179,6 +179,18 @@ class FullParseHandler
         if (expr->isKind(ParseNodeKind::Elem))
             return newUnary(ParseNodeKind::DeleteElem, begin, expr);
 
+        if (expr->isKind(ParseNodeKind::OptionalChain)) {
+          ParseNode* kid = expr->pn_kid;
+          // Handle property deletion explictly. OptionalCall is handled
+          // via DeleteExpr.
+          if (kid->isKind(ParseNodeKind::Dot) ||
+              kid->isKind(ParseNodeKind::OptionalDot) ||
+              kid->isKind(ParseNodeKind::Elem) ||
+              kid->isKind(ParseNodeKind::OptionalElem)) {
+            return newUnary(ParseNodeKind::DeleteOptionalChain, begin, kid);
+          }
+        }
+
         return newUnary(ParseNodeKind::DeleteExpr, begin, expr);
     }
 
@@ -287,6 +299,10 @@ class FullParseHandler
 
     ParseNode* newCall(ParseNode* callee, ParseNode* args) {
         return new_<BinaryNode>(ParseNodeKind::Call, JSOP_CALL, callee, args);
+    }
+
+    ParseNode* newOptionalCall(ParseNode* callee, ParseNode* args) {
+        return new_<BinaryNode>(ParseNodeKind::OptionalCall, JSOP_CALL, callee, args);
     }
 
     ParseNode* newArguments(const TokenPos& pos) {
@@ -436,6 +452,11 @@ class FullParseHandler
     ParseNode* newAwaitExpression(uint32_t begin, ParseNode* value) {
         TokenPos pos(begin, value ? value->pn_pos.end : begin + 1);
         return new_<UnaryNode>(ParseNodeKind::Await, pos, value);
+    }
+
+    ParseNode* newOptionalChain(uint32_t begin, Node value) {
+        TokenPos pos(begin, value->pn_pos.end);
+        return new_<UnaryNode>(ParseNodeKind::OptionalChain, pos, value);
     }
 
     // Statements
@@ -684,6 +705,14 @@ class FullParseHandler
 
     ParseNode* newPropertyByValue(ParseNode* lhs, ParseNode* index, uint32_t end) {
         return new_<PropertyByValue>(lhs, index, lhs->pn_pos.begin, end);
+    }
+
+    ParseNode* newOptionalPropertyAccess(ParseNode* expr, ParseNode* key) {
+        return new_<OptionalPropertyAccess>(expr, key, expr->pn_pos.begin, key->pn_pos.end);
+    }
+  
+    ParseNode* newOptionalPropertyByValue(ParseNode* lhs, ParseNode* index, uint32_t end) {
+        return new_<OptionalPropertyByValue>(lhs, index, lhs->pn_pos.begin, end);
     }
 
     inline MOZ_MUST_USE bool addCatchBlock(ParseNode* catchList, ParseNode* lexicalScope,

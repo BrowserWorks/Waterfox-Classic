@@ -1933,7 +1933,23 @@ TokenStreamSpecific<CharT, AnyCharsAccess>::getTokenInternal(TokenKind* ttp, Mod
         goto out;
 
       case '?':
-        tp->type = matchChar('?') ? TokenKind::Coalesce : TokenKind::Hook;
+        if (matchChar('.')) {
+            c = getCharIgnoreEOL();
+            if (JS7_ISDEC(c)) {
+                // if the code unit is followed by a number, for example it has the
+                // following form `<...> ?.5 <..> then it should be treated as a
+                // ternary rather than as an optional chain
+                tp->type = TokenKind::Hook;
+                ungetCharIgnoreEOL(c);
+                ungetCharIgnoreEOL('.');
+            } else {
+                ungetCharIgnoreEOL(c);
+                tp->type = TokenKind::OptionalChain;
+            }
+        } else {
+            tp->type = matchChar('?') ? TokenKind::Coalesce : TokenKind::Hook;
+        }
+
         goto out;
 
       case '!':

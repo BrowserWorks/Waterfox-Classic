@@ -64,6 +64,7 @@
     macro(Dec,          "'--'")   /* decrement */ \
     macro(Dot,          "'.'")    /* member operator */ \
     macro(TripleDot,    "'...'")  /* rest arguments and spread operator */ \
+    macro(OptionalChain, "'?.'") \
     macro(LeftBracket,  "'['") \
     macro(RightBracket, "']'") \
     macro(LeftCurly,    "'{'") \

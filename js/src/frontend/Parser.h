@@ -754,6 +754,10 @@ class Parser final
     Node unaryExpr(YieldHandling yieldHandling, TripledotHandling tripledotHandling,
                    PossibleError* possibleError = nullptr,
                    InvokedPrediction invoked = PredictUninvoked);
+    Node optionalExpr(YieldHandling yieldHandling, TripledotHandling tripledotHandling,
+                      TokenKind tt, bool allowCallSyntax = true,
+                      PossibleError* possibleError = nullptr,
+                      InvokedPrediction invoked = PredictUninvoked);
     Node memberExpr(YieldHandling yieldHandling, TripledotHandling tripledotHandling,
                     TokenKind tt, bool allowCallSyntax = true,
                     PossibleError* possibleError = nullptr,
@@ -948,6 +952,18 @@ class Parser final
     Node newNumber(const Token& tok) {
         return handler.newNumber(tok.number(), tok.decimalPoint(), tok.pos);
     }
+
+    enum class OptionalKind {
+        NonOptional = 0,
+        Optional,
+    };
+    Node memberPropertyAccess(Node lhs, OptionalKind optionalKind = OptionalKind::NonOptional);
+    Node memberElemAccess(Node lhs, YieldHandling yieldHandling,
+                          OptionalKind optionalKind = OptionalKind::NonOptional);
+    Node memberSuperCall(Node lhs, YieldHandling yieldHandling);
+    Node memberCall(TokenKind tt, Node lhs, YieldHandling yieldHandling,
+                    PossibleError* possibleError,
+                    OptionalKind optionalKind = OptionalKind::NonOptional);
 
     static Node null() { return ParseHandler::null(); }
 

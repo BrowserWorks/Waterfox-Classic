@@ -9700,6 +9700,42 @@ BytecodeEmitter::emitPipeline(ParseNode* pn)
     return true;
 }
 
+ParseNode* BytecodeEmitter::getCoordNode(ParseNode* pn,
+                                         ParseNode* calleeNode,
+                                         ParseNode* argsList) {
+    ParseNode* coordNode = pn;
+    if (pn->isOp(JSOP_CALL) || pn->isOp(JSOP_SPREADCALL) || pn->isOp(JSOP_FUNCALL) ||
+        pn->isOp(JSOP_FUNAPPLY)) {
+        // Default to using the location of the `(` itself.
+        // obj[expr]() // expression
+        //          ^  // column coord
+        coordNode = argsList;
+
+        switch (calleeNode->getKind()) {
+          case ParseNodeKind::Dot:
+            // Use the position of a property access identifier.
+            //
+            // obj().aprop() // expression
+            //       ^       // column coord
+            //
+            // Note: Because of the constant folding logic in FoldElement,
+            // this case also applies for constant string properties.
+            //
+            // obj()['aprop']() // expression
+            //       ^          // column coord
+            coordNode = calleeNode->pn_right;
+            break;
+          case ParseNodeKind::Name:
+            // Use the start of callee names.
+            coordNode = calleeNode;
+            break;
+          default:
+            break;
+        }
+    }
+    return coordNode;
+}
+
 bool
 BytecodeEmitter::emitArguments(ParseNode* pn, bool callop, bool spread)
 {
@@ -9841,36 +9877,7 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn, ValueUsage valueUsage /* = ValueUs
         }
     }
 
-    ParseNode* coordNode = pn;
-    if (pn->isOp(JSOP_CALL) || pn->isOp(JSOP_SPREADCALL) || pn->isOp(JSOP_FUNCALL) ||
-        pn->isOp(JSOP_FUNAPPLY)) {
-        // Default to using the location of the `(` itself.
-        // obj[expr]() // expression
-        //          ^  // column coord
-        coordNode = pn_args;
-
-        switch (pn_callee->getKind()) {
-          case ParseNodeKind::Dot:
-            // Use the position of a property access identifier.
-            //
-            // obj().aprop() // expression
-            //       ^       // column coord
-            //
-            // Note: Because of the constant folding logic in FoldElement,
-            // this case also applies for constant string properties.
-            //
-            // obj()['aprop']() // expression
-            //       ^          // column coord
-            coordNode = pn_callee->pn_right;
-            break;
-          case ParseNodeKind::Name:
-            // Use the start of callee names.
-            coordNode = pn_callee;
-            break;
-          default:
-            break;
-        }
-    }
+    ParseNode* coordNode = getCoordNode(pn, pn_callee, pn_args);
 
     if (!spread) {
         if (pn->getOp() == JSOP_CALL && valueUsage == ValueUsage::IgnoreValue) {

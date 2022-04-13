@@ -320,6 +320,7 @@ ContainsHoistedDeclaration(JSContext* cx, ParseNode* node, bool* result)
       case ParseNodeKind::DeleteName:
       case ParseNodeKind::DeleteProp:
       case ParseNodeKind::DeleteElem:
+      case ParseNodeKind::DeleteOptionalChain:
       case ParseNodeKind::DeleteExpr:
       case ParseNodeKind::Pos:
       case ParseNodeKind::Neg:

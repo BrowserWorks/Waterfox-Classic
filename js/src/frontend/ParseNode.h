@@ -37,6 +37,10 @@ class ObjectBox;
     F(PropertyName) \
     F(Dot) \
     F(Elem) \
+    F(OptionalDot) \
+    F(OptionalChain) \
+    F(OptionalElem) \
+    F(OptionalCall) \
     F(Array) \
     F(Elision) \
     F(StatementList) \
@@ -79,6 +83,7 @@ class ObjectBox;
     F(DeleteName) \
     F(DeleteProp) \
     F(DeleteElem) \
+    F(DeleteOptionalChain) \
     F(DeleteExpr) \
     F(Try) \
     F(Catch) \
@@ -1205,29 +1210,30 @@ class RegExpLiteral : public NullaryNode
     }
 };
 
-class PropertyAccess : public BinaryNode
+class PropertyAccessBase : public BinaryNode
 {
   public:
     /*
      * PropertyAccess nodes can have any expression/'super' as left-hand
      * side, but the name must be a ParseNodeKind::PropertyName node.
      */
-    PropertyAccess(ParseNode* lhs, ParseNode* name, uint32_t begin, uint32_t end)
-      : BinaryNode(ParseNodeKind::Dot, JSOP_NOP, TokenPos(begin, end), lhs, name)
+    PropertyAccessBase(ParseNodeKind kind, ParseNode* lhs, ParseNode* name, uint32_t begin, uint32_t end)
+      : BinaryNode(kind, JSOP_NOP, TokenPos(begin, end), lhs, name)
     {
         MOZ_ASSERT(lhs != nullptr);
         MOZ_ASSERT(name != nullptr);
     }
 
+    ParseNode& expression() const {
+        return *pn_u.binary.left;
+    }
+
     static bool test(const ParseNode& node) {
-        bool match = node.isKind(ParseNodeKind::Dot);
+        bool match = node.isKind(ParseNodeKind::Dot) ||
+                     node.isKind(ParseNodeKind::OptionalDot);
         MOZ_ASSERT_IF(match, node.isArity(PN_BINARY));
         MOZ_ASSERT_IF(match, node.pn_right->isKind(ParseNodeKind::PropertyName));
         return match;
-    }
-
-    ParseNode& expression() const {
-        return *pn_u.binary.left;
     }
 
     PropertyName& name() const {
@@ -1240,24 +1246,81 @@ class PropertyAccess : public BinaryNode
     }
 };
 
-class PropertyByValue : public ParseNode
+class PropertyAccess : public PropertyAccessBase
 {
   public:
-    PropertyByValue(ParseNode* lhs, ParseNode* propExpr, uint32_t begin, uint32_t end)
-      : ParseNode(ParseNodeKind::Elem, JSOP_NOP, PN_BINARY, TokenPos(begin, end))
+    PropertyAccess(ParseNode* lhs, ParseNode* name, uint32_t begin, uint32_t end)
+        : PropertyAccessBase(ParseNodeKind::Dot, lhs, name, begin, end) {
+      MOZ_ASSERT(lhs);
+      MOZ_ASSERT(name);
+    }
+
+    static bool test(const ParseNode& node) {
+      bool match = node.isKind(ParseNodeKind::Dot);
+      MOZ_ASSERT_IF(match, node.is<PropertyAccessBase>());
+      return match;
+    }
+};
+  
+class OptionalPropertyAccess : public PropertyAccessBase {
+  public:
+    OptionalPropertyAccess(ParseNode* lhs, ParseNode* name, uint32_t begin, uint32_t end)
+        : PropertyAccessBase(ParseNodeKind::OptionalDot, lhs, name, begin, end) {
+      MOZ_ASSERT(lhs);
+      MOZ_ASSERT(name);
+    }
+  
+    static bool test(const ParseNode& node) {
+      bool match = node.isKind(ParseNodeKind::OptionalDot);
+      MOZ_ASSERT_IF(match, node.is<PropertyAccessBase>());
+      return match;
+    }
+};
+
+class PropertyByValueBase : public ParseNode
+{
+  public:
+    PropertyByValueBase(ParseNodeKind kind, ParseNode* lhs, ParseNode* propExpr,
+                        uint32_t begin, uint32_t end)
+      : ParseNode(kind, JSOP_NOP, PN_BINARY, TokenPos(begin, end))
     {
         pn_u.binary.left = lhs;
         pn_u.binary.right = propExpr;
     }
 
     static bool test(const ParseNode& node) {
-        bool match = node.isKind(ParseNodeKind::Elem);
+        bool match = node.isKind(ParseNodeKind::Elem) ||
+                     node.isKind(ParseNodeKind::OptionalElem);
         MOZ_ASSERT_IF(match, node.isArity(PN_BINARY));
         return match;
     }
 
     bool isSuper() const {
         return pn_left->isKind(ParseNodeKind::SuperBase);
+    }
+};
+
+class PropertyByValue : public PropertyByValueBase {
+  public:
+    PropertyByValue(ParseNode* lhs, ParseNode* propExpr, uint32_t begin, uint32_t end)
+        : PropertyByValueBase(ParseNodeKind::Elem, lhs, propExpr, begin, end) {}
+  
+    static bool test(const ParseNode& node) {
+      bool match = node.isKind(ParseNodeKind::Elem);
+      MOZ_ASSERT_IF(match, node.is<PropertyByValueBase>());
+      return match;
+    }
+};
+
+class OptionalPropertyByValue : public PropertyByValueBase {
+  public:
+    OptionalPropertyByValue(ParseNode* lhs, ParseNode* propExpr, uint32_t begin, uint32_t end)
+        : PropertyByValueBase(ParseNodeKind::OptionalElem, lhs, propExpr, begin, end) {}
+  
+    static bool test(const ParseNode& node) {
+      bool match = node.isKind(ParseNodeKind::OptionalElem);
+      MOZ_ASSERT_IF(match, node.is<PropertyByValueBase>());
+      return match;
     }
 };
 

@@ -59,6 +59,8 @@ class SyntaxParseHandler
         // noticed).
         NodeFunctionCall,
 
+        NodeOptionalFunctionCall,
+
         // Node representing normal names which don't require any special
         // casing.
         NodeName,
@@ -72,7 +74,9 @@ class SyntaxParseHandler
         NodePotentialAsyncKeyword,
 
         NodeDottedProperty,
+        NodeOptionalDottedProperty,
         NodeElement,
+        NodeOptionalElement,
 
         // Destructuring target patterns can't be parenthesized: |([a]) = [3];|
         // must be a syntax error.  (We can't use NodeGeneric instead of these
@@ -243,6 +247,7 @@ class SyntaxParseHandler
 
     Node newArguments(const TokenPos& pos) { return NodeGeneric; }
     Node newCall(Node callee, Node args) { return NodeFunctionCall; }
+    Node newOptionalCall(Node callee, Node args) { return NodeOptionalFunctionCall; }
 
     Node newSuperCall(Node callee, Node args) { return NodeGeneric; }
     Node newTaggedTemplate(Node callee, Node args) { return NodeGeneric; }
@@ -265,6 +270,7 @@ class SyntaxParseHandler
     Node newYieldExpression(uint32_t begin, Node value) { return NodeGeneric; }
     Node newYieldStarExpression(uint32_t begin, Node value) { return NodeGeneric; }
     Node newAwaitExpression(uint32_t begin, Node value) { return NodeGeneric; }
+    Node newOptionalChain(uint32_t begin, Node value) { return NodeGeneric; }
 
     // Statements
 
@@ -327,7 +333,15 @@ class SyntaxParseHandler
         return NodeDottedProperty;
     }
 
+    Node newOptionalPropertyAccess(Node expr, Node key) {
+        return NodeOptionalDottedProperty;
+    }
+
     Node newPropertyByValue(Node pn, Node kid, uint32_t end) { return NodeElement; }
+
+    Node newOptionalPropertyByValue(Node pn, Node kid, uint32_t end) {
+        return NodeOptionalElement;
+    }
 
     MOZ_MUST_USE bool addCatchBlock(Node catchList, Node letBlock, Node catchName,
                                     Node catchGuard, Node catchBody) { return true; }
