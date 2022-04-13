@@ -800,7 +800,7 @@ class Parser final
     Node arrayComprehension(uint32_t begin);
     Node generatorComprehension(uint32_t begin);
 
-    bool argumentList(YieldHandling yieldHandling, Node listNode, bool* isSpread,
+    Node argumentList(YieldHandling yieldHandling, bool* isSpread,
                       PossibleError* possibleError = nullptr);
     Node destructuringDeclaration(DeclarationKind kind, YieldHandling yieldHandling,
                                   TokenKind tt);
