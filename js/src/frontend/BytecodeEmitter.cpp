@@ -9587,20 +9587,21 @@ BytecodeEmitter::isRestParameter(ParseNode* pn)
 }
 
 bool
-BytecodeEmitter::emitCallee(ParseNode* callee, ParseNode* call, bool spread, bool* callop)
+BytecodeEmitter::emitCalleeAndThis(ParseNode* callee, ParseNode* call, bool isCall, bool isNew)
 {
+    bool needsThis = !isCall;
     switch (callee->getKind()) {
       case ParseNodeKind::Name:
-        if (!emitGetName(callee, *callop))
+        if (!emitGetName(callee, isCall))
             return false;
         break;
       case ParseNodeKind::Dot:
         MOZ_ASSERT(emitterMode != BytecodeEmitter::SelfHosting);
         if (callee->as<PropertyAccess>().isSuper()) {
-            if (!emitSuperPropOp(callee, JSOP_GETPROP_SUPER, /* isCall = */ *callop))
+            if (!emitSuperPropOp(callee, JSOP_GETPROP_SUPER, isCall))
                 return false;
         } else {
-            if (!emitPropOp(callee, *callop ? JSOP_CALLPROP : JSOP_GETPROP))
+            if (!emitPropOp(callee, isCall ? JSOP_CALLPROP : JSOP_GETPROP))
                 return false;
         }
 
@@ -9608,12 +9609,12 @@ BytecodeEmitter::emitCallee(ParseNode* callee, ParseNode* call, bool spread, boo
       case ParseNodeKind::Elem:
         MOZ_ASSERT(emitterMode != BytecodeEmitter::SelfHosting);
         if (callee->as<PropertyByValue>().isSuper()) {
-            if (!emitSuperElemOp(callee, JSOP_GETELEM_SUPER, /* isCall = */ *callop))
+            if (!emitSuperElemOp(callee, JSOP_GETELEM_SUPER, isCall))
                 return false;
         } else {
-            if (!emitElemOp(callee, *callop ? JSOP_CALLELEM : JSOP_GETELEM))
+            if (!emitElemOp(callee, isCall ? JSOP_CALLELEM : JSOP_GETELEM))
                 return false;
-            if (*callop) {
+            if (isCall) {
                 if (!emit1(JSOP_SWAP))
                     return false;
             }
@@ -9641,7 +9642,7 @@ BytecodeEmitter::emitCallee(ParseNode* callee, ParseNode* call, bool spread, boo
             if (!emitTree(callee))
                 return false;
         }
-        *callop = false;
+        needsThis = true;
         break;
       case ParseNodeKind::SuperBase:
         MOZ_ASSERT(call->isKind(ParseNodeKind::SuperCall));
@@ -9652,8 +9653,20 @@ BytecodeEmitter::emitCallee(ParseNode* callee, ParseNode* call, bool spread, boo
       default:
         if (!emitTree(callee))
             return false;
-        *callop = false;             /* trigger JSOP_UNDEFINED after */
+        needsThis = true;
         break;
+    }
+
+    if (needsThis) {
+        if (isNew) {
+            if (!emit1(JSOP_IS_CONSTRUCTING)) {
+                return false;
+            }
+        } else {
+            if (!emit1(JSOP_UNDEFINED)) {
+                return false;
+            }
+        }
     }
 
     return true;
@@ -9671,14 +9684,8 @@ BytecodeEmitter::emitPipeline(ParseNode* pn)
     ParseNode* callee = pn->pn_head->pn_next;
 
     do {
-        bool callop = true;
-        if (!emitCallee(callee, pn, false, &callop))
+        if (!emitCalleeAndThis(callee, pn, true, false)) {
             return false;
-
-        // Emit room for |this|
-        if (!callop) {
-            if (!emit1(JSOP_UNDEFINED))
-                return false;
         }
 
         if (!emit2(JSOP_PICK, 2))
@@ -9803,21 +9810,11 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn, ValueUsage valueUsage /* = ValueUs
         // Fall through
     }
 
-    if (!emitCallee(pn_callee, pn, false, &callop))
-        return false;
-
     bool isNewOp = pn->getOp() == JSOP_NEW || pn->getOp() == JSOP_SPREADNEW ||
                    pn->getOp() == JSOP_SUPERCALL || pn->getOp() == JSOP_SPREADSUPERCALL;
 
-    // Emit room for |this|.
-    if (!callop) {
-        if (isNewOp) {
-            if (!emit1(JSOP_IS_CONSTRUCTING))
-                return false;
-        } else {
-            if (!emit1(JSOP_UNDEFINED))
-                return false;
-        }
+    if (!emitCalleeAndThis(pn_callee, pn, callop, isNewOp)) {
+        return false;
     }
 
     if (!emitArguments(pn_args, callop, spread))
