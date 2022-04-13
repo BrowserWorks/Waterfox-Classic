@@ -431,8 +431,10 @@ class NameResolver
           case ParseNodeKind::DeleteName:
           case ParseNodeKind::DeleteProp:
           case ParseNodeKind::DeleteElem:
+          case ParseNodeKind::DeleteOptionalChain:
           case ParseNodeKind::DeleteExpr:
           case ParseNodeKind::Neg:
+          case ParseNodeKind::OptionalChain:
           case ParseNodeKind::Pos:
           case ParseNodeKind::PreIncrement:
           case ParseNodeKind::PostIncrement:
@@ -490,6 +492,14 @@ class NameResolver
           case ParseNodeKind::Elem:
             MOZ_ASSERT(cur->isArity(PN_BINARY));
             if (!cur->as<PropertyByValue>().isSuper() && !resolve(cur->pn_left, prefix))
+                return false;
+            if (!resolve(cur->pn_right, prefix))
+                return false;
+            break;
+
+          case ParseNodeKind::OptionalElem:
+            MOZ_ASSERT(cur->isArity(PN_BINARY));
+            if (!resolve(cur->pn_left, prefix))
                 return false;
             if (!resolve(cur->pn_right, prefix))
                 return false;
@@ -756,6 +766,7 @@ class NameResolver
 
           case ParseNodeKind::New:
           case ParseNodeKind::Call:
+          case ParseNodeKind::OptionalCall:
           case ParseNodeKind::SuperCall:
             MOZ_ASSERT(cur->isArity(PN_BINARY));
             if (!resolve(cur->pn_left, prefix))
@@ -820,6 +831,13 @@ class NameResolver
             // Super prop nodes do not have a meaningful LHS
             if (cur->as<PropertyAccess>().isSuper())
                 break;
+            if (!resolve(cur->pn_left, prefix))
+                return false;
+            break;
+
+          case ParseNodeKind::OptionalDot:
+            MOZ_ASSERT(cur->isArity(PN_BINARY));
+
             if (!resolve(cur->pn_left, prefix))
                 return false;
             break;

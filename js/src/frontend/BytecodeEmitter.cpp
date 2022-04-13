@@ -2005,6 +2005,121 @@ class MOZ_STACK_CLASS IfThenElseEmitter
 #endif
 };
 
+// OOOEEE start
+
+class MOZ_RAII BytecodeEmitter::OptionalEmitter {
+  private:
+    BytecodeEmitter* bce_;
+
+    BytecodeEmitter::TDZCheckCache tdzCache_;
+
+    // jumptarget for ShortCircuiting code, which has null or undefined values
+    JumpList jumpShortCircuit_;
+
+    // jumpTarget for code that does not shortCircuit
+    JumpList jumpFinish_;
+
+    int32_t initialDepth_;
+
+  public:
+    OptionalEmitter(BytecodeEmitter* bce, int32_t initialDepth)
+        : bce_(bce), tdzCache_(bce), initialDepth_(initialDepth) {}
+
+    enum class Kind {
+        // Requires two values on the stack
+        Reference,
+        // Requires one value on the stack
+        Other
+    };
+
+    bool emitJumpShortCircuit() {
+        MOZ_ASSERT(initialDepth_ + 1 == bce_->stackDepth);
+        IfThenElseEmitter ifEmitter(bce_);
+        if (!bce_->emitPushNotUndefinedOrNull())
+            return false;
+
+        if (!bce_->emit1(JSOP_NOT))
+            return false;
+
+        if (!ifEmitter.emitIf())
+            return false;
+
+        if (!bce_->emitJump(JSOP_GOTO, &jumpShortCircuit_))
+            return false;
+
+        if (!ifEmitter.emitEnd()) {
+            return false;
+        }
+        return true;
+    }
+
+    bool emitJumpShortCircuitForCall() {
+        int32_t depth = bce_->stackDepth;
+        MOZ_ASSERT(initialDepth_ + 2 == depth);
+        if (!bce_->emit1(JSOP_SWAP))
+            return false;
+
+        IfThenElseEmitter ifEmitter(bce_);
+        if (!bce_->emitPushNotUndefinedOrNull())
+            return false;
+
+        if (!bce_->emit1(JSOP_NOT))
+            return false;
+
+        if (!ifEmitter.emitIf())
+            return false;
+
+        if (!bce_->emit1(JSOP_POP))
+            return false;
+
+        if (!bce_->emitJump(JSOP_GOTO, &jumpShortCircuit_))
+            return false;
+
+        if (!ifEmitter.emitEnd())
+            return false;
+
+        bce_->stackDepth = depth;
+
+        if (!bce_->emit1(JSOP_SWAP))
+            return false;
+        return true;
+    }
+
+    // JSOp is the op code to be emitted, Kind is if we are dealing with a
+    // reference (in which case we need two elements on the stack) or other value
+    // (which needs one element on the stack)
+    bool emitOptionalJumpTarget(JSOp op, Kind kind = Kind::Other) {
+
+        // if we get to this point, it means that the optional chain did not short
+        // circuit, so we should skip the short circuiting bytecode.
+        if (!bce_->emitJump(JSOP_GOTO, &jumpFinish_))
+            return false;
+
+        if (!bce_->emitJumpTargetAndPatch(jumpShortCircuit_))
+            return false;
+
+        // reset stack depth to the depth when we jumped
+        bce_->stackDepth = initialDepth_ + 1;
+
+        if (!bce_->emit1(JSOP_POP))
+            return false;
+
+        if (!bce_->emit1(op))
+            return false;
+
+        if (kind == Kind::Reference) {
+            if (!bce_->emit1(op))
+                return false;
+        }
+
+        if (!bce_->emitJumpTargetAndPatch(jumpFinish_))
+            return false;
+        return true;
+    }
+};
+
+// OOOEEE end
+
 class ForOfLoopControl : public LoopControl
 {
     using EmitterScope = BytecodeEmitter::EmitterScope;
@@ -3172,6 +3287,7 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
         return true;
 
       // Watch out for getters!
+      case ParseNodeKind::OptionalDot:
       case ParseNodeKind::Dot:
         MOZ_ASSERT(pn->isArity(PN_BINARY));
         *answer = true;
@@ -3255,6 +3371,7 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
       case ParseNodeKind::DeleteName:
       case ParseNodeKind::DeleteProp:
       case ParseNodeKind::DeleteElem:
+      case ParseNodeKind::DeleteOptionalChain:
         MOZ_ASSERT(pn->isArity(PN_UNARY));
         *answer = true;
         return true;
@@ -3356,6 +3473,7 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
         return checkSideEffects(pn->pn_right, answer);
 
       // More getters.
+      case ParseNodeKind::OptionalElem:
       case ParseNodeKind::Elem:
         MOZ_ASSERT(pn->isArity(PN_BINARY));
         *answer = true;
@@ -3414,6 +3532,7 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
       // Function calls can invoke non-local code.
       case ParseNodeKind::New:
       case ParseNodeKind::Call:
+      case ParseNodeKind::OptionalCall:
       case ParseNodeKind::TaggedTemplate:
       case ParseNodeKind::SuperCall:
         MOZ_ASSERT(pn->isArity(PN_BINARY));
@@ -3425,6 +3544,11 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
       // the call being made will always trigger side-effects, it isn't needed.
       case ParseNodeKind::Arguments:
         MOZ_ASSERT(pn->isArity(PN_LIST));
+        *answer = true;
+        return true;
+
+      case ParseNodeKind::OptionalChain:
+        MOZ_ASSERT(pn->isArity(PN_UNARY));
         *answer = true;
         return true;
 
@@ -9355,6 +9479,77 @@ BytecodeEmitter::emitDeleteExpression(ParseNode* node)
     return emit1(JSOP_TRUE);
 }
 
+bool BytecodeEmitter::emitDeleteOptionalChain(ParseNode* node) {
+    MOZ_ASSERT(node->isKind(ParseNodeKind::DeleteOptionalChain));
+
+    OptionalEmitter oe(this, this->stackDepth);
+
+    ParseNode* kid = node->pn_kid;
+    switch (kid->getKind()) {
+        case ParseNodeKind::Elem:
+        case ParseNodeKind::OptionalElem: {
+            auto* elemExpr = &kid->as<PropertyByValueBase>();
+            if (!emitDeleteElementInOptChain(elemExpr, oe))
+                return false;
+
+            break;
+        }
+        case ParseNodeKind::Dot:
+        case ParseNodeKind::OptionalDot: {
+            auto* propExpr = &kid->as<PropertyAccessBase>();
+            if (!emitDeletePropertyInOptChain(propExpr, oe))
+                return false;
+            break;
+        }
+        default:
+            MOZ_ASSERT_UNREACHABLE("Unrecognized optional delete ParseNodeKind");
+    }
+
+    if (!oe.emitOptionalJumpTarget(JSOP_TRUE))
+        return false;
+
+    return true;
+}
+
+bool BytecodeEmitter::emitDeletePropertyInOptChain(PropertyAccessBase* propExpr,
+                                                           OptionalEmitter& oe) {
+    MOZ_ASSERT_IF(propExpr->is<PropertyAccess>(),
+                  !propExpr->as<PropertyAccess>().isSuper());
+  
+    if (!emitOptionalTree(&propExpr->expression(), oe))
+        return false;
+    if (propExpr->isKind(ParseNodeKind::OptionalDot)) {
+        if (!oe.emitJumpShortCircuit())
+            return false;
+    }
+
+    //  POE.emitDelete, !isSuper
+    JSOp delOp = sc->strict() ? JSOP_STRICTDELPROP : JSOP_DELPROP;
+    return emitAtomOp(propExpr->pn_right, delOp);
+
+}
+
+bool BytecodeEmitter::emitDeleteElementInOptChain(PropertyByValueBase* elemExpr,
+                                                          OptionalEmitter& oe) {
+    MOZ_ASSERT_IF(elemExpr->is<PropertyByValue>(),
+                  !elemExpr->as<PropertyByValue>().isSuper());
+
+    if (!emitOptionalTree(&elemExpr->expression(), oe))
+        return false;
+
+    if (elemExpr->isKind(ParseNodeKind::OptionalElem)) {
+        if (!oe.emitJumpShortCircuit())
+            return false;
+    }
+
+    if (!emitTree(elemExpr->pn_right))
+        return false;
+
+    //  EOE.emitDelete, !isSuper
+    JSOp delOp = sc->strict() ? JSOP_STRICTDELELEM : JSOP_DELELEM;
+    return emitElemOpBase(delOp);
+}
+
 static const char *
 SelfHostedCallFunctionName(JSAtom* name, JSContext* cx)
 {
@@ -9586,6 +9781,109 @@ BytecodeEmitter::isRestParameter(ParseNode* pn)
     return false;
 }
 
+/* A version of emitCalleeAndThis for the optional cases:
+ *   * a?.()
+ *   * a?.b()
+ *   * a?.["b"]()
+ *   * (a?.b)()
+ *
+ * See emitCallOrNew and emitOptionalCall for more context.
+ */
+bool BytecodeEmitter::emitOptionalCalleeAndThis(ParseNode* callee, ParseNode* call,
+                                                bool isCall, bool isNew,
+                                                OptionalEmitter& oe) {
+    if (!CheckRecursionLimit(cx)) {
+        return false;
+    }
+
+    bool needsThis = !isCall;
+
+    switch (ParseNodeKind kind = callee->getKind()) {
+        case ParseNodeKind::Name: {
+            if (!emitGetName(callee, isCall))
+                return false;
+            break;
+        }
+
+        case ParseNodeKind::OptionalDot: {
+            MOZ_ASSERT(emitterMode != BytecodeEmitter::SelfHosting);
+            OptionalPropertyAccess* prop = &callee->as<OptionalPropertyAccess>();
+            bool isSuper = false;
+
+            if (!emitOptionalDotExpression(prop, isCall, isSuper, oe))
+                return false;
+            break;
+        }
+        case ParseNodeKind::Dot: {
+            MOZ_ASSERT(emitterMode != BytecodeEmitter::SelfHosting);
+            PropertyAccess* prop = &callee->as<PropertyAccess>();
+            bool isSuper = prop->isSuper();
+
+            if (!emitOptionalDotExpression(prop, isCall, isSuper, oe))
+                return false;
+            break;
+        }
+
+        case ParseNodeKind::OptionalElem: {
+            OptionalPropertyByValue* elem = &callee->as<OptionalPropertyByValue>();
+            bool isSuper = false;
+
+            if (!emitOptionalElemExpression(elem, isCall, isSuper, oe))
+                return false;
+            break;
+        }
+        case ParseNodeKind::Elem: {
+            PropertyByValue* elem = &callee->as<PropertyByValue>();
+            bool isSuper = elem->isSuper();
+
+            if (!emitOptionalElemExpression(elem, isCall, isSuper, oe))
+                return false;
+            break;
+        }
+
+        case ParseNodeKind::Function:
+            MOZ_ASSERT(!emittingRunOnceLambda);
+            if (checkRunOnceContext()) {
+                emittingRunOnceLambda = true;
+                if (!emitOptionalTree(callee, oe))
+                    return false;
+                emittingRunOnceLambda = false;
+            } else {
+                if (!emitOptionalTree(callee, oe))
+                    return false;
+            }
+            needsThis = true;
+            break;
+        case ParseNodeKind::OptionalChain: {
+            return emitCalleeAndThisForOptionalChain(callee, call, isCall, isNew);
+            break;
+        }
+
+        default:
+            MOZ_RELEASE_ASSERT(kind != ParseNodeKind::SuperBase);
+
+            if (!emitOptionalTree(callee, oe))
+                return false;
+
+            needsThis = true;
+            break;
+    }
+
+    if (needsThis) {
+        if (isNew) {
+            if (!emit1(JSOP_IS_CONSTRUCTING)) {
+                return false;
+            }
+        } else {
+            if (!emit1(JSOP_UNDEFINED)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 bool
 BytecodeEmitter::emitCalleeAndThis(ParseNode* callee, ParseNode* call, bool isCall, bool isNew)
 {
@@ -9649,6 +9947,9 @@ BytecodeEmitter::emitCalleeAndThis(ParseNode* callee, ParseNode* call, bool isCa
         MOZ_ASSERT(parser.isSuperBase(callee));
         if (!emit1(JSOP_SUPERFUN))
             return false;
+        break;
+      case ParseNodeKind::OptionalChain:
+        return emitCalleeAndThisForOptionalChain(callee, call, isCall, isNew);
         break;
       default:
         if (!emitTree(callee))
@@ -9792,6 +10093,85 @@ BytecodeEmitter::emitArguments(ParseNode* pn, bool callop, bool spread)
             if (!ifNotOptimizable.emitEnd())
                 return false;
         }
+    }
+
+    return true;
+}
+
+bool BytecodeEmitter::emitOptionalCall(BinaryNode* node, OptionalEmitter& oe,
+                                       ValueUsage valueUsage) {
+    /*
+     * A modified version of emitCallOrNew that handles optional calls.
+     *
+     * These include the following:
+     *    a?.()
+     *    a.b?.()
+     *    a.["b"]?.()
+     *    (a?.b)?.()
+     *
+     * See CallOrNewEmitter for more context.
+     */
+    ParseNode* pn_callee = node->pn_left;
+    ParseNode* pn_args = node->pn_right;
+    bool isSpread = JOF_OPTYPE(node->getOp()) == JOF_BYTE;
+
+    JSOp op = node->getOp();
+
+    bool isNewOp = op == JSOP_NEW || op == JSOP_SPREADNEW ||
+                   op == JSOP_SUPERCALL || op == JSOP_SPREADSUPERCALL;
+
+    if (!emitOptionalCalleeAndThis(pn_callee, node, /* isCall = */ true, isNewOp, oe))
+        return false;
+
+    if (node->isKind(ParseNodeKind::OptionalCall)) {
+        if (!oe.emitJumpShortCircuitForCall())
+            return false;
+    }
+
+    if (!emitArguments(pn_args, /* isCall = */ true, isSpread))
+        return false;
+
+    uint32_t argc = pn_args->pn_count;
+
+    if (isNewOp) {
+        if (!isSpread) {
+            // Repush the callee as new.target
+            if (!emitDupAt(argc + 1))
+                return false;
+        } else {
+            if (!emitDupAt(2))
+                return false;
+        }
+    }
+
+    ParseNode* coordNode = getCoordNode(node, pn_callee, pn_args);
+
+    if (!isSpread) {
+        if (op == JSOP_CALL && valueUsage == ValueUsage::IgnoreValue) {
+            if (!emitCall(JSOP_CALL_IGNORES_RV, argc, coordNode))
+                return false;
+            checkTypeSet(JSOP_CALL_IGNORES_RV);
+        } else {
+            if (!emitCall(op, argc, coordNode))
+                return false;
+            checkTypeSet(op);
+        }
+    } else {
+        if (coordNode) {
+            if (!updateSourceCoordNotes(coordNode->pn_pos.begin))
+                return false;
+        }
+
+        if (!emit1(op))
+            return false;
+        checkTypeSet(op);
+    }
+    if (op == JSOP_EVAL || op == JSOP_STRICTEVAL ||
+        op == JSOP_SPREADEVAL || op == JSOP_STRICTSPREADEVAL)
+    {
+        uint32_t lineNum = parser.tokenStream().srcCoords.lineNum(node->pn_pos.begin);
+        if (!emitUint32Operand(JSOP_LINENO, lineNum))
+            return false;
     }
 
     return true;
@@ -9995,6 +10375,226 @@ BytecodeEmitter::emitLeftAssociative(ParseNode* pn)
         if (!emit1(op))
             return false;
     } while ((nextExpr = nextExpr->pn_next));
+    return true;
+}
+
+/*
+ * Special `emitTree` for Optional Chaining case.
+ * Examples of this are `emitOptionalChain`, `emitDeleteOptionalChain` and
+ * `emitCalleeAndThisForOptionalChain`.
+ */
+bool BytecodeEmitter::emitOptionalTree(ParseNode* pn, OptionalEmitter& oe,
+                                       ValueUsage valueUsage /* = ValueUsage::WantValue */) {
+    if (!CheckRecursionLimit(cx)) {
+        return false;
+    }
+
+    ParseNodeKind kind = pn->getKind();
+    switch (kind) {
+        case ParseNodeKind::OptionalDot: {
+            OptionalPropertyAccess* prop = &pn->as<OptionalPropertyAccess>();
+            bool isSuper = false;
+            if (!emitOptionalDotExpression(prop, false, isSuper, oe))
+                return false;
+            break;
+        }
+        case ParseNodeKind::Dot: {
+            PropertyAccess* prop = &pn->as<PropertyAccess>();
+            bool isSuper = prop->isSuper();
+            if (!emitOptionalDotExpression(prop, false, isSuper, oe))
+                return false;
+            break;
+        }
+
+        case ParseNodeKind::OptionalElem: {
+            OptionalPropertyByValue* elem = &pn->as<OptionalPropertyByValue>();
+            bool isSuper = false;
+
+            if (!emitOptionalElemExpression(elem, false, isSuper, oe))
+                return false;
+            break;
+        }
+        case ParseNodeKind::Elem: {
+            PropertyByValue* elem = &pn->as<PropertyByValue>();
+            bool isSuper = elem->isSuper();
+
+            if (!emitOptionalElemExpression(elem, false, isSuper, oe))
+                return false;
+            break;
+        }
+
+        case ParseNodeKind::Call:
+        case ParseNodeKind::OptionalCall:
+            if (!emitOptionalCall(&pn->as<BinaryNode>(), oe, valueUsage))
+                return false;
+            break;
+
+        // List of accepted ParseNodeKinds that might appear only at the beginning
+        // of an Optional Chain.
+        // For example, a taggedTemplateExpr node might occur if we have
+        // `test`?.b, with `test` as the taggedTemplateExpr ParseNode.
+        default:
+#ifdef DEBUG
+            // https://tc39.es/ecma262/#sec-primary-expression
+            bool isPrimaryExpression =
+                kind == ParseNodeKind::This || kind == ParseNodeKind::Name ||
+                kind == ParseNodeKind::Null || kind == ParseNodeKind::True ||
+                kind == ParseNodeKind::False ||
+                kind == ParseNodeKind::Number ||
+                /*kind == ParseNodeKind::BigInt || no BigInt-support in Waterfox right now */
+                kind == ParseNodeKind::String ||
+                kind == ParseNodeKind::Array ||
+                kind == ParseNodeKind::Object ||
+                kind == ParseNodeKind::Function || kind == ParseNodeKind::Class ||
+                kind == ParseNodeKind::RegExp ||
+                kind == ParseNodeKind::TemplateString ||
+                kind == ParseNodeKind::RawUndefined || pn->isInParens();
+
+            // https://tc39.es/ecma262/#sec-left-hand-side-expressions
+            bool isMemberExpression = isPrimaryExpression ||
+                                      kind == ParseNodeKind::TaggedTemplate ||
+                                      kind == ParseNodeKind::New ||
+                                      kind == ParseNodeKind::NewTarget; /* ||
+                                      kind == ParseNodeKind::ImportMeta; Waterfox is missing bug 1427610 */
+
+            bool isCallExpression = kind == ParseNodeKind::SetThis; /* ||
+                                    kind == ParseNodeKind::CallImport; Waterfox is missing bug 1484948 */
+
+            MOZ_ASSERT(isMemberExpression || isCallExpression,
+                       "Unknown ParseNodeKind for OptionalChain");
+#endif
+            return emitTree(pn);
+    }
+    return true;
+}
+
+// Handle the case of a call made on a OptionalChainParseNode.
+// For example `(a?.b)()` and `(a?.b)?.()`.
+bool BytecodeEmitter::emitCalleeAndThisForOptionalChain(ParseNode* optionalChain,
+                                                        ParseNode* callNode,
+                                                        bool isCall, bool isNew) {
+    ParseNode* calleeNode = optionalChain->pn_kid;
+
+    // Create a new OptionalEmitter, in order to emit the right bytecode
+    // in isolation.
+    OptionalEmitter oe(this, this->stackDepth);
+
+    if (!emitOptionalCalleeAndThis(calleeNode, callNode, isCall, isNew, oe))
+        return false;
+
+    // complete the jump if necessary. This will set both the "this" value
+    // and the "callee" value to undefined, if the callee is undefined. It
+    // does not matter much what the this value is, the function call will
+    // fail if it is not optional, and be set to undefined otherwise.
+    if (!oe.emitOptionalJumpTarget(JSOP_UNDEFINED, OptionalEmitter::Kind::Reference)) {
+        //              [stack] # If shortcircuit
+        //              [stack] UNDEFINED UNDEFINED
+        //              [stack] # otherwise
+        //              [stack] CALLEE THIS
+        return false;
+    }
+    return true;
+}
+
+bool BytecodeEmitter::emitOptionalChain(ParseNode* node, ValueUsage valueUsage) {
+    ParseNode* expr = node->pn_kid;
+
+    OptionalEmitter oe(this, this->stackDepth);
+
+    if (!emitOptionalTree(expr, oe, valueUsage))
+        return false;
+
+    if (!oe.emitOptionalJumpTarget(JSOP_UNDEFINED)) {
+        //              [stack] # If shortcircuit
+        //              [stack] UNDEFINED
+        //              [stack] # otherwise
+        //              [stack] VAL
+        return false;
+    }
+
+    return true;
+}
+
+bool BytecodeEmitter::emitOptionalDotExpression(PropertyAccessBase* prop,
+                                                bool isCall, bool isSuper,
+                                                OptionalEmitter& oe) {
+    if (isSuper) {
+        UnaryNode* base = &prop->expression().as<UnaryNode>();
+        if (!emitGetThisForSuperBase(base))
+            return false;
+    } else {
+        if (!emitOptionalTree(&prop->expression(), oe))
+            return false;
+    }
+
+    if (prop->isKind(ParseNodeKind::OptionalDot)) {
+        MOZ_ASSERT(!isSuper);
+        if (!oe.emitJumpShortCircuit())
+            return false;
+    }
+
+    //  POE.emitGet
+    if (isCall && !emit1(JSOP_DUP))
+        return false;
+
+    if (isSuper && !emit1(JSOP_SUPERBASE))
+        return false;
+
+    JSOp op;
+    if (isSuper)
+        op = JSOP_GETPROP_SUPER;
+    else
+        op = isCall ? JSOP_CALLPROP : JSOP_GETPROP;
+
+    if (!emitAtomOp(prop->pn_right, op))
+        return false;
+
+    if (isCall && !emit1(JSOP_SWAP))
+        return false;
+
+    return true;
+}
+
+bool BytecodeEmitter::emitOptionalElemExpression(PropertyByValueBase* elem,
+                                                 bool isCall, bool isSuper,
+                                                 OptionalEmitter& oe) {
+    if (isSuper) {
+        UnaryNode* base = &elem->expression().as<UnaryNode>();
+        if (!emitGetThisForSuperBase(base))
+            return false;
+    } else {
+        if (!emitOptionalTree(&elem->expression(), oe))
+            return false;
+    }
+
+    if (elem->isKind(ParseNodeKind::OptionalElem)) {
+        MOZ_ASSERT(!isSuper);
+        if (!oe.emitJumpShortCircuit())
+            return false;
+    }
+
+    //  EOE.prepareForKey
+    if (isCall && !emit1(JSOP_DUP))
+        return false;
+
+    if (!emitTree(elem->pn_right))
+        return false;
+
+    if (isSuper && !emit1(JSOP_SUPERBASE))
+            return false;
+
+    JSOp op;
+    if (isSuper)
+        op = JSOP_GETELEM_SUPER;
+    else
+        op = isCall ? JSOP_CALLELEM : JSOP_GETELEM;
+
+    if (!emitElemOpBase(op))
+        return false;
+
+    if (isCall && !emit1(JSOP_SWAP))
+            return false;
+
     return true;
 }
 
@@ -11414,6 +12014,16 @@ BytecodeEmitter::emitTree(ParseNode* pn, ValueUsage valueUsage /* = ValueUsage::
       case ParseNodeKind::DeleteExpr:
         if (!emitDeleteExpression(pn))
             return false;
+        break;
+
+      case ParseNodeKind::DeleteOptionalChain:
+        if (!emitDeleteOptionalChain(pn))
+          return false;
+        break;
+  
+      case ParseNodeKind::OptionalChain:
+        if (!emitOptionalChain(pn, valueUsage))
+          return false;
         break;
 
       case ParseNodeKind::Dot:

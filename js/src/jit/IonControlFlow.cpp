@@ -297,8 +297,11 @@ ControlFlowGenerator::snoopControlFlow(JSOp op)
             return processWhileOrForInLoop(sn);
 
           default:
-            // Hard assert for now - make an error later.
-            MOZ_CRASH("unknown goto case");
+            // Partially implemented optional chaining can end up here.
+            // Just leave the script uncompiled.
+
+            // Not implemented yet.
+            return ControlStatus::Abort;
         }
         break;
       }

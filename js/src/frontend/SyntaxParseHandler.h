@@ -135,6 +135,10 @@ class SyntaxParseHandler
         return node == NodeDottedProperty || node == NodeElement;
     }
 
+    bool isOptionalPropertyAccess(Node node) {
+        return node == NodeOptionalDottedProperty || node == NodeOptionalElement;
+    }
+
     bool isFunctionCall(Node node) {
         // Note: super() is a special form, *not* a function call.
         return node == NodeFunctionCall;
@@ -557,7 +561,7 @@ class SyntaxParseHandler
         // |this|.  It's not really eligible for the funapply/funcall
         // optimizations as they're currently implemented (assuming a single
         // value is used for both retrieval and |this|).
-        if (node != NodeDottedProperty)
+        if (node != NodeDottedProperty && node != NodeOptionalDottedProperty)
             return nullptr;
         return lastAtom->asPropertyName();
     }

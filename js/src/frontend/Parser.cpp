@@ -7273,7 +7273,7 @@ Parser<ParseHandler, CharT>::classDefinition(YieldHandling yieldHandling,
     if (hasHeritage) {
         if (!tokenStream.getToken(&tt))
             return null();
-        classHeritage = memberExpr(yieldHandling, TripledotProhibited, tt);
+        classHeritage = optionalExpr(yieldHandling, TripledotProhibited, tt);
         if (!classHeritage)
             return null();
     }
@@ -8020,10 +8020,11 @@ enum class EnforcedParentheses : uint8_t { CoalesceExpr, AndOrExpr, None };
 
 template <class ParseHandler, typename CharT>
 MOZ_ALWAYS_INLINE typename ParseHandler::Node
-Parser<ParseHandler, CharT>::orExpr(InHandling inHandling, YieldHandling yieldHandling,
+Parser<ParseHandler, CharT>::orExpr(InHandling inHandling,
+                                    YieldHandling yieldHandling,
                                     TripledotHandling tripledotHandling,
                                     PossibleError* possibleError,
-                                    InvokedPrediction invoked /* = PredictUninvoked */)
+                                    InvokedPrediction invoked)
 {
     // Shift-reduce parser for the binary operator part of the JS expression
     // syntax.
@@ -8137,10 +8138,11 @@ Parser<ParseHandler, CharT>::orExpr(InHandling inHandling, YieldHandling yieldHa
 
 template <class ParseHandler, typename CharT>
 MOZ_ALWAYS_INLINE typename ParseHandler::Node
-Parser<ParseHandler, CharT>::condExpr(InHandling inHandling, YieldHandling yieldHandling,
+Parser<ParseHandler, CharT>::condExpr(InHandling inHandling,
+                                      YieldHandling yieldHandling,
                                       TripledotHandling tripledotHandling,
                                       PossibleError* possibleError,
-                                      InvokedPrediction invoked /* = PredictUninvoked */)
+                                      InvokedPrediction invoked)
 {
     Node condition = orExpr(inHandling, yieldHandling, tripledotHandling, possibleError, invoked);
     if (!condition)
@@ -8475,8 +8477,7 @@ template <class ParseHandler, typename CharT>
 typename ParseHandler::Node
 Parser<ParseHandler, CharT>::optionalExpr(YieldHandling yieldHandling,
                                           TripledotHandling tripledotHandling,
-                                          TokenKind tt, bool allowCallSyntax /* = true */,
-                                          PossibleError* possibleError /* = nullptr */,
+                                          TokenKind tt, PossibleError* possibleError /* = nullptr */,
                                           InvokedPrediction invoked /* = PredictUninvoked */)
 {
     if (!CheckRecursionLimit(context)) {
@@ -8495,7 +8496,7 @@ Parser<ParseHandler, CharT>::optionalExpr(YieldHandling yieldHandling,
         return null();
     }
   
-    if (tt == TokenKind::Eof || tt != TokenKind::OptionalChain) {
+    if (tt != TokenKind::OptionalChain) {
         return lhs;
     }
   
@@ -8550,7 +8551,7 @@ Parser<ParseHandler, CharT>::optionalExpr(YieldHandling yieldHandling,
             if (!nextMember) {
                 return null();
             }
-        } else if (allowCallSyntax && tt == TokenKind::LeftParen) {
+        } else if (tt == TokenKind::LeftParen) {
             nextMember = memberCall(tt, lhs, yieldHandling, possibleError);
             if (!nextMember) {
                 return null();
@@ -8564,9 +8565,8 @@ Parser<ParseHandler, CharT>::optionalExpr(YieldHandling yieldHandling,
             break;
         }
     
-        if (nextMember) {
-            lhs = nextMember;
-        }
+        MOZ_ASSERT(nextMember);
+        lhs = nextMember;
     }
   
     return handler.newOptionalChain(begin, lhs);
@@ -8625,7 +8625,7 @@ Parser<ParseHandler, CharT>::unaryExpr(YieldHandling yieldHandling,
             return null();
 
         uint32_t operandOffset = pos().begin;
-        Node operand = memberExpr(yieldHandling, TripledotProhibited, tt2);
+        Node operand = optionalExpr(yieldHandling, TripledotProhibited, tt2);
         if (!operand || !checkIncDecOperand(operand, operandOffset))
             return null();
 
@@ -8669,7 +8669,7 @@ Parser<ParseHandler, CharT>::unaryExpr(YieldHandling yieldHandling,
         MOZ_FALLTHROUGH;
 
       default: {
-        Node expr = optionalExpr(yieldHandling, tripledotHandling, tt, /* allowCallSyntax = */ true,
+        Node expr = optionalExpr(yieldHandling, tripledotHandling, tt,
                                  possibleError, invoked);
         if (!expr)
             return null();
@@ -9088,9 +9088,9 @@ template <class ParseHandler, typename CharT>
 typename ParseHandler::Node
 Parser<ParseHandler, CharT>::memberExpr(YieldHandling yieldHandling,
                                         TripledotHandling tripledotHandling,
-                                        TokenKind tt, bool allowCallSyntax /* = true */,
-                                        PossibleError* possibleError /* = nullptr */,
-                                        InvokedPrediction invoked /* = PredictUninvoked */)
+                                        TokenKind tt, bool allowCallSyntax,
+                                        PossibleError* possibleError,
+                                        InvokedPrediction invoked)
 {
     MOZ_ASSERT(anyChars.isCurrentTokenType(tt));
 
@@ -9262,6 +9262,7 @@ Parser<ParseHandler, CharT>::memberPropertyAccess(Node lhs,
     }
 
     if (optionalKind == OptionalKind::Optional) {
+        MOZ_ASSERT(!handler.isSuperBase(lhs));
         return handler.newOptionalPropertyAccess(lhs, name);
     }
     return handler.newPropertyAccess(lhs, name);
@@ -9285,6 +9286,7 @@ Parser<ParseHandler, CharT>::memberElemAccess(Node lhs, YieldHandling yieldHandl
         return null();
     }
     if (optionalKind == OptionalKind::Optional) {
+        MOZ_ASSERT(!handler.isSuperBase(lhs));
         return handler.newOptionalPropertyByValue(lhs, propExpr, pos().end);
     }
     return handler.newPropertyByValue(lhs, propExpr, pos().end);
@@ -9327,7 +9329,8 @@ Parser<ParseHandler, CharT>::memberCall(TokenKind tt, Node lhs, YieldHandling yi
                                                PossibleError* possibleError /* = nullptr */,
                                                OptionalKind optionalKind /* = OptionalKind::NonOptional */)
 {
-    if (options().selfHostingMode && handler.isPropertyAccess(lhs)) {
+    if (options().selfHostingMode && (handler.isPropertyAccess(lhs) ||
+                                      handler.isOptionalPropertyAccess(lhs))) {
         error(JSMSG_SELFHOSTED_METHOD_CALL);
         return null();
     }
@@ -10427,7 +10430,7 @@ typename ParseHandler::Node
 Parser<ParseHandler, CharT>::primaryExpr(YieldHandling yieldHandling,
                                          TripledotHandling tripledotHandling, TokenKind tt,
                                          PossibleError* possibleError,
-                                         InvokedPrediction invoked /* = PredictUninvoked */)
+                                         InvokedPrediction invoked)
 {
     MOZ_ASSERT(anyChars.isCurrentTokenType(tt));
     if (!CheckRecursionLimit(context))

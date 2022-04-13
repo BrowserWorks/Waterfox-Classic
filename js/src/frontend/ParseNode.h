@@ -875,6 +875,10 @@ struct UnaryNode : public ParseNode
         pn_kid = kid;
     }
 
+    static bool test(const ParseNode& node) {
+        return node.isArity(PN_UNARY);
+    }
+
 #ifdef DEBUG
     void dump(GenericPrinter& out, int indent);
 #endif
@@ -894,6 +898,10 @@ struct BinaryNode : public ParseNode
     {
         pn_left = left;
         pn_right = right;
+    }
+
+    static bool test(const ParseNode& node) {
+        return node.isArity(PN_BINARY);
     }
 
 #ifdef DEBUG
@@ -1239,11 +1247,6 @@ class PropertyAccessBase : public BinaryNode
     PropertyName& name() const {
         return *pn_u.binary.right->pn_atom->asPropertyName();
     }
-
-    bool isSuper() const {
-        // ParseNodeKind::SuperBase cannot result from any expression syntax.
-        return expression().isKind(ParseNodeKind::SuperBase);
-    }
 };
 
 class PropertyAccess : public PropertyAccessBase
@@ -1259,6 +1262,11 @@ class PropertyAccess : public PropertyAccessBase
       bool match = node.isKind(ParseNodeKind::Dot);
       MOZ_ASSERT_IF(match, node.is<PropertyAccessBase>());
       return match;
+    }
+
+    bool isSuper() const {
+        // ParseNodeKind::SuperBase cannot result from any expression syntax.
+        return expression().isKind(ParseNodeKind::SuperBase);
     }
 };
   
@@ -1288,15 +1296,15 @@ class PropertyByValueBase : public ParseNode
         pn_u.binary.right = propExpr;
     }
 
+    ParseNode& expression() const {
+        return *pn_u.binary.left;
+    }
+
     static bool test(const ParseNode& node) {
         bool match = node.isKind(ParseNodeKind::Elem) ||
                      node.isKind(ParseNodeKind::OptionalElem);
         MOZ_ASSERT_IF(match, node.isArity(PN_BINARY));
         return match;
-    }
-
-    bool isSuper() const {
-        return pn_left->isKind(ParseNodeKind::SuperBase);
     }
 };
 
@@ -1309,6 +1317,10 @@ class PropertyByValue : public PropertyByValueBase {
       bool match = node.isKind(ParseNodeKind::Elem);
       MOZ_ASSERT_IF(match, node.is<PropertyByValueBase>());
       return match;
+    }
+
+    bool isSuper() const {
+        return pn_left->isKind(ParseNodeKind::SuperBase);
     }
 };
 

@@ -374,6 +374,10 @@ ContainsHoistedDeclaration(JSContext* cx, ParseNode* node, bool* result)
       case ParseNodeKind::Elem:
       case ParseNodeKind::Arguments:
       case ParseNodeKind::Call:
+      case ParseNodeKind::OptionalChain:
+      case ParseNodeKind::OptionalDot:
+      case ParseNodeKind::OptionalElem:
+      case ParseNodeKind::OptionalCall:
       case ParseNodeKind::Name:
       case ParseNodeKind::TemplateString:
       case ParseNodeKind::TemplateStringList:
@@ -834,6 +838,13 @@ FoldAndOrCoalesce(JSContext* cx, ParseNode** nodePtr, Parser<FullParseHandler, c
     // its element.
     if (node->pn_count == 1) {
         ParseNode* first = node->pn_head;
+
+        //  TryReplaceNode()
+        if (!first)
+            return false;
+
+        first->setInParens((*nodePtr)->isInParens());
+        first->setDirectRHSAnonFunction((*nodePtr)->isDirectRHSAnonFunction());
         ReplaceNode(nodePtr, first);
     }
 
@@ -1289,7 +1300,7 @@ FoldElement(JSContext* cx, ParseNode** nodePtr, Parser<FullParseHandler, char16_
 {
     ParseNode* node = *nodePtr;
 
-    MOZ_ASSERT(node->isKind(ParseNodeKind::Elem));
+    MOZ_ASSERT(node->isKind(ParseNodeKind::Elem) || node->isKind(ParseNodeKind::OptionalElem));
     MOZ_ASSERT(node->isArity(PN_BINARY));
 
     ParseNode*& expr = node->pn_left;
@@ -1493,6 +1504,7 @@ FoldCall(JSContext* cx, ParseNode* node, Parser<FullParseHandler, char16_t>& par
          bool inGenexpLambda)
 {
     MOZ_ASSERT(node->isKind(ParseNodeKind::Call) ||
+               node->isKind(ParseNodeKind::OptionalCall) ||
                node->isKind(ParseNodeKind::SuperCall) ||
                node->isKind(ParseNodeKind::New) ||
                node->isKind(ParseNodeKind::TaggedTemplate));
@@ -1587,13 +1599,14 @@ static bool
 FoldDottedProperty(JSContext* cx, ParseNode* node, Parser<FullParseHandler, char16_t>& parser,
                    bool inGenexpLambda)
 {
-    MOZ_ASSERT(node->isKind(ParseNodeKind::Dot));
+    MOZ_ASSERT(node->isKind(ParseNodeKind::Dot) || node->isKind(ParseNodeKind::OptionalDot));
     MOZ_ASSERT(node->isArity(PN_BINARY));
 
     // Iterate through a long chain of dotted property accesses to find the
     // most-nested non-dotted property node, then fold that.
     ParseNode** nested = &node->pn_left;
-    while ((*nested)->isKind(ParseNodeKind::Dot)) {
+    while ((*nested)->isKind(ParseNodeKind::Dot) ||
+           (*nested)->isKind(ParseNodeKind::OptionalDot)) {
         MOZ_ASSERT((*nested)->isArity(PN_BINARY));
         nested = &(*nested)->pn_left;
     }
@@ -1800,12 +1813,14 @@ Fold(JSContext* cx, ParseNode** pnp, Parser<FullParseHandler, char16_t>& parser,
         return FoldClass(cx, pn, parser, inGenexpLambda);
 
       case ParseNodeKind::Elem:
+      case ParseNodeKind::OptionalElem:
         return FoldElement(cx, pnp, parser, inGenexpLambda);
 
       case ParseNodeKind::Add:
         return FoldAdd(cx, pnp, parser, inGenexpLambda);
 
       case ParseNodeKind::Call:
+      case ParseNodeKind::OptionalCall:
       case ParseNodeKind::New:
       case ParseNodeKind::SuperCall:
       case ParseNodeKind::TaggedTemplate:
@@ -1897,6 +1912,7 @@ Fold(JSContext* cx, ParseNode** pnp, Parser<FullParseHandler, char16_t>& parser,
         MOZ_CRASH("unreachable, handled by ::Dot");
 
       case ParseNodeKind::Dot:
+      case ParseNodeKind::OptionalDot:
         return FoldDottedProperty(cx, pn, parser, inGenexpLambda);
 
       case ParseNodeKind::LexicalScope:
@@ -1910,6 +1926,10 @@ Fold(JSContext* cx, ParseNode** pnp, Parser<FullParseHandler, char16_t>& parser,
 
       case ParseNodeKind::Limit: // invalid sentinel value
         MOZ_CRASH("invalid node kind");
+
+      case ParseNodeKind::OptionalChain:
+      case ParseNodeKind::DeleteOptionalChain:
+        return true;    //  XXX: ???
     }
 
     MOZ_CRASH("shouldn't reach here");
