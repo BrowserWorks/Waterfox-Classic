@@ -70,7 +70,7 @@ if __name__ == '__main__':
     # Run Firefox a first time to initialize its profile
     runner = FirefoxRunner(profile=profile,
                            binary=build.get_binary_path(where="staged-package"),
-                           cmdargs=['javascript:Quitter.quit()'],
+                           cmdargs=['data:text/html,<script>Quitter.quit()</script>'],
                            env=env)
     runner.start()
     runner.wait()
