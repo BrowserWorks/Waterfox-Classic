@@ -126,7 +126,10 @@ do
     ;;
     -c)
       args="$args -c"
-      args="$(echo $args | sed 's%/Fe%/Fo%g')"
+      args="$(echo $args | sed 's/Fe/Fo/g')"
+      if [ -n "$output" ]; then
+        output="$(echo $output | sed 's/Fe/Fo/g')"
+      fi
       single="-c"
       shift 1
     ;;
