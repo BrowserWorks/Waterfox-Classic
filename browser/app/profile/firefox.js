@@ -1668,6 +1668,20 @@ pref("extensions.formautofill.loglevel", "Warn");
 // Whether or not to restore a session with lazy-browser tabs.
 pref("browser.sessionstore.restore_tabs_lazily", true);
 
+// Enable safebrowsing v4 tables (suffixed by "-proto") update.
+pref("urlclassifier.malwareTable", "goog-malware-proto,goog-unwanted-proto,test-malware-simple,test-unwanted-simple");
+#ifdef MOZILLA_OFFICIAL
+// In the official build, we are allowed to use google's private
+// phishing list "goog-phish-shavar". See Bug 1288840.
+pref("urlclassifier.phishTable", "goog-phish-proto,test-phish-simple");
+#else
+pref("urlclassifier.phishTable", "googpub-phish-proto,test-phish-simple");
+#endif
+
+// Tables for application reputation.
+pref("urlclassifier.downloadAllowTable", "goog-downloadwhite-proto");
+pref("urlclassifier.downloadBlockTable", "goog-badbinurl-proto");
+
 pref("browser.suppress_first_window_animation", true);
 
 // Preferences for Photon onboarding system extension
