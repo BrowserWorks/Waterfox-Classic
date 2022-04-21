@@ -734,6 +734,7 @@ BytecodeParser::simulateOp(JSOp op, uint32_t offset, OffsetAndDefIndex* offsetSt
       case JSOP_INITGLEXICAL:
       case JSOP_INITLEXICAL:
       case JSOP_OR:
+      case JSOP_COALESCE:
       case JSOP_SETALIASEDVAR:
       case JSOP_SETARG:
       case JSOP_SETINTRINSIC:

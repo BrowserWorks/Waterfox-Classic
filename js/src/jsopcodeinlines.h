@@ -25,6 +25,7 @@ GetDefCount(JSScript* script, unsigned offset)
     switch (JSOp(*pc)) {
       case JSOP_OR:
       case JSOP_AND:
+      case JSOP_COALESCE:
         return 1;
       case JSOP_PICK:
       case JSOP_UNPICK:

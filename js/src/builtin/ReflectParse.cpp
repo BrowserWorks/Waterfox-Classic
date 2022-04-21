@@ -78,7 +78,7 @@ enum BinaryOperator {
     /* binary */
     BINOP_BITOR, BINOP_BITXOR, BINOP_BITAND,
     /* misc */
-    BINOP_IN, BINOP_INSTANCEOF,
+    BINOP_IN, BINOP_INSTANCEOF, BINOP_COALESCE,
 
     BINOP_LIMIT
 };
@@ -154,6 +154,7 @@ static const char* const binopNames[] = {
     "&",          /* BINOP_BITAND */
     "in",         /* BINOP_IN */
     "instanceof", /* BINOP_INSTANCEOF */
+    "??",         /* BINOP_COALESCE */
 };
 
 static const char* const unopNames[] = {
@@ -1961,6 +1962,8 @@ ASTSerializer::binop(ParseNodeKind kind, JSOp op)
         return BINOP_IN;
       case PNK_INSTANCEOF:
         return BINOP_INSTANCEOF;
+      case PNK_COALESCE:
+        return BINOP_COALESCE;
       default:
         return BINOP_ERR;
     }
@@ -2852,6 +2855,7 @@ ASTSerializer::expression(ParseNode* pn, MutableHandleValue dst)
                builder.conditionalExpression(test, cons, alt, &pn->pn_pos, dst);
       }
 
+      case PNK_COALESCE:
       case PNK_OR:
       case PNK_AND:
         return leftAssociate(pn, dst);

@@ -48,6 +48,7 @@ using namespace js;
 using namespace js::gc;
 using namespace js::frontend;
 
+using mozilla::ArrayLength;
 using mozilla::AssertedCast;
 using mozilla::DebugOnly;
 using mozilla::Maybe;
@@ -3296,8 +3297,9 @@ BytecodeEmitter::checkSideEffects(ParseNode* pn, bool* answer)
 
       case PNK_STATEMENTLIST:
       case PNK_CATCHLIST:
-      // Strict equality operations and logical operators are well-behaved and
-      // perform no conversions.
+      // Strict equality operations and short circuit operators are well-behaved
+      // and perform no conversions.
+      case PNK_COALESCE:
       case PNK_OR:
       case PNK_AND:
       case PNK_STRICTEQ:
@@ -9783,10 +9785,12 @@ BytecodeEmitter::emitLeftAssociative(ParseNode* pn)
     return true;
 }
 
+
 bool
-BytecodeEmitter::emitLogical(ParseNode* pn)
+BytecodeEmitter::emitShortCircuit(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isArity(PN_LIST));
+    MOZ_ASSERT(pn->isKind(PNK_OR) || pn->isKind(PNK_COALESCE) || pn->isKind(PNK_AND));
 
     /*
      * JSOP_OR converts the operand on the stack to boolean, leaves the original
@@ -11055,8 +11059,9 @@ BytecodeEmitter::emitTree(ParseNode* pn, ValueUsage valueUsage /* = ValueUsage::
         break;
 
       case PNK_OR:
+      case PNK_COALESCE:
       case PNK_AND:
-        if (!emitLogical(pn))
+        if (!emitShortCircuit(pn))
             return false;
         break;
 

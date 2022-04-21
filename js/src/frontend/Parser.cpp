@@ -8045,34 +8045,39 @@ BinaryOpTokenKindToParseNodeKind(TokenKind tok)
     return ParseNodeKind(PNK_BINOP_FIRST + (tok - TOK_BINOP_FIRST));
 }
 
+// This list must be kept in the same order in several places:
+//   - The binary operators in ParseNode.h
+//   - the binary operators in TokenKind.h
+//   - the precedence list in Parser.cpp
 static const int PrecedenceTable[] = {
-    1, /* PNK_OR */
-    2, /* PNK_AND */
-    3, /* PNK_BITOR */
-    4, /* PNK_BITXOR */
-    5, /* PNK_BITAND */
-    6, /* PNK_STRICTEQ */
-    6, /* PNK_EQ */
-    6, /* PNK_STRICTNE */
-    6, /* PNK_NE */
-    7, /* PNK_LT */
-    7, /* PNK_LE */
-    7, /* PNK_GT */
-    7, /* PNK_GE */
-    7, /* PNK_INSTANCEOF */
-    7, /* PNK_IN */
-    8, /* PNK_LSH */
-    8, /* PNK_RSH */
-    8, /* PNK_URSH */
-    9, /* PNK_ADD */
-    9, /* PNK_SUB */
-    10, /* PNK_STAR */
-    10, /* PNK_DIV */
-    10, /* PNK_MOD */
-    11  /* PNK_POW */
+    1, /* PNK_COALESCE */
+    2, /* PNK_OR */
+    3, /* PNK_AND */
+    4, /* PNK_BITOR */
+    5, /* PNK_BITXOR */
+    6, /* PNK_BITAND */
+    7, /* PNK_STRICTEQ */
+    7, /* PNK_EQ */
+    7, /* PNK_STRICTNE */
+    7, /* PNK_NE */
+    8, /* PNK_LT */
+    8, /* PNK_LE */
+    8, /* PNK_GT */
+    8, /* PNK_GE */
+    8, /* PNK_INSTANCEOF */
+    8, /* PNK_IN */
+    9, /* PNK_LSH */
+    9, /* PNK_RSH */
+    9, /* PNK_URSH */
+    10, /* PNK_ADD */
+    10, /* PNK_SUB */
+    11, /* PNK_STAR */
+    11, /* PNK_DIV */
+    11, /* PNK_MOD */
+    12  /* PNK_POW */
 };
 
-static const int PRECEDENCE_CLASSES = 11;
+static const int PRECEDENCE_CLASSES = 12;
 
 static int
 Precedence(ParseNodeKind pnk) {
@@ -8086,6 +8091,8 @@ Precedence(ParseNodeKind pnk) {
     MOZ_ASSERT(pnk <= PNK_BINOP_LAST);
     return PrecedenceTable[pnk - PNK_BINOP_FIRST];
 }
+
+enum class EnforcedParentheses : uint8_t { CoalesceExpr, AndOrExpr, None };
 
 template <class ParseHandler, typename CharT>
 MOZ_ALWAYS_INLINE typename ParseHandler::Node
@@ -8103,6 +8110,7 @@ Parser<ParseHandler, CharT>::orExpr1(InHandling inHandling, YieldHandling yieldH
     ParseNodeKind kindStack[PRECEDENCE_CLASSES];
     int depth = 0;
     Node pn;
+    EnforcedParentheses unparenthesizedExpression = EnforcedParentheses::None;
     for (;;) {
         pn = unaryExpr(yieldHandling, tripledotHandling, possibleError, invoked);
         if (!pn)
@@ -8120,11 +8128,44 @@ Parser<ParseHandler, CharT>::orExpr1(InHandling inHandling, YieldHandling yieldH
             // pending expression error now.
             if (possibleError && !possibleError->checkForExpressionError())
                 return null();
-            // Report an error for unary expressions on the LHS of **.
-            if (tok == TOK_POW && handler.isUnparenthesizedUnaryExpression(pn)) {
-                error(JSMSG_BAD_POW_LEFTSIDE);
-                return null();
+
+            switch (tok) {
+              // Report an error for unary expressions on the LHS of **.
+              case TOK_POW:
+                if (handler.isUnparenthesizedUnaryExpression(pn)) {
+                  error(JSMSG_BAD_POW_LEFTSIDE);
+                  return null();
+                }
+                break;
+      
+              case TOK_OR:
+              case TOK_AND:
+                // In the case that the `??` is on the left hand side of the
+                // expression: Disallow Mixing of ?? and other logical operators (||
+                // and &&) unless one expression is parenthesized
+                if (unparenthesizedExpression == EnforcedParentheses::CoalesceExpr) {
+                  error(JSMSG_BAD_COALESCE_MIXING);
+                  return null();
+                }
+                // If we have not detected a mixing error at this point, record that
+                // we have an unparenthesized expression, in case we have one later.
+                unparenthesizedExpression = EnforcedParentheses::AndOrExpr;
+                break;
+              case TOK_COALESCE:
+                if (unparenthesizedExpression == EnforcedParentheses::AndOrExpr) {
+                  error(JSMSG_BAD_COALESCE_MIXING);
+                  return null();
+                }
+                // If we have not detected a mixing error at this point, record that
+                // we have an unparenthesized expression, in case we have one later.
+                unparenthesizedExpression = EnforcedParentheses::CoalesceExpr;
+                break;
+      
+              default:
+                // do nothing in other cases
+                break;
             }
+
             pnk = BinaryOpTokenKindToParseNodeKind(tok);
         } else {
             tok = TOK_EOF;

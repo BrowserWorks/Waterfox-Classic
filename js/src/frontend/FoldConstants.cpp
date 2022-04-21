@@ -327,6 +327,7 @@ ContainsHoistedDeclaration(JSContext* cx, ParseNode* node, bool* result)
       case PNK_POSTINCREMENT:
       case PNK_PREDECREMENT:
       case PNK_POSTDECREMENT:
+      case PNK_COALESCE:
       case PNK_OR:
       case PNK_AND:
       case PNK_BITOR:
@@ -750,15 +751,17 @@ FoldIncrementDecrement(JSContext* cx, ParseNode* node, Parser<FullParseHandler, 
 }
 
 static bool
-FoldAndOr(JSContext* cx, ParseNode** nodePtr, Parser<FullParseHandler, char16_t>& parser,
+FoldAndOrCoalesce(JSContext* cx, ParseNode** nodePtr, Parser<FullParseHandler, char16_t>& parser,
           bool inGenexpLambda)
 {
     ParseNode* node = *nodePtr;
 
-    MOZ_ASSERT(node->isKind(PNK_AND) || node->isKind(PNK_OR));
+    MOZ_ASSERT(node->isKind(PNK_AND) || node->isKind(PNK_COALESCE) || node->isKind(PNK_OR));
     MOZ_ASSERT(node->isArity(PN_LIST));
 
     bool isOrNode = node->isKind(PNK_OR);
+    bool isAndNode = node->isKind(PNK_AND);
+    bool isCoalesceNode = node->isKind(PNK_COALESCE);
     ParseNode** elem = &node->pn_head;
     do {
         if (!Fold(cx, elem, parser, inGenexpLambda))
@@ -774,11 +777,19 @@ FoldAndOr(JSContext* cx, ParseNode** nodePtr, Parser<FullParseHandler, char16_t>
             continue;
         }
 
+        bool isTruthyCoalesceNode =
+            isCoalesceNode && !((*elem)->isKind(PNK_NULL) ||
+                                (*elem)->isKind(PNK_VOID) ||
+                                (*elem)->isKind(PNK_RAW_UNDEFINED));
+        bool canShortCircuit = (isOrNode && t == Truthy) ||
+                               (isAndNode && t == Falsy) || isTruthyCoalesceNode;
+
         // If the constant-folded node's truthiness will terminate the
-        // condition -- `a || true || expr` or |b && false && expr| -- then
-        // trailing nodes will never be evaluated.  Truncate the list after
-        // the known-truthiness node, as it's the overall result.
-        if ((t == Truthy) == isOrNode) {
+        // condition -- `a || true || expr` or `b && false && expr` or
+        // `false ?? c ?? expr` -- then trailing nodes will never be
+        // evaluated.  Truncate the list after the known-truthiness node,
+        // as it's the overall result.
+        if (canShortCircuit) {
             ParseNode* afterNext;
             for (ParseNode* next = (*elem)->pn_next; next; next = afterNext) {
                 afterNext = next->pn_next;
@@ -792,8 +803,6 @@ FoldAndOr(JSContext* cx, ParseNode** nodePtr, Parser<FullParseHandler, char16_t>
             elem = &(*elem)->pn_next;
             break;
         }
-
-        MOZ_ASSERT((t == Truthy) == !isOrNode);
 
         // We've encountered a vacuous node that'll never short- circuit
         // evaluation.
@@ -1727,7 +1736,8 @@ Fold(JSContext* cx, ParseNode** pnp, Parser<FullParseHandler, char16_t>& parser,
 
       case PNK_AND:
       case PNK_OR:
-        return FoldAndOr(cx, pnp, parser, inGenexpLambda);
+      case PNK_COALESCE:
+        return FoldAndOrCoalesce(cx, pnp, parser, inGenexpLambda);
 
       case PNK_FUNCTION:
         return FoldFunction(cx, pn, parser, inGenexpLambda);

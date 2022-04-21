@@ -1290,8 +1290,8 @@ enum FirstCharKind {
     LastCharKind = Other
 };
 
-// OneChar: 40,  41,  44,  58,  59,  63,  91,  93,  123, 125, 126:
-//          '(', ')', ',', ':', ';', '?', '[', ']', '{', '}', '~'
+// OneChar: 40,  41,  44,  58,  59,  91,  93,  123, 125, 126:
+//          '(', ')', ',', ':', ';', '[', ']', '{', '}', '~'
 // Ident:   36, 65..90, 95, 97..122: '$', 'A'..'Z', '_', 'a'..'z'
 // Dot:     46: '.'
 // Equals:  61: '='
@@ -1315,7 +1315,7 @@ static const uint8_t firstCharKinds[] = {
 /*  30+ */ _______, _______,   Space, _______,  String, _______,   Ident, _______, _______,  String,
 /*  40+ */  TOK_LP,  TOK_RP, _______, _______, T_COMMA,_______,  _______, _______,BasePrefix,  Dec,
 /*  50+ */     Dec,     Dec,     Dec,     Dec,     Dec,     Dec,     Dec,    Dec,  T_COLON,TOK_SEMI,
-/*  60+ */ _______, _______, _______,TOK_HOOK, _______,   Ident,   Ident,   Ident,   Ident,   Ident,
+/*  60+ */ _______, _______, _______, _______, _______,   Ident,   Ident,   Ident,   Ident,   Ident,
 /*  70+ */   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,
 /*  80+ */   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,   Ident,
 /*  90+ */   Ident,  TOK_LB, _______,  TOK_RB, _______,   Ident, Templat,   Ident,   Ident,   Ident,
@@ -1826,6 +1826,10 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
             tp->type = TOK_AND;
         else
             tp->type = matchChar('=') ? TOK_BITANDASSIGN : TOK_BITAND;
+        goto out;
+
+      case '?':
+        tp->type = matchChar('?') ? TOK_COALESCE : TOK_HOOK;
         goto out;
 
       case '!':

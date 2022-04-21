@@ -126,8 +126,12 @@ class ObjectBox;
     \
     /* \
      * Binary operators. \
-     * These must be in the same order as TOK_OR and friends in TokenStream.h. \
+     * This list must be kept in the same order in several places: \
+     *   - The binary operators in ParseNode.h \
+     *   - the binary operators in TokenKind.h \
+     *   - the precedence list in Parser.cpp \
      */ \
+    F(COALESCE) \
     F(OR) \
     F(AND) \
     F(BITOR) \
@@ -327,6 +331,7 @@ IsTypeofKind(ParseNodeKind kind)
  *                          pn_kid1: cond, pn_kid2: then, pn_kid3: else
  * PNK_OR,      list        pn_head; list of pn_count subexpressions
  * PNK_AND,                 All of these operators are left-associative except (**).
+ * PNK_COALESCE,
  * PNK_BITOR,
  * PNK_BITXOR,
  * PNK_BITAND,

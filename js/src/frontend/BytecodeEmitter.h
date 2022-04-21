@@ -808,7 +808,7 @@ struct MOZ_STACK_CLASS BytecodeEmitter
     MOZ_MUST_USE bool emitUnary(ParseNode* pn);
     MOZ_MUST_USE bool emitRightAssociative(ParseNode* pn);
     MOZ_MUST_USE bool emitLeftAssociative(ParseNode* pn);
-    MOZ_MUST_USE bool emitLogical(ParseNode* pn);
+    MOZ_MUST_USE bool emitShortCircuit(ParseNode* pn);
     MOZ_MUST_USE bool emitSequenceExpr(ParseNode* pn,
                                        ValueUsage valueUsage = ValueUsage::WantValue);
 
