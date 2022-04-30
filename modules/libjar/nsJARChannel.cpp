@@ -594,47 +594,47 @@ nsJARChannel::GetSecurityInfo(nsISupports **aSecurityInfo)
     return NS_OK;
 }
 
+bool nsJARChannel::GetContentTypeGuess(nsACString& aResult) const {
+  const char *ext = nullptr, *fileName = mJarEntry.get();
+  int32_t len = mJarEntry.Length();
+
+  // check if we're displaying a directory
+  // mJarEntry will be empty if we're trying to display
+  // the topmost directory in a zip, e.g. jar:foo.zip!/
+  if (ENTRY_IS_DIRECTORY(mJarEntry)) {
+    aResult.AssignLiteral(APPLICATION_HTTP_INDEX_FORMAT);
+    return true;
+  }
+
+  // Not a directory, take a guess by its extension
+  for (int32_t i = len - 1; i >= 0; i--) {
+    if (fileName[i] == '.') {
+      ext = &fileName[i + 1];
+      break;
+    }
+  }
+  if (!ext) {
+    return false;
+  }
+  nsIMIMEService* mimeServ = gJarHandler->MimeService();
+  if (!mimeServ) {
+    return false;
+  }
+  mimeServ->GetTypeFromExtension(nsDependentCString(ext), aResult);
+  return !aResult.IsEmpty();
+}
+
+
 NS_IMETHODIMP
 nsJARChannel::GetContentType(nsACString &result)
 {
     // If the Jar file has not been open yet,
     // We return application/x-unknown-content-type
     if (!mOpened) {
-      result.Assign(UNKNOWN_CONTENT_TYPE);
+      result.AssignLiteral(UNKNOWN_CONTENT_TYPE);
       return NS_OK;
     }
 
-    if (mContentType.IsEmpty()) {
-
-        //
-        // generate content type and set it
-        //
-        const char *ext = nullptr, *fileName = mJarEntry.get();
-        int32_t len = mJarEntry.Length();
-
-        // check if we're displaying a directory
-        // mJarEntry will be empty if we're trying to display
-        // the topmost directory in a zip, e.g. jar:foo.zip!/
-        if (ENTRY_IS_DIRECTORY(mJarEntry)) {
-            mContentType.AssignLiteral(APPLICATION_HTTP_INDEX_FORMAT);
-        }
-        else {
-            // not a directory, take a guess by its extension
-            for (int32_t i = len-1; i >= 0; i--) {
-                if (fileName[i] == '.') {
-                    ext = &fileName[i + 1];
-                    break;
-                }
-            }
-            if (ext) {
-                nsIMIMEService *mimeServ = gJarHandler->MimeService();
-                if (mimeServ)
-                    mimeServ->GetTypeFromExtension(nsDependentCString(ext), mContentType);
-            }
-            if (mContentType.IsEmpty())
-                mContentType.AssignLiteral(UNKNOWN_CONTENT_TYPE);
-        }
-    }
     result = mContentType;
     return NS_OK;
 }
@@ -642,8 +642,8 @@ nsJARChannel::GetContentType(nsACString &result)
 NS_IMETHODIMP
 nsJARChannel::SetContentType(const nsACString &aContentType)
 {
-    // If someone gives us a type hint we should just use that type instead of
-    // doing our guessing.  So we don't care when this is being called.
+  // We behave like HTTP channels (treat this as a hint if called before open,
+  // and override the charset if called after open).
 
     // mContentCharset is unchanged if not parsed
     NS_ParseResponseContentType(aContentType, mContentType, mContentCharset);
@@ -746,10 +746,19 @@ nsJARChannel::Open(nsIInputStream **stream)
         return rv;
 
     input.forget(stream);
-    mOpened = true;
+    SetOpened();
     // local files are always considered safe
     mIsUnsafe = false;
     return NS_OK;
+}
+
+void nsJARChannel::SetOpened() {
+  MOZ_ASSERT(!mOpened, "Opening channel twice?");
+  mOpened = true;
+  // Compute the content type now.
+  if (!GetContentTypeGuess(mContentType)) {
+    mContentType.Assign(UNKNOWN_CONTENT_TYPE);
+  }
 }
 
 NS_IMETHODIMP
@@ -854,7 +863,7 @@ nsJARChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *ctx)
     if (mLoadGroup)
         mLoadGroup->AddRequest(this, nullptr);
 
-    mOpened = true;
+    SetOpened();
 
     return NS_OK;
 }

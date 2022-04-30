@@ -61,6 +61,10 @@ private:
     nsresult OpenLocalFile();
     void NotifyError(nsresult aError);
     void FireOnProgress(uint64_t aProgress);
+    // Returns false if we don't know the content type of this channel, in which
+    // case we should use the content-type hint.
+    bool GetContentTypeGuess(nsACString&) const;
+    void SetOpened();
     virtual void OnDownloadComplete(mozilla::net::MemoryDownloader* aDownloader,
                                     nsIRequest* aRequest,
                                     nsISupports* aCtxt,
