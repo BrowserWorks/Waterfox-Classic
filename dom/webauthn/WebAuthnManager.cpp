@@ -520,6 +520,8 @@ WebAuthnManager::StartSign() {
   }
 }
 
+const size_t MAX_ALLOWED_CREDENTIALS = 20;
+
 already_AddRefed<Promise>
 WebAuthnManager::GetAssertion(nsPIDOMWindowInner* aParent,
                               const PublicKeyCredentialRequestOptions& aOptions)
@@ -573,6 +575,12 @@ WebAuthnManager::GetAssertion(nsPIDOMWindowInner* aParent,
   CryptoBuffer rpIdHash;
   if (!rpIdHash.SetLength(SHA256_LENGTH, fallible)) {
     promise->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
+    return promise.forget();
+  }
+
+    // Abort the request if the allowCredentials set is too large
+  if (aOptions.mAllowList.Length() > MAX_ALLOWED_CREDENTIALS) {
+    promise->MaybeReject(NS_ERROR_DOM_SECURITY_ERR);
     return promise.forget();
   }
 
