@@ -13,7 +13,7 @@ function CallModuleResolveHook(module, specifier, expectedMinimumStatus)
 }
 
 // 15.2.1.16.2 GetExportedNames(exportStarSet)
-function ModuleGetExportedNames(exportStarSet = [])
+function ModuleGetExportedNames(exportStarSet = new_List())
 {
     if (!IsObject(this) || !IsModule(this)) {
         return callFunction(CallModuleMethodIfWrapped, this, exportStarSet,
@@ -25,13 +25,13 @@ function ModuleGetExportedNames(exportStarSet = [])
 
     // Step 2
     if (callFunction(ArrayIncludes, exportStarSet, module))
-        return [];
+        return new_List();
 
     // Step 3
     _DefineDataProperty(exportStarSet, exportStarSet.length, module);
 
     // Step 4
-    let exportedNames = [];
+    let exportedNames = new_List();
     let namesCount = 0;
 
     // Step 5
@@ -97,7 +97,7 @@ function ModuleSetStatus(module, newStatus)
 //  - If the request is found to be ambiguous, the string `"ambiguous"` is
 //    returned.
 //
-function ModuleResolveExport(exportName, resolveSet = [])
+function ModuleResolveExport(exportName, resolveSet = new_List())
 {
     if (!IsObject(this) || !IsModule(this)) {
         return callFunction(CallModuleMethodIfWrapped, this, exportName, resolveSet,
@@ -199,7 +199,7 @@ function GetModuleNamespace(module)
     // Step 3
     if (typeof namespace === "undefined") {
         let exportedNames = callFunction(module.getExportedNames, module);
-        let unambiguousNames = [];
+        let unambiguousNames = new_List();
         for (let i = 0; i < exportedNames.length; i++) {
             let name = exportedNames[i];
             let resolution = callFunction(module.resolveExport, module, name);
@@ -292,7 +292,7 @@ function ModuleInstantiate()
     }
 
     // Step 3
-    let stack = [];
+    let stack = new_List();
 
     // Steps 4-5
     try {
@@ -522,7 +522,7 @@ function ModuleEvaluate()
     }
 
     // Step 3
-    let stack = [];
+    let stack = new_List();
 
     // Steps 4-5
     try {

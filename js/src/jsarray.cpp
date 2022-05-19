@@ -4023,6 +4023,43 @@ js::NewValuePair(JSContext* cx, const Value& val1, const Value& val2, MutableHan
     return true;
 }
 
+bool js::intrinsic_newList(JSContext* cx, unsigned argc, js::Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  MOZ_ASSERT(args.length() == 0);
+
+  size_t length = 0;
+  gc::AllocKind allocKind = GuessArrayGCKind(length);
+  MOZ_ASSERT(CanBeFinalizedInBackground(allocKind, &ArrayObject::class_));
+  allocKind = GetBackgroundAllocKind(allocKind);
+
+  RootedObjectGroup group(cx, ObjectGroup::defaultNewGroup(cx, &ArrayObject::class_,
+                                                           TaggedProto()));
+  if (!group)
+    return false;
+
+  /*
+   * Get a shape with zero fixed slots, regardless of the size class.
+   * See JSObject::createArray.
+   */
+  RootedShape shape(
+      cx, EmptyShape::getInitialShape(cx, &ArrayObject::class_,
+                                       TaggedProto(), gc::AllocKind::OBJECT0));
+  if (!shape) {
+    return false;
+  }
+
+  gc::InitialHeap heap = gc::InitialHeap::DefaultHeap;
+  AutoSetNewObjectMetadata metadata(cx);
+  RootedArrayObject list(cx, ArrayObject::createArray(cx, allocKind, heap,
+                                                      shape, group, length, metadata));
+  if (!list || !AddLengthProperty(cx, list)) {
+    return false;
+  }
+
+  args.rval().setObject(*list);
+  return true;
+}
+
 #ifdef DEBUG
 bool
 js::ArrayInfo(JSContext* cx, unsigned argc, Value* vp)
