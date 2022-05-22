@@ -1318,67 +1318,67 @@ ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
                         aElement,
                         &nsIScriptElement::FireErrorEvent));
       return false;
+  }
+
+  RefPtr<ScriptLoadRequest> request = LookupPreloadRequest(aElement, aScriptKind);
+
+  if (request && NS_FAILED(CheckContentPolicy(mDocument, aElement, request->mURI,
+                                              aTypeAttr, false))) {
+    LOG(("ScriptLoader (%p): content policy check failed for preload", this));
+
+    // Probably plans have changed; even though the preload was allowed seems
+    // like the actual load is not; let's cancel the preload request.
+    request->Cancel();
+    return false;
+  }
+
+  if (request) {
+    // Use the preload request.
+
+    LOG(("ScriptLoadRequest (%p): Using preload request", request.get()));
+
+    // It's possible these attributes changed since we started the preload so
+    // update them here.
+    request->SetScriptMode(aElement->GetScriptDeferred(),
+                           aElement->GetScriptAsync());
+  } else {
+    // No usable preload found.
+
+    SRIMetadata sriMetadata;
+    {
+      nsAutoString integrity;
+      aScriptContent->GetAttr(kNameSpaceID_None,
+                             nsGkAtoms::integrity,
+                             integrity);
+      GetSRIMetadata(integrity, &sriMetadata);
     }
 
-    RefPtr<ScriptLoadRequest> request = LookupPreloadRequest(aElement, aScriptKind);
+    CORSMode ourCORSMode = aElement->GetCORSMode();
+    mozilla::net::ReferrerPolicy ourRefPolicy = mDocument->GetReferrerPolicy();
+    request = CreateLoadRequest(aScriptKind, scriptURI, aElement,
+                                aVersion, ourCORSMode, sriMetadata,
+                                ourRefPolicy);
+    request->mIsInline = false;
+    request->SetScriptMode(aElement->GetScriptDeferred(),
+                           aElement->GetScriptAsync());
+    // keep request->mScriptFromHead to false so we don't treat non preloaded
+    // scripts as blockers for full page load. See bug 792438.
 
-    if (request && NS_FAILED(CheckContentPolicy(mDocument, aElement, request->mURI,
-                                                aTypeAttr, false))) {
-      LOG(("ScriptLoader (%p): content policy check failed for preload", this));
+    LOG(("ScriptLoadRequest (%p): Created request for external script",
+        request.get()));
 
-      // Probably plans have changed; even though the preload was allowed seems
-      // like the actual load is not; let's cancel the preload request.
-      request->Cancel();
+    nsresult rv = StartLoad(request);
+    if (NS_FAILED(rv)) {
+      ReportErrorToConsole(request, rv);
+
+      // Asynchronously report the load failure
+      NS_DispatchToCurrentThread(
+        NewRunnableMethod("nsIScriptElement::FireErrorEvent",
+                          aElement,
+                          &nsIScriptElement::FireErrorEvent));
       return false;
     }
-
-    if (request) {
-      // Use the preload request.
-
-      LOG(("ScriptLoadRequest (%p): Using preload request", request.get()));
-
-      // It's possible these attributes changed since we started the preload so
-      // update them here.
-      request->SetScriptMode(aElement->GetScriptDeferred(),
-                             aElement->GetScriptAsync());
-    } else {
-      // No usable preload found.
-
-      SRIMetadata sriMetadata;
-      {
-        nsAutoString integrity;
-        aScriptContent->GetAttr(kNameSpaceID_None,
-                               nsGkAtoms::integrity,
-                               integrity);
-        GetSRIMetadata(integrity, &sriMetadata);
-      }
-
-      CORSMode ourCORSMode = aElement->GetCORSMode();
-      mozilla::net::ReferrerPolicy ourRefPolicy = mDocument->GetReferrerPolicy();
-      request = CreateLoadRequest(aScriptKind, scriptURI, aElement,
-                                  aVersion, ourCORSMode, sriMetadata,
-                                  ourRefPolicy);
-      request->mIsInline = false;
-      request->SetScriptMode(aElement->GetScriptDeferred(),
-                             aElement->GetScriptAsync());
-      // keep request->mScriptFromHead to false so we don't treat non preloaded
-      // scripts as blockers for full page load. See bug 792438.
-
-      LOG(("ScriptLoadRequest (%p): Created request for external script",
-          request.get()));
-
-      nsresult rv = StartLoad(request);
-      if (NS_FAILED(rv)) {
-        ReportErrorToConsole(request, rv);
-
-        // Asynchronously report the load failure
-        NS_DispatchToCurrentThread(
-          NewRunnableMethod("nsIScriptElement::FireErrorEvent",
-                            aElement,
-                            &nsIScriptElement::FireErrorEvent));
-        return false;
-      }
-    }
+  }
 
   // We should still be in loading stage of script unless we're loading a
   // module.
