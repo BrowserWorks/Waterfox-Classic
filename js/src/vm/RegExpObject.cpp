@@ -955,13 +955,13 @@ RegExpCompartment::createMatchResultTemplateObject(JSContext* cx)
     // Make sure that the properties are in the right slots.
 #ifdef DEBUG
   Shape* groupsShape = templateObject->lastProperty();
-  MOZ_ASSERT(groupsShape->slot() == 0 &&
+  MOZ_ASSERT(groupsShape->slot() == MatchResultObjectGroupsSlot &&
              groupsShape->propidRef() == NameToId(cx->names().groups));
   Shape* inputShape = groupsShape->previous().get();
-  MOZ_ASSERT(inputShape->slot() == 1 &&
+  MOZ_ASSERT(inputShape->slot() == MatchResultObjectInputSlot &&
              inputShape->propidRef() == NameToId(cx->names().input));
   Shape* indexShape = inputShape->previous().get();
-  MOZ_ASSERT(indexShape->slot() == 2 &&
+  MOZ_ASSERT(indexShape->slot() == MatchResultObjectIndexSlot &&
              indexShape->propidRef() == NameToId(cx->names().index));
 #endif
 

@@ -143,26 +143,29 @@ js::CreateRegExpMatchResult(JSContext* cx,
 
     /* Step 20 (reordered).
      * Set the |index| property. (TemplateObject positions it in slot 0) */
-    arr->setSlot(0, Int32Value(matches[0].start));
+    arr->setSlot(RegExpCompartment::MatchResultObjectIndexSlot,
+                 Int32Value(matches[0].start));
 
     /* Step 21 (reordered).
      * Set the |input| property. (TemplateObject positions it in slot 1) */
-    arr->setSlot(1, StringValue(input));
+    arr->setSlot(RegExpCompartment::MatchResultObjectInputSlot,
+                 StringValue(input));
 
     // Steps 25-26 (reordered)
     // Set the |groups| property.
-    arr->setSlot(2, groups ? ObjectValue(*groups) : UndefinedValue());
+    arr->setSlot(RegExpCompartment::MatchResultObjectGroupsSlot,
+                 groups ? ObjectValue(*groups) : UndefinedValue());
 
 #ifdef DEBUG
     RootedValue test(cx);
     RootedId id(cx, NameToId(cx->names().index));
     if (!NativeGetProperty(cx, arr, id, &test))
         return false;
-    MOZ_ASSERT(test == arr->getSlot(0));
+    MOZ_ASSERT(test == arr->getSlot(RegExpCompartment::MatchResultObjectIndexSlot));
     id = NameToId(cx->names().input);
     if (!NativeGetProperty(cx, arr, id, &test))
         return false;
-    MOZ_ASSERT(test == arr->getSlot(1));
+    MOZ_ASSERT(test == arr->getSlot(RegExpCompartment::MatchResultObjectInputSlot));
 #endif
 
     // Step 28.

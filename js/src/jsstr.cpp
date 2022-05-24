@@ -3593,10 +3593,8 @@ static const JSFunctionSpec string_methods[] = {
     JS_FN("startsWith",        str_startsWith,        1,0),
     JS_FN("endsWith",          str_endsWith,          1,0),
     JS_FN("trim",              str_trim,              0,0),
-    JS_FN("trimLeft",          str_trimStart,         0,0),
-	JS_FN("trimStart",         str_trimStart,         0,0),
-    JS_FN("trimRight",         str_trimEnd,           0,0),
-	JS_FN("trimEnd",           str_trimEnd,           0,0),
+    JS_FN("trimStart",         str_trimStart,         0,0),
+    JS_FN("trimEnd",           str_trimEnd,           0,0),
 #if EXPOSE_INTL_API
     JS_SELF_HOSTED_FN("toLocaleLowerCase", "String_toLocaleLowerCase", 0,0),
     JS_SELF_HOSTED_FN("toLocaleUpperCase", "String_toLocaleUpperCase", 0,0),
@@ -3904,9 +3902,7 @@ static const JSFunctionSpec string_static_methods[] = {
     JS_SELF_HOSTED_FN("startsWith",      "String_static_startsWith",    2,0),
     JS_SELF_HOSTED_FN("endsWith",        "String_static_endsWith",      2,0),
     JS_SELF_HOSTED_FN("trim",            "String_static_trim",          1,0),
-    JS_SELF_HOSTED_FN("trimLeft",        "String_static_trimStart",     1,0),
     JS_SELF_HOSTED_FN("trimStart",       "String_static_trimStart",     1,0),
-    JS_SELF_HOSTED_FN("trimRight",       "String_static_trimEnd",       1,0),
     JS_SELF_HOSTED_FN("trimEnd",         "String_static_trimEnd",       1,0),
     JS_SELF_HOSTED_FN("toLocaleLowerCase","String_static_toLocaleLowerCase",1,0),
     JS_SELF_HOSTED_FN("toLocaleUpperCase","String_static_toLocaleUpperCase",1,0),
@@ -3955,6 +3951,25 @@ js::InitStringClass(JSContext* cx, HandleObject obj)
 
     if (!DefinePropertiesAndFunctions(cx, proto, nullptr, string_methods) ||
         !DefinePropertiesAndFunctions(cx, ctor, nullptr, string_static_methods))
+    {
+        return nullptr;
+    }
+
+    // Create "trimLeft" as an alias for "trimStart".
+    RootedValue trimFn(cx);
+    RootedId trimId(cx, NameToId(cx->names().trimStart));
+    RootedId trimAliasId(cx, NameToId(cx->names().trimLeft));
+    if (!NativeGetProperty(cx, protoObj, trimId, &trimFn) ||
+        !NativeDefineProperty(cx, protoObj, trimAliasId, trimFn, nullptr, nullptr, 0))
+    {
+        return nullptr;
+    }
+
+    // Create "trimRight" as an alias for "trimEnd".
+    trimId = NameToId(cx->names().trimEnd);
+    trimAliasId = NameToId(cx->names().trimRight);
+    if (!NativeGetProperty(cx, protoObj, trimId, &trimFn) ||
+        !NativeDefineProperty(cx, protoObj, trimAliasId, trimFn, nullptr, nullptr, 0))
     {
         return nullptr;
     }
