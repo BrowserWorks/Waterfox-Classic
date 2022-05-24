@@ -94,7 +94,7 @@ var NetworkManager = (function NetworkManagerClosure() {
         var rangeStr = args.begin + "-" + (args.end - 1);
         xhr.setRequestHeader("Range", "bytes=" + rangeStr);
         pendingRequest.expectedStatus = 206;
-        xhr.channel.QueryInterface(Ci.nsIHttpChannel).redirectionLimit = 0;
+        xhr.channel.QueryInterface(Components.interfaces.nsIHttpChannel).redirectionLimit = 0;
       } else {
         pendingRequest.expectedStatus = 200;
       }
