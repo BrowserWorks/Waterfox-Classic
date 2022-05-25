@@ -455,10 +455,10 @@ ContentPrefService.prototype = {
   },
 
   // A hash of arrays of observers, indexed by setting name.
-  _observers: {},
+  _observers: new Map(),
 
   // An array of generic observers, which observe all settings.
-  _genericObservers: [],
+  _genericObservers: new Set(),
 
   addObserver: function ContentPrefService_addObserver(aName, aObserver) {
     warnDeprecated();
@@ -466,16 +466,18 @@ ContentPrefService.prototype = {
   },
 
   _addObserver: function ContentPrefService__addObserver(aName, aObserver) {
-    var observers;
+    let observers;
     if (aName) {
-      if (!this._observers[aName])
-        this._observers[aName] = [];
-      observers = this._observers[aName];
-    } else
+      observers = this._observers.get(aName);
+      if (!observers) {
+        observers = new Set();
+        this._observers.set(aName, observers);
+      }
+    } else {
       observers = this._genericObservers;
+    }
 
-    if (observers.indexOf(aObserver) == -1)
-      observers.push(aObserver);
+    observers.add(aObserver);
   },
 
   removeObserver: function ContentPrefService_removeObserver(aName, aObserver) {
@@ -484,16 +486,16 @@ ContentPrefService.prototype = {
   },
 
   _removeObserver: function ContentPrefService__removeObserver(aName, aObserver) {
-    var observers;
+    let observers;
     if (aName) {
-      if (!this._observers[aName])
+      observers = this._observers.get(aName);
+      if (!observers) {
         return;
-      observers = this._observers[aName];
-    } else
+      }
+    } else {
       observers = this._genericObservers;
-
-    if (observers.indexOf(aObserver) != -1)
-      observers.splice(observers.indexOf(aObserver), 1);
+    }
+    observers.delete(aObserver);
   },
 
   /**
@@ -504,13 +506,14 @@ ContentPrefService.prototype = {
    * being initialized first (like the content prefs sidebar).
    */
   _getObservers: function ContentPrefService__getObservers(aName) {
-    var observers = [];
-
-    if (aName && this._observers[aName])
-      observers = observers.concat(this._observers[aName]);
-    observers = observers.concat(this._genericObservers);
-
-    return observers;
+    let genericObserverList = Array.from(this._genericObservers);
+    if (aName) {
+      let observersForName = this._observers.get(aName);
+      if (observersForName) {
+        return Array.from(observersForName).concat(genericObserverList);
+      }
+    }
+    return genericObserverList;
   },
 
   /**
