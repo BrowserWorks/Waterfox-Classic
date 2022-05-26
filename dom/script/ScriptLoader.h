@@ -371,11 +371,13 @@ public:
 
   bool ProcessExternalScript(nsIScriptElement* aElement,
                              ScriptKind aScriptKind,
+                             uint32_t aVersion,
                              nsAutoString aTypeAttr,
                              nsIContent* aScriptContent);
 
   bool ProcessInlineScript(nsIScriptElement* aElement,
-                           ScriptKind aScriptKind);
+                           ScriptKind aScriptKind,
+                           uint32_t aVersion);
 
   ScriptLoadRequest* LookupPreloadRequest(nsIScriptElement* aElement,
                                           ScriptKind aScriptKind);

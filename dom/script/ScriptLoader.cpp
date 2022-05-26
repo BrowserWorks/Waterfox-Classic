@@ -1291,20 +1291,20 @@ ScriptLoader::ProcessScriptElement(nsIScriptElement* aElement)
 
   // Step 15. and later in the HTML5 spec
   if (aElement->GetScriptExternal()) {
-    return ProcessExternalScript(aElement, scriptKind, type, scriptContent);
+    return ProcessExternalScript(aElement, scriptKind, version, type, scriptContent);
   }
 
-  return ProcessInlineScript(aElement, scriptKind);
+  return ProcessInlineScript(aElement, scriptKind, version);
 }
 
 bool
 ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
                                     ScriptKind aScriptKind,
+                                    uint32_t aVersion,
                                     nsAutoString aTypeAttr,
                                     nsIContent* aScriptContent)
 {
   nsCOMPtr<nsIURI> scriptURI = aElement->GetScriptURI();
-  JSVersion version = JSVERSION_DEFAULT;
   if (!scriptURI) {
     // Asynchronously report the failure to create a URI object
     NS_DispatchToCurrentThread(
@@ -1346,7 +1346,7 @@ ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
       CORSMode ourCORSMode = aElement->GetCORSMode();
       mozilla::net::ReferrerPolicy ourRefPolicy = mDocument->GetReferrerPolicy();
       request = CreateLoadRequest(aScriptKind, scriptURI, aElement,
-                                  version, ourCORSMode, sriMetadata,
+                                  aVersion, ourCORSMode, sriMetadata,
                                   ourRefPolicy);
       request->mIsInline = false;
       request->SetScriptMode(aElement->GetScriptDeferred(),
@@ -1371,7 +1371,7 @@ ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
   NS_ASSERTION(!request->InCompilingStage() || request->IsModuleRequest(),
                  "Request should not yet be in compiling stage.");
 
-    request->mJSVersion = version;
+    request->mJSVersion = aVersion;
 
     if (request->IsAsyncScript()) {
       AddAsyncRequest(request);
@@ -1459,7 +1459,8 @@ ScriptLoader::ProcessExternalScript(nsIScriptElement* aElement,
 
 bool
 ScriptLoader::ProcessInlineScript(nsIScriptElement* aElement,
-                                  ScriptKind aScriptKind)
+                                  ScriptKind aScriptKind,
+                                  uint32_t aVersion)
 {
   // Is this document sandboxed without 'allow-scripts'?
   if (mDocument->HasScriptsBlockedBySandbox()) {
@@ -1477,14 +1478,12 @@ ScriptLoader::ProcessInlineScript(nsIScriptElement* aElement,
     corsMode = aElement->GetCORSMode();
   }
 
-  JSVersion version = JSVERSION_DEFAULT;
-
   RefPtr<ScriptLoadRequest> request =
     CreateLoadRequest(aScriptKind, mDocument->GetDocumentURI(), aElement,
-                      version, corsMode,
+                      aVersion, corsMode,
                       SRIMetadata(), // SRI doesn't apply
                       mDocument->GetReferrerPolicy());
-  request->mJSVersion = version;
+  request->mJSVersion = aVersion;
   request->mIsInline = true;
   request->mLineNo = aElement->GetScriptLineNumber();
   request->mProgress = ScriptLoadRequest::Progress::eLoading_Source;
