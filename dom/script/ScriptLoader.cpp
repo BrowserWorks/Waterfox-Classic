@@ -764,9 +764,6 @@ HostResolveImportedModule(JSContext* aCx, JS::Handle<JSObject*> aModule,
   if (!string.init(aCx, aSpecifier)) {
     return nullptr;
   }
-  if (!aModule || !aCx) {
-    return nullptr;
-  }
 
   nsCOMPtr<nsIURI> uri = ResolveModuleSpecifier(script, string);
 
@@ -779,7 +776,15 @@ HostResolveImportedModule(JSContext* aCx, JS::Handle<JSObject*> aModule,
   ModuleScript* ms = script->Loader()->GetFetchedModule(uri);
   MOZ_ASSERT(ms, "Resolved module not found in module map");
   
-  if (!ms) {
+  if (MOZ_UNLIKELY(!ms)) {
+    // XXX: This shouldn't really happen (compare the debug assert above), but
+    // it turns out that there is at least one edge case involving modules
+    // loaded via blob: URIs.
+
+    // The proper fix would possibly involve cancelling all pending load
+    // requests as soon as our Destroy() method is called (compare the solution
+    // implemented for bugs 1666724 and 1678774), but as a stopgap we just catch
+    // that case here in order to stop release builds from crashing.
     return nullptr;
   }
 
