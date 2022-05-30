@@ -78,6 +78,17 @@ class GCVector
 
     template<typename U> bool append(U&& item) { return vector.append(mozilla::Forward<U>(item)); }
 
+    void erase(T* it) { vector.erase(it); }
+    void erase(T* begin, T* end) { vector.erase(begin, end); }
+    template <typename Pred>
+    void eraseIf(Pred pred) {
+        vector.eraseIf(pred);
+    }
+    template <typename U>
+    void eraseIfEqual(const U& u) {
+        vector.eraseIfEqual(u);
+    }
+
     template<typename... Args>
     MOZ_MUST_USE bool
     emplaceBack(Args&&... args) {
@@ -249,6 +260,14 @@ class MutableWrappedPtrOperations<JS::GCVector<T, Capacity, AllocPolicy>, Wrappe
     }
     void erase(T* aT) { vec().erase(aT); }
     void erase(T* aBegin, T* aEnd) { vec().erase(aBegin, aEnd); }
+    template <typename Pred>
+    void eraseIf(Pred pred) {
+        vec().eraseIf(pred);
+    }
+    template <typename U>
+    void eraseIfEqual(const U& u) {
+        vec().eraseIfEqual(u);
+    }
 };
 
 } // namespace js
