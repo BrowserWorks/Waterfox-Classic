@@ -292,8 +292,8 @@ function MergeSort(array, len, comparefn) {
     }
 
     // We do all of our allocating up front
-    var lBuffer = new List();
-    var rBuffer = new List();
+    var lBuffer = new_List();
+    var rBuffer = new_List();
 
     var mid, end;
     for (var windowSize = 1; windowSize < denseLen; windowSize = 2 * windowSize) {
@@ -358,7 +358,7 @@ function QuickSort(array, len, comparefn) {
     assert(0 <= len && len <= 0x7FFFFFFF, "length is a positive int32 value");
 
     // Managing the stack ourselves seems to provide a small performance boost.
-    var stack = new List();
+    var stack = new_List();
     var top = 0;
 
     var start = 0;

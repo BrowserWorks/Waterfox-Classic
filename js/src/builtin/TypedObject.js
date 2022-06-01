@@ -1095,7 +1095,7 @@ function BuildTypedSeqImpl(arrayType, len, depth, func) {
   // Create a zeroed instance with no data
   var result = new arrayType();
 
-  var indices = new List();
+  var indices = new_List();
   indices.length = depth;
   for (var i = 0; i < depth; i++) {
     indices[i] = 0;
@@ -1128,7 +1128,7 @@ function ComputeIterationSpace(arrayType, depth, len) {
   assert(IsObject(arrayType) && ObjectIsTypeDescr(arrayType), "ComputeIterationSpace called on non-type-object");
   assert(TypeDescrIsArrayType(arrayType), "ComputeIterationSpace called on non-array-type");
   assert(depth > 0, "ComputeIterationSpace called on non-positive depth");
-  var iterationSpace = new List();
+  var iterationSpace = new_List();
   iterationSpace.length = depth;
   iterationSpace[0] = len;
   var totalLength = len;
@@ -1299,7 +1299,7 @@ function MapTypedSeqImpl(inArray, depth, outputType, func) {
   function DoMapTypedSeqDepthN() {
     // Simulate Uint32Array(depth) with a dumber (and more accessible)
     // datastructure.
-    var indices = new List();
+    var indices = new_List();
     for (var i = 0; i < depth; i++)
         callFunction(std_Array_push, indices, 0);
 

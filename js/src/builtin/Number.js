@@ -5,7 +5,7 @@
 /*global intl_NumberFormat: false, */
 
 
-var numberFormatCache = new Record();
+var numberFormatCache = new_Record();
 
 
 /**

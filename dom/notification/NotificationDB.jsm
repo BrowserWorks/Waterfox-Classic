@@ -47,8 +47,8 @@ var NotificationDB = {
       return;
     }
 
-    this.notifications = {};
-    this.byTag = {};
+    this.notifications = Object.create(null);
+    this.byTag = Object.create(null);
     this.loaded = false;
 
     this.tasks = []; // read/write operation queue
@@ -80,22 +80,23 @@ var NotificationDB = {
   },
 
   filterNonAppNotifications: function(notifications) {
+    let result = Object.create(null);
     for (let origin in notifications) {
+      result[origin] = Object.create(null);
       let persistentNotificationCount = 0;
       for (let id in notifications[origin]) {
         if (notifications[origin][id].serviceWorkerRegistrationScope) {
           persistentNotificationCount++;
-        } else {
-          delete notifications[origin][id];
+          result[origin][id] = notifications[origin][id];
         }
       }
       if (persistentNotificationCount == 0) {
         if (DEBUG) debug("Origin " + origin + " is not linked to an app manifest, deleting.");
-        delete notifications[origin];
+        delete result[origin];
       }
     }
 
-    return notifications;
+    return result;
   },
 
   // Attempt to read notification file, if it's not there we will create it.
@@ -112,7 +113,7 @@ var NotificationDB = {
         // populate the list of notifications by tag
         if (this.notifications) {
           for (var origin in this.notifications) {
-            this.byTag[origin] = {};
+            this.byTag[origin] = Object.create(null);
             for (var id in this.notifications[origin]) {
               var curNotification = this.notifications[origin][id];
               if (curNotification.tag) {
@@ -314,8 +315,8 @@ var NotificationDB = {
     var origin = data.origin;
     var notification = data.notification;
     if (!this.notifications[origin]) {
-      this.notifications[origin] = {};
-      this.byTag[origin] = {};
+      this.notifications[origin] = Object.create(null);
+      this.byTag[origin] = Object.create(null);
     }
 
     // We might have existing notification with this tag,

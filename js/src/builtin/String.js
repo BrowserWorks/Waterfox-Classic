@@ -720,7 +720,7 @@ function StringIteratorNext() {
     return result;
 }
 
-var collatorCache = new Record();
+var collatorCache = new_Record();
 
 /**
  * Compare this String against that String, using the locale and collation

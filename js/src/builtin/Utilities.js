@@ -59,23 +59,15 @@ var std_WeakMap = WeakMap;
 var std_StopIteration = StopIteration;
 
 
-/********** List specification type **********/
-
-/* Spec: ECMAScript Language Specification, 5.1 edition, 8.8 */
-function List() {
-    this.length = 0;
-}
-MakeConstructible(List, {__proto__: null});
+/********** Specification types **********/
 
 
-/********** Record specification type **********/
-
-
-/* Spec: ECMAScript Internationalization API Specification, draft, 5 */
-function Record() {
+// A "Record" is an internal type used in the ECMAScript spec to define a struct
+// made up of key / values. It is never exposed to user script, but we use a
+// simple Object (with null prototype) as a convenient implementation.
+function new_Record() {
     return std_Object_create(null);
 }
-MakeConstructible(Record, {});
 
 
 /********** Abstract operations defined in ECMAScript Language Specification **********/
