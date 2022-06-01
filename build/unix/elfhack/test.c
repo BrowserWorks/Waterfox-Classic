@@ -129,11 +129,19 @@ int print_status() {
 __thread int foo;
 __thread long long int bar[512];
 
+/* We need a .bss that can hold at least 2 pointers. The static in
+ * end_test() plus this variable should do. */
+size_t dummy;
+
 void end_test() {
     static size_t count = 0;
     /* Only exit when both constructors have been called */
-    if (++count == 2)
+    if (++count == 2) {
         ret = 0;
+        // Avoid the dummy variable being stripped out at link time because
+        // it's unused.
+        dummy = 1;
+    }
 }
 
 void test() {

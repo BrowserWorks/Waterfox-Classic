@@ -161,6 +161,15 @@ CONFIGS = defaultdict(lambda: {
             'MOZ_APP_NAME': 'my_app',
         },
     },
+    'prog-lib-c-only': {
+        'defines': {},
+        'non_global_defines': [],
+        'substs': {
+            'COMPILE_ENVIRONMENT': '1',
+            'LIB_SUFFIX': '.a',
+            'BIN_SUFFIX': '',
+        },
+    },
     'gn-processor': {
         'defines': {},
         'non_global_defines': [],
@@ -179,7 +188,7 @@ CONFIGS = defaultdict(lambda: {
             'OS_TARGET': 'Darwin',
         },
     },
-    'prog-lib-c-only': {
+    'ipdl_sources': {
         'defines': {},
         'non_global_defines': [],
         'substs': {
@@ -187,7 +196,27 @@ CONFIGS = defaultdict(lambda: {
             'LIB_SUFFIX': '.a',
             'BIN_SUFFIX': '',
         },
-    }
+    },
+    'program-paths': {
+        'defines': {},
+        'non_global_defines': [],
+        'substs': {
+            'COMPILE_ENVIRONMENT': '1',
+            'BIN_SUFFIX': '.prog',
+        },
+    },
+    'linkage': {
+        'defines': {},
+        'non_global_defines': [],
+        'substs': {
+            'COMPILE_ENVIRONMENT': '1',
+            'LIB_SUFFIX': 'a',
+            'BIN_SUFFIX': '.exe',
+            'DLL_SUFFIX': '.so',
+            'OBJ_SUFFIX': 'o',
+            'EXPAND_LIBS_LIST_STYLE': 'list',
+        },
+    },
 })
 
 

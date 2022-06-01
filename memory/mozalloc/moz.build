@@ -12,9 +12,9 @@ EXPORTS.mozilla += [
 ]
 
 if CONFIG['WRAP_STL_INCLUDES']:
-    if CONFIG['GNU_CXX']:
+    if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
         EXPORTS.mozilla += ['throw_gcc.h']
-    elif CONFIG['_MSC_VER']:
+    elif CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
         DEFINES['_HAS_EXCEPTIONS'] = 0
         SOURCES += [
             'msvc_raise_wrappers.cpp',
@@ -40,9 +40,6 @@ DEFINES['_GNU_SOURCE'] = True
 DisableStlWrapping()
 
 DEFINES['IMPL_MFBT'] = True
-
-if CONFIG['_MSC_VER']:
-    DIRS += ['staticruntime']
 
 LOCAL_INCLUDES += [
     '!/xpcom',

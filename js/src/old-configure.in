@@ -63,6 +63,8 @@ dnl ========================================================
 USE_PTHREADS=
 _PTHREAD_LDFLAGS=""
 
+LDFLAGS="$LDFLAGS $LINKER_LDFLAGS"
+
 MOZ_DEFAULT_COMPILER
 
 if test -z "$JS_STANDALONE"; then
@@ -144,7 +146,7 @@ case "$target" in
         _WIN32_MSVC=1
 
         # Make sure compilers are valid
-        CFLAGS="$CFLAGS -TC -nologo"
+        CFLAGS="$CFLAGS -nologo"
         CXXFLAGS="$CXXFLAGS -TP -nologo"
         if test -z "$CLANG_CL"; then
             CPPFLAGS="$CPPFLAGS -utf-8"
@@ -199,12 +201,18 @@ case "$target" in
         AC_SUBST(MSVC_C_RUNTIME_DLL)
         AC_SUBST(MSVC_CXX_RUNTIME_DLL)
 
-        # Check linker version
-        _LD_FULL_VERSION=`"${LINK}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
-        _LD_MAJOR_VERSION=`echo ${_LD_FULL_VERSION} | $AWK -F\. '{ print $1 }'`
-        if test "$_LD_MAJOR_VERSION" != "$_CC_SUITE"; then
-            AC_MSG_ERROR([The linker major version, $_LD_FULL_VERSION,  does not match the compiler suite version, $_CC_SUITE.])
-        fi
+        # Check linker version, except in lld builds
+        case "$LINKER" in
+        *lld*)
+            ;;
+        *)
+            _LD_FULL_VERSION=`"${LINKER}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
+            _LD_MAJOR_VERSION=`echo ${_LD_FULL_VERSION} | $AWK -F\. '{ print $1 }'`
+            if test "$_LD_MAJOR_VERSION" != "$_CC_SUITE"; then
+                AC_MSG_ERROR([The linker major version, $_LD_FULL_VERSION,  does not match the compiler suite version, $_CC_SUITE.])
+            fi
+            ;;
+        esac
 
         INCREMENTAL_LINKER=1
 
@@ -446,7 +454,7 @@ if test "$GNU_CC"; then
         # Some tools like ASan use a runtime library that is only
         # linked against executables, so we must allow undefined
         # symbols for shared objects in some cases.
-        if test -z "$MOZ_NO_WLZDEFS"; then
+        if test -z "$MOZ_ASAN$MOZ_MSAN$MOZ_UBSAN$MOZ_TSAN"; then
             # Don't allow undefined symbols in libraries
             DSO_LDOPTS="$DSO_LDOPTS -Wl,-z,defs"
         fi
@@ -507,7 +515,7 @@ case "$host" in
     if test -n "$_WIN32_MSVC"; then
         HOST_AR=lib
         HOST_AR_FLAGS='-NOLOGO -OUT:$@'
-        HOST_CFLAGS="$HOST_CFLAGS -TC -nologo"
+        HOST_CFLAGS="$HOST_CFLAGS -nologo"
         HOST_RANLIB='echo ranlib'
     else
         HOST_CFLAGS="$HOST_CFLAGS -mwindows"
@@ -664,15 +672,23 @@ case "$target" in
         if test "$AS_BIN"; then
             AS="$(basename "$AS_BIN")"
         fi
-        AR='lib'
-        AR_FLAGS='-NOLOGO -OUT:$@'
+        case "$LINKER" in
+        *lld*)
+            AR='llvm-lib'
+            AR_FLAGS='-llvmlibthin -out:$@'
+            ;;
+        *)
+            AR='lib'
+            AR_FLAGS='-NOLOGO -OUT:$@'
+            ;;
+        esac
         AR_EXTRACT=
         RANLIB='echo not_ranlib'
         STRIP='echo not_strip'
         PKG_SKIP_STRIP=1
-        MKSHLIB='$(LINK) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
-        MKCSHLIB='$(LINK) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
-        WIN32_SUBSYSTEM_VERSION=5.02
+        MKSHLIB='$(LINKER) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
+        MKCSHLIB='$(LINKER) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
+        WIN32_SUBSYSTEM_VERSION=6.01
         WIN32_CONSOLE_EXE_LDFLAGS=-SUBSYSTEM:CONSOLE,$WIN32_SUBSYSTEM_VERSION
         WIN32_GUI_EXE_LDFLAGS=-SUBSYSTEM:WINDOWS,$WIN32_SUBSYSTEM_VERSION
         DSO_LDOPTS=-SUBSYSTEM:WINDOWS,$WIN32_SUBSYSTEM_VERSION
@@ -779,9 +795,6 @@ case "$target" in
         MOZ_OPTIMIZE_FLAGS="-O2"
         MOZ_FIX_LINK_PATHS=
         LDFLAGS="$LDFLAGS -LARGEADDRESSAWARE -NXCOMPAT"
-        if test -z "$DEVELOPER_OPTIONS"; then
-            LDFLAGS="$LDFLAGS -RELEASE"
-        fi
         LDFLAGS="$LDFLAGS -DYNAMICBASE"
         RCFLAGS="-nologo"
     fi
@@ -830,7 +843,7 @@ case "$target" in
     if $CC -E - -dM </dev/null | grep __ELF__ >/dev/null; then
         DSO_PIC_CFLAGS='-fPIC -DPIC'
         DSO_LDOPTS='-shared'
-	BIN_FLAGS='-Wl,--export-dynamic'
+        MOZ_PROGRAM_LDFLAGS="$MOZ_PROGRAM_LDFLAGS -Wl,--export-dynamic"
     else
     	DSO_PIC_CFLAGS='-fPIC -DPIC'
     	DSO_LDOPTS='-shared'
@@ -1944,6 +1957,7 @@ AC_SUBST(AR)
 AC_SUBST(AR_FLAGS)
 AC_SUBST(AR_EXTRACT)
 AC_SUBST(AS)
+AC_SUBST(NM)
 AC_SUBST_LIST(ASFLAGS)
 AC_SUBST(AS_DASH_C_FLAG)
 AC_SUBST(RC)
@@ -1951,7 +1965,6 @@ AC_SUBST(RCFLAGS)
 AC_SUBST(WINDRES)
 AC_SUBST(IMPLIB)
 AC_SUBST(FILTER)
-AC_SUBST(BIN_FLAGS)
 AC_SUBST_LIST(MOZ_DEBUG_LDFLAGS)
 AC_SUBST(WARNINGS_AS_ERRORS)
 AC_SUBST(LIBICONV)
@@ -2036,7 +2049,6 @@ AC_SUBST(HOST_BIN_SUFFIX)
 
 AC_SUBST(TARGET_XPCOM_ABI)
 
-AC_SUBST(WRAP_LDFLAGS)
 AC_SUBST(MKSHLIB)
 AC_SUBST(MKCSHLIB)
 AC_SUBST_LIST(DSO_CFLAGS)
@@ -2058,18 +2070,6 @@ if test "$MOZ_DEBUG"; then
     AC_DEFINE(MOZ_REFLOW_PERF)
     AC_DEFINE(MOZ_REFLOW_PERF_DSP)
 fi
-
-dnl ========================================================
-dnl Determine options to use for running the preprocessor.
-dnl ========================================================
-
-if test -z "$GNU_CC" -a "$OS_ARCH" = "WINNT"; then
-    PREPROCESS_OPTION="-P -Fi"
-else
-    PREPROCESS_OPTION="-E -o "
-fi
-
-AC_SUBST(PREPROCESS_OPTION)
 
 dnl ========================================================
 dnl JavaScript shell

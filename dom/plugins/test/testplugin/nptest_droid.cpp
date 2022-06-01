@@ -35,7 +35,6 @@
 
 struct _PlatformData {
 };
- using namespace std;
 
 bool
 pluginSupportsWindowMode()
@@ -100,6 +99,7 @@ int32_t pluginGetClipRegionRectEdge(InstanceData* instanceData,
   return NPTEST_INT32_ERROR;
 }
 
-void pluginDoInternalConsistencyCheck(InstanceData* instanceData, string& error)
+void pluginDoInternalConsistencyCheck(InstanceData* instanceData,
+                                      std::string& error)
 {
 }

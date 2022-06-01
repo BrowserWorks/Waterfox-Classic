@@ -268,7 +268,15 @@ ARCHIVE_FILES = {
             'base': 'build/pgo/certs',
             'pattern': '**',
             'dest': 'certs',
-        }
+        },
+        {
+            'source': buildconfig.topobjdir,
+            'base': 'build/unix/elfhack',
+            'patterns': [
+                'elfhack%s' % buildconfig.substs['BIN_SUFFIX'],
+            ],
+            'dest': 'bin',
+        },
     ],
     'cppunittest': [
         {
@@ -369,6 +377,12 @@ ARCHIVE_FILES = {
             'source': buildconfig.topsrcdir,
             'base': 'testing',
             'pattern': 'talos/**',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'third_party/webkit/PerformanceTests',
+            'pattern': '**',
+            'dest': 'talos/talos/tests/webkit/PerformanceTests/',
         },
     ],
     'awsy': [

@@ -9,8 +9,6 @@ with Files('*'):
 
 DIRS += ['blink']
 
-TEST_DIRS += ['gtest']
-
 MOCHITEST_MANIFESTS += [
     'test/blink/mochitest.ini',
     'test/mochitest.ini',
@@ -133,5 +131,5 @@ LOCAL_INCLUDES += [
     '..'
 ]
 
-if CONFIG['GNU_CXX']:
+if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     CXXFLAGS += ['-Wno-error=shadow']

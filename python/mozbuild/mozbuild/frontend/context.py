@@ -317,18 +317,24 @@ class BaseCompileFlags(ContextDerivedValue, dict):
 class HostCompileFlags(BaseCompileFlags):
     def __init__(self, context):
         self._context = context
+        main_src_dir = mozpath.dirname(context.main_path)
 
         self.flag_variables = (
             ('HOST_CXXFLAGS', context.config.substs.get('HOST_CXXFLAGS'),
-             ('HOST_CXXFLAGS',)),
+             ('HOST_CXXFLAGS', 'HOST_CXX_LDFLAGS')),
             ('HOST_CFLAGS', context.config.substs.get('HOST_CFLAGS'),
-             ('HOST_CFLAGS',)),
+             ('HOST_CFLAGS', 'HOST_C_LDFLAGS')),
             ('HOST_OPTIMIZE', self._optimize_flags(),
-             ('HOST_CFLAGS', 'HOST_CXXFLAGS')),
-            ('RTL', None, ('HOST_CFLAGS',)),
+             ('HOST_CFLAGS', 'HOST_CXXFLAGS', 'HOST_C_LDFLAGS', 'HOST_CXX_LDFLAGS')),
+            ('RTL', None, ('HOST_CFLAGS', 'HOST_C_LDFLAGS')),
             ('HOST_DEFINES', None, ('HOST_CFLAGS', 'HOST_CXXFLAGS')),
-            ('MOZBUILD_HOST_CFLAGS', [], ('HOST_CFLAGS',)),
-            ('MOZBUILD_HOST_CXXFLAGS', [], ('HOST_CXXFLAGS',)),
+            ('MOZBUILD_HOST_CFLAGS', [], ('HOST_CFLAGS', 'HOST_C_LDFLAGS')),
+            ('MOZBUILD_HOST_CXXFLAGS', [], ('HOST_CXXFLAGS', 'HOST_CXX_LDFLAGS')),
+            ('BASE_INCLUDES', ['-I%s' % main_src_dir, '-I%s' % context.objdir],
+             ('HOST_CFLAGS', 'HOST_CXXFLAGS')),
+            ('LOCAL_INCLUDES', None, ('HOST_CFLAGS', 'HOST_CXXFLAGS')),
+            ('EXTRA_INCLUDES', ['-I%s/dist/include' % context.config.topobjdir],
+             ('HOST_CFLAGS', 'HOST_CXXFLAGS')),
         )
         BaseCompileFlags.__init__(self, context)
 
@@ -345,9 +351,12 @@ class AsmFlags(BaseCompileFlags):
     def __init__(self, context):
         self._context = context
         self.flag_variables = (
-            ('OS', context.config.substs.get('ASFLAGS'), ('ASFLAGS',)),
-            ('DEBUG', self._debug_flags(), ('ASFLAGS',)),
-            ('MOZBUILD', None, ('ASFLAGS',)),
+            ('DEFINES', None, ('SFLAGS',)),
+            ('LIBRARY_DEFINES', None, ('SFLAGS',)),
+            ('OS', context.config.substs.get('ASFLAGS'), ('ASFLAGS', 'SFLAGS')),
+            ('DEBUG', self._debug_flags(), ('ASFLAGS', 'SFLAGS')),
+            ('LOCAL_INCLUDES', None, ('SFLAGS',)),
+            ('MOZBUILD', None, ('ASFLAGS', 'SFLAGS')),
         )
         BaseCompileFlags.__init__(self, context)
 
@@ -378,8 +387,6 @@ class LinkFlags(BaseCompileFlags):
 
         self.flag_variables = (
             ('OS', self._os_ldflags(), ('LDFLAGS',)),
-            ('LINKER', context.config.substs.get('LINKER_LDFLAGS'),
-             ('LDFLAGS',)),
             ('DEFFILE', None, ('LDFLAGS',)),
             ('MOZBUILD', None, ('LDFLAGS',)),
             ('FIX_LINK_PATHS', context.config.substs.get('MOZ_FIX_LINK_PATHS'),
@@ -447,6 +454,7 @@ class CompileFlags(BaseCompileFlags):
             ('DSO_PIC', context.config.substs.get('DSO_PIC_CFLAGS'),
              ('CXXFLAGS', 'CFLAGS')),
             ('RTL', None, ('CXXFLAGS', 'CFLAGS')),
+            ('PROFILE_GEN_DYN_CFLAGS', None, ('PROFILE_GEN_DYN_CFLAGS',)),
             ('OS_COMPILE_CFLAGS', context.config.substs.get('OS_COMPILE_CFLAGS'),
              ('CFLAGS',)),
             ('OS_COMPILE_CXXFLAGS', context.config.substs.get('OS_COMPILE_CXXFLAGS'),
@@ -1140,7 +1148,7 @@ VARIABLES = {
         APK file.
         """),
 
-    'SOURCES': (ContextDerivedTypedListWithItems(Path, StrictOrderingOnAppendListWithFlagsFactory({'no_pgo': bool, 'flags': List})), list,
+    'SOURCES': (ContextDerivedTypedListWithItems(Path, StrictOrderingOnAppendListWithFlagsFactory({'no_pgo': bool, 'flags': List, 'pgo_generate_only': bool})), list,
         """Source code files.
 
         This variable contains a list of source code files to compile.
@@ -1371,7 +1379,7 @@ VARIABLES = {
         This variable only has an effect when building with MSVC.
         """),
 
-    'HOST_SOURCES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
+    'HOST_SOURCES': (ContextDerivedTypedList(Path, StrictOrderingOnAppendList), list,
         """Source code files to compile with the host compiler.
 
         This variable contains a list of source code files to compile.
@@ -1476,12 +1484,6 @@ VARIABLES = {
         """The program .def (module definition) file.
 
         This variable can only be used on Windows.
-        """),
-
-    'LD_VERSION_SCRIPT': (unicode, unicode,
-        """The linker version script for shared libraries.
-
-        This variable can only be used on Linux.
         """),
 
     'SYMBOLS_FILE': (Path, unicode,
@@ -1649,6 +1651,13 @@ VARIABLES = {
         This flag exists primarily to prevent test-only XPIDL modules from being
         added to the application's chrome manifest. Most XPIDL modules should
         not use this flag.
+        """),
+
+    'PREPROCESSED_IPDL_SOURCES': (StrictOrderingOnAppendList, list,
+        """Preprocessed IPDL source files.
+
+        These files will be preprocessed, then parsed and converted to
+        ``.cpp`` files.
         """),
 
     'IPDL_SOURCES': (StrictOrderingOnAppendList, list,

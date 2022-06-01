@@ -47,7 +47,7 @@ ifndef MOZ_PROFILE_USE
 # We need to explicitly put BUILD_BACKEND_FILES here otherwise the rule in
 # rules.mk doesn't run early enough.
 $(TIERS) binaries:: CLOBBER $(configure_dir)/configure config.status $(BUILD_BACKEND_FILES)
-ifndef JS_STANDALONE
+ifdef MOZ_WIDGET_TOOLKIT
 ifdef COMPILE_ENVIRONMENT
 $(TIERS) binaries:: $(topsrcdir)/js/src/configure js/src/config.status
 endif
@@ -61,8 +61,7 @@ CLOBBER:
 else
 CLOBBER: $(topsrcdir)/CLOBBER
 	@echo 'STOP!  The CLOBBER file has changed.'
-	@echo 'Please run the build through a sanctioned build wrapper, such as'
-	@echo '"mach build" or client.mk.'
+	@echo 'Please run the build through "mach build".'
 	@exit 1
 endif
 
@@ -122,7 +121,7 @@ install_manifest_depends = \
   $(BUILD_BACKEND_FILES) \
   $(NULL)
 
-ifndef JS_STANDALONE
+ifdef MOZ_WIDGET_TOOLKIT
 ifdef COMPILE_ENVIRONMENT
 install_manifest_depends += \
   $(topsrcdir)/js/src/configure \
@@ -230,7 +229,7 @@ recurse_pre-export:: install-dist/sdk
 recurse_artifact:
 	$(topsrcdir)/mach --log-no-times artifact install
 
-ifndef JS_STANDALONE
+ifdef MOZ_WIDGET_TOOLKIT
 ifdef ENABLE_TESTS
 # Additional makefile targets to call automated test suites
 include $(topsrcdir)/testing/testsuite-targets.mk
@@ -239,6 +238,31 @@ endif
 
 default all::
 	$(call BUILDSTATUS,TIERS $(TIERS) $(if $(MOZ_AUTOMATION),$(MOZ_AUTOMATION_TIERS)))
+
+# PGO build target.
+profiledbuild::
+	$(call BUILDSTATUS,TIERS pgo_profile_generate pgo_package pgo_profile pgo_clobber pgo_profile_use)
+	$(call BUILDSTATUS,TIER_START pgo_profile_generate)
+	$(MAKE) default MOZ_PROFILE_GENERATE=1 MOZ_PGO_INSTRUMENTED=1
+	$(call BUILDSTATUS,TIER_FINISH pgo_profile_generate)
+	$(call BUILDSTATUS,TIER_START pgo_package)
+	$(MAKE) package MOZ_PGO_INSTRUMENTED=1 MOZ_INTERNAL_SIGNING_FORMAT= MOZ_EXTERNAL_SIGNING_FORMAT=
+	rm -f jarlog/en-US.log
+	$(call BUILDSTATUS,TIER_FINISH pgo_package)
+	$(call BUILDSTATUS,TIER_START pgo_profile)
+	MOZ_PGO_INSTRUMENTED=1 JARLOG_FILE=jarlog/en-US.log $(PYTHON) $(topsrcdir)/build/pgo/profileserver.py 10
+	$(call BUILDSTATUS,TIER_FINISH pgo_profile)
+	$(call BUILDSTATUS,TIER_START pgo_clobber)
+	$(MAKE) maybe_clobber_profiledbuild
+	$(call BUILDSTATUS,TIER_FINISH pgo_clobber)
+	$(call BUILDSTATUS,TIER_START pgo_profile_use)
+	$(MAKE) default MOZ_PROFILE_USE=1 $(if $(CLANG_CL),MOZ_PROFILE_ORDER_FILE=$(topobjdir)/cygprofile.txt)
+	$(call BUILDSTATUS,TIER_FINISH pgo_profile_use)
+
+# Change default target to PGO build if PGO is enabled.
+ifdef MOZ_PGO
+OVERRIDE_DEFAULT_GOAL := profiledbuild
+endif
 
 include $(topsrcdir)/config/rules.mk
 
@@ -305,20 +329,27 @@ endif
 update-packaging:
 	$(MAKE) -C tools/update-packaging
 
+.PHONY: package-generated-sources
+package-generated-sources:
+	$(call py_action,package_generated_sources,'$(DIST)/$(PKG_PATH)$(GENERATED_SOURCE_FILE_PACKAGE)')
+
 #XXX: this is a hack, since we don't want to clobber for MSVC
 # PGO support, but we can't do this test in client.mk
-ifneq ($(OS_ARCH)_$(GNU_CC), WINNT_)
 # No point in clobbering if PGO has been explicitly disabled.
-ifndef NO_PROFILE_GUIDED_OPTIMIZE
-maybe_clobber_profiledbuild: clean
-else
+ifdef NO_PROFILE_GUIDED_OPTIMIZE
 maybe_clobber_profiledbuild:
+else
+ifneq ($(CC_TYPE),msvc)
+maybe_clobber_profiledbuild: clean
+ifneq (,$(findstring clang,$(CC_TYPE)))
+	$(LLVM_PROFDATA) merge -o $(DEPTH)/merged.profdata $(DEPTH)/*.profraw
 endif
 else
 maybe_clobber_profiledbuild:
 	$(RM) $(DIST)/bin/*.pgc
 	find $(DIST)/$(MOZ_APP_NAME) -name '*.pgc' -exec mv {} $(DIST)/bin \;
-endif
+endif # msvc
+endif # NO_PROFILE_GUIDED_OPTIMIZE
 
 .PHONY: maybe_clobber_profiledbuild
 

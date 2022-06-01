@@ -12,7 +12,6 @@ MOZ_ARG_ENABLE_BOOL(address-sanitizer,
     MOZ_ASAN=1,
     MOZ_ASAN= )
 if test -n "$MOZ_ASAN"; then
-    MOZ_LLVM_HACKS=1
     if test -n "$CLANG_CL"; then
         # Look for the ASan runtime binary
         if test "$CPU_ARCH" = "x86_64"; then
@@ -50,7 +49,6 @@ MOZ_ARG_ENABLE_BOOL(memory-sanitizer,
     MOZ_MSAN=1,
     MOZ_MSAN= )
 if test -n "$MOZ_MSAN"; then
-    MOZ_LLVM_HACKS=1
     CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins $CFLAGS"
     CXXFLAGS="-fsanitize=memory -fsanitize-memory-track-origins $CXXFLAGS"
     if test -z "$CLANG_CL"; then
@@ -69,7 +67,6 @@ MOZ_ARG_ENABLE_BOOL(thread-sanitizer,
    MOZ_TSAN=1,
    MOZ_TSAN= )
 if test -n "$MOZ_TSAN"; then
-    MOZ_LLVM_HACKS=1
     CFLAGS="-fsanitize=thread $CFLAGS"
     CXXFLAGS="-fsanitize=thread $CXXFLAGS"
     if test -z "$CLANG_CL"; then
@@ -88,7 +85,6 @@ MOZ_ARG_ENABLE_BOOL(ubsan-int-overflow,
    MOZ_UBSAN_INT_OVERFLOW=1,
    MOZ_UBSAN_INT_OVERFLOW= )
 if test -n "$MOZ_UBSAN_INT_OVERFLOW"; then
-    MOZ_LLVM_HACKS=1
     MOZ_UBSAN=1
     CFLAGS="-fsanitize=integer -fsanitize-blacklist=$_topsrcdir/build/sanitizers/ubsan_blacklist_int.txt $CFLAGS"
     CXXFLAGS="-fsanitize=integer -fsanitize-blacklist=$_topsrcdir/build/sanitizers/ubsan_blacklist_int.txt $CXXFLAGS"
@@ -104,18 +100,6 @@ AC_SUBST(MOZ_UBSAN)
 
 # The LLVM symbolizer is used by all sanitizers
 AC_SUBST(LLVM_SYMBOLIZER)
-
-dnl ========================================================
-dnl = Enable hacks required for LLVM instrumentations
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(llvm-hacks,
-[  --enable-llvm-hacks       Enable workarounds required for several LLVM instrumentations (default=no)],
-    MOZ_LLVM_HACKS=1,
-    MOZ_LLVM_HACKS= )
-if test -n "$MOZ_LLVM_HACKS"; then
-    MOZ_NO_WLZDEFS=1
-fi
-AC_SUBST(MOZ_NO_WLZDEFS)
 
 dnl ========================================================
 dnl = Test for whether the compiler is compatible with the

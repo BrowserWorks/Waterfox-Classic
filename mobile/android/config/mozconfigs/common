@@ -25,8 +25,6 @@ if [ ! -f /etc/redhat-release ] || [ "$(< /etc/redhat-release)" != "CentOS relea
     mk_add_options "export PATH=$PATH:$topsrcdir/java_home/bin"
 fi
 
-ac_add_options --enable-elf-hack
-
 ANDROID_NDK_VERSION="r10e"
 ANDROID_NDK_VERSION_32BIT="r8c"
 
@@ -89,8 +87,5 @@ HOST_CC="$topsrcdir/gcc/bin/gcc"
 HOST_CXX="$topsrcdir/gcc/bin/g++"
 
 . "$topsrcdir/build/unix/mozconfig.stdcxx"
-
-# Use libc++ as our C++ standard library
-ac_add_options --with-android-cxx-stl=libc++
 
 JS_BINARY="$topsrcdir/mobile/android/config/js_wrapper.sh"

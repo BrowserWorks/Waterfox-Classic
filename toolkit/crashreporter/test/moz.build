@@ -24,12 +24,12 @@ SOURCES += [
   'ExceptionThrower.cpp',
 ]
 
-if CONFIG['CLANG_CL']:
+if CONFIG['CC_TYPE'] == 'clang-cl':
     SOURCES['ExceptionThrower.cpp'].flags += [
         '-Xclang',
         '-fcxx-exceptions',
     ]
-elif not CONFIG['_MSC_VER']:
+elif CONFIG['CC_TYPE'] not in ('msvc', 'clang-cl'):
     SOURCES['ExceptionThrower.cpp'].flags += [
         '-fexceptions',
     ]
@@ -50,5 +50,5 @@ include('/toolkit/crashreporter/crashreporter.mozbuild')
 NO_PGO = True
 
 # Temporary workaround for an issue in upstream breakpad
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
     CXXFLAGS += ['-wd4334']

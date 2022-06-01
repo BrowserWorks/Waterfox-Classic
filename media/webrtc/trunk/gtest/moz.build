@@ -340,7 +340,8 @@ if CONFIG['OS_TARGET'] in ['Darwin', 'Linux', 'WINNT']:
         '../webrtc/modules/remote_bitrate_estimator/remote_bitrate_estimator_single_stream_unittest.cc',
         '../webrtc/modules/remote_bitrate_estimator/remote_bitrate_estimator_unittest_helper.cc',
         '../webrtc/modules/remote_bitrate_estimator/remote_estimator_proxy_unittest.cc',
-        '../webrtc/modules/remote_bitrate_estimator/send_time_history_unittest.cc',
+    # Doesn't build with C++17
+    #    '../webrtc/modules/remote_bitrate_estimator/send_time_history_unittest.cc',
         '../webrtc/modules/remote_bitrate_estimator/test/bwe.cc',
         '../webrtc/modules/remote_bitrate_estimator/test/bwe_test_framework.cc',
     # Requires external files
@@ -351,7 +352,8 @@ if CONFIG['OS_TARGET'] in ['Darwin', 'Linux', 'WINNT']:
         '../webrtc/modules/remote_bitrate_estimator/test/estimators/send_side.cc',
         '../webrtc/modules/remote_bitrate_estimator/test/estimators/tcp.cc',
         '../webrtc/modules/remote_bitrate_estimator/test/metric_recorder.cc',
-        '../webrtc/modules/remote_bitrate_estimator/test/metric_recorder_unittest.cc',
+    # Doesn't build with C++17
+    #    '../webrtc/modules/remote_bitrate_estimator/test/metric_recorder_unittest.cc',
         '../webrtc/modules/remote_bitrate_estimator/test/packet_sender.cc',
         '../webrtc/modules/rtp_rtcp/source/byte_io_unittest.cc',
         '../webrtc/modules/rtp_rtcp/source/fec_test_helper.cc',
@@ -514,7 +516,8 @@ if CONFIG['OS_TARGET'] in ['Darwin', 'Linux', 'WINNT']:
         '../webrtc/modules/congestion_controller/probing_interval_estimator_unittest.cc',
         '../webrtc/modules/congestion_controller/transport_feedback_adapter_unittest.cc',
         '../webrtc/modules/congestion_controller/trendline_estimator_unittest.cc',
-        '../webrtc/modules/remote_bitrate_estimator/test/bwe_unittest.cc',
+    # Doesn't build with C++17
+    #    '../webrtc/modules/remote_bitrate_estimator/test/bwe_unittest.cc',
         '../webrtc/modules/rtp_rtcp/source/flexfec_header_reader_writer_unittest.cc',
         '../webrtc/modules/rtp_rtcp/source/flexfec_sender_unittest.cc',
         '../webrtc/modules/rtp_rtcp/source/rtcp_packet/bye_unittest.cc',
@@ -561,16 +564,16 @@ if CONFIG['OS_TARGET'] in ['Darwin', 'Linux', 'WINNT']:
         '../webrtc/voice_engine/voice_engine_fixture.cc',
     ]
 
-    if CONFIG['GNU_CXX']:
+    if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
         CXXFLAGS += [
             '-Wno-error=shadow',
             '-Wno-inconsistent-missing-override',
             '-Wno-overloaded-virtual',
         ]
-        if CONFIG['CLANG_CXX']:
+        if CONFIG['CC_TYPE'] == 'clang':
             CXXFLAGS += ['-Wno-comma']
 
-    if CONFIG['_MSC_VER']:
+    if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
         # This is intended as a temporary workaround to enable warning free building
         # with VS2015.
         # reinterpret_cast': conversion from 'DWORD' to 'HANDLE' of greater size

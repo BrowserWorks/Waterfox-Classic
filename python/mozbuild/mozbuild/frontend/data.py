@@ -17,6 +17,7 @@ structures.
 
 from __future__ import absolute_import, unicode_literals
 
+from mozbuild.frontend.context import ObjDirPath
 from mozbuild.util import StrictOrderingOnAppendList
 from mozpack.chrome.manifest import ManifestEntry
 
@@ -24,6 +25,7 @@ import mozpack.path as mozpath
 from .context import FinalTargetValue
 
 from collections import defaultdict, OrderedDict
+import itertools
 
 from ..util import (
     group_unified_files,
@@ -54,7 +56,7 @@ class ContextDerived(TreeMetadata):
         'context_all_paths',
         'topsrcdir',
         'topobjdir',
-        'relativedir',
+        'relsrcdir',
         'srcdir',
         'objdir',
         'config',
@@ -72,7 +74,7 @@ class ContextDerived(TreeMetadata):
         self.topsrcdir = context.config.topsrcdir
         self.topobjdir = context.config.topobjdir
 
-        self.relativedir = context.relsrcdir
+        self.relsrcdir = context.relsrcdir
         self.srcdir = context.srcdir
         self.objdir = context.objdir
 
@@ -83,6 +85,10 @@ class ContextDerived(TreeMetadata):
     @property
     def install_target(self):
         return self._context['FINAL_TARGET']
+
+    @property
+    def installed(self):
+        return self._context['DIST_INSTALL'] is not False
 
     @property
     def defines(self):
@@ -232,104 +238,139 @@ class Defines(BaseDefines):
 class HostDefines(BaseDefines):
     pass
 
-class IPDLFile(ContextDerived):
-    """Describes an individual .ipdl source file."""
+class WebIDLCollection(ContextDerived):
+    """Collects WebIDL info referenced during the build."""
 
-    __slots__ = (
-        'basename',
-    )
-
-    def __init__(self, context, path):
+    def __init__(self, context):
         ContextDerived.__init__(self, context)
+        self.sources = set()
+        self.generated_sources = set()
+        self.generated_events_sources = set()
+        self.preprocessed_sources = set()
+        self.test_sources = set()
+        self.preprocessed_test_sources = set()
+        self.example_interfaces = set()
 
-        self.basename = path
+    def all_regular_sources(self):
+        return self.sources | self.generated_sources | \
+            self.generated_events_sources | self.preprocessed_sources
 
-class WebIDLFile(ContextDerived):
-    """Describes an individual .webidl source file."""
+    def all_regular_basenames(self):
+        return [mozpath.basename(source) for source in self.all_regular_sources()]
 
-    __slots__ = (
-        'basename',
-    )
+    def all_regular_stems(self):
+        return [mozpath.splitext(b)[0] for b in self.all_regular_basenames()]
 
-    def __init__(self, context, path):
+    def all_regular_bindinggen_stems(self):
+        for stem in self.all_regular_stems():
+            yield '%sBinding' % stem
+
+        for source in self.generated_events_sources:
+            yield mozpath.splitext(mozpath.basename(source))[0]
+
+    def all_regular_cpp_basenames(self):
+        for stem in self.all_regular_bindinggen_stems():
+            yield '%s.cpp' % stem
+
+    def all_test_sources(self):
+        return self.test_sources | self.preprocessed_test_sources
+
+    def all_test_basenames(self):
+        return [mozpath.basename(source) for source in self.all_test_sources()]
+
+    def all_test_stems(self):
+        return [mozpath.splitext(b)[0] for b in self.all_test_basenames()]
+
+    def all_test_cpp_basenames(self):
+        return sorted('%sBinding.cpp' % s for s in self.all_test_stems())
+
+    def all_static_sources(self):
+        return self.sources | self.generated_events_sources | \
+            self.test_sources
+
+    def all_non_static_sources(self):
+        return self.generated_sources | self.all_preprocessed_sources()
+
+    def all_non_static_basenames(self):
+        return [mozpath.basename(s) for s in self.all_non_static_sources()]
+
+    def all_preprocessed_sources(self):
+        return self.preprocessed_sources | self.preprocessed_test_sources
+
+    def all_sources(self):
+        return set(self.all_regular_sources()) | set(self.all_test_sources())
+
+    def all_basenames(self):
+        return [mozpath.basename(source) for source in self.all_sources()]
+
+    def all_stems(self):
+        return [mozpath.splitext(b)[0] for b in self.all_basenames()]
+
+    def generated_events_basenames(self):
+        return [mozpath.basename(s) for s in self.generated_events_sources]
+
+    def generated_events_stems(self):
+        return [mozpath.splitext(b)[0] for b in self.generated_events_basenames()]
+
+    @property
+    def unified_source_mapping(self):
+        # Bindings are compiled in unified mode to speed up compilation and
+        # to reduce linker memory size. Note that test bindings are separated
+        # from regular ones so tests bindings aren't shipped.
+        return list(group_unified_files(self.all_regular_cpp_basenames(),
+                                        unified_prefix='UnifiedBindings',
+                                        unified_suffix='cpp',
+                                        files_per_unified_file=32))
+
+    def all_source_files(self):
+        from mozwebidlcodegen import WebIDLCodegenManager
+        return (sorted(list(WebIDLCodegenManager.GLOBAL_DEFINE_FILES)) +
+                sorted(set(p for p, _ in self.unified_source_mapping)))
+
+
+class IPDLCollection(ContextDerived):
+    """Collects IPDL files during the build."""
+
+    def __init__(self, context):
         ContextDerived.__init__(self, context)
+        self.sources = set()
+        self.preprocessed_sources = set()
 
-        self.basename = path
+    def all_sources(self):
+        return self.sources | self.preprocessed_sources
 
-class GeneratedEventWebIDLFile(ContextDerived):
-    """Describes an individual .webidl source file."""
+    def all_regular_sources(self):
+        return self.sources
 
-    __slots__ = (
-        'basename',
-    )
+    def all_preprocessed_sources(self):
+        return self.preprocessed_sources
 
-    def __init__(self, context, path):
-        ContextDerived.__init__(self, context)
+    def all_generated_sources(self):
+        sorted_ipdl_sources = list(sorted(self.all_sources()))
 
-        self.basename = path
+        def files_from(ipdl):
+            base = mozpath.basename(ipdl)
+            root, ext = mozpath.splitext(base)
 
-class TestWebIDLFile(ContextDerived):
-    """Describes an individual test-only .webidl source file."""
+            # Both .ipdl and .ipdlh become .cpp files
+            files = ['%s.cpp' % root]
+            if ext == '.ipdl':
+                # .ipdl also becomes Child/Parent.cpp files
+                files.extend(['%sChild.cpp' % root,
+                              '%sParent.cpp' % root])
+            return files
 
-    __slots__ = (
-        'basename',
-    )
+        return list(itertools.chain(*[files_from(p) for p in sorted_ipdl_sources]))
 
-    def __init__(self, context, path):
-        ContextDerived.__init__(self, context)
+    @property
+    def unified_source_mapping(self):
+        return list(group_unified_files(self.all_generated_sources(),
+                                        unified_prefix='UnifiedProtocols',
+                                        unified_suffix='cpp',
+                                        files_per_unified_file=16))
 
-        self.basename = path
-
-class PreprocessedTestWebIDLFile(ContextDerived):
-    """Describes an individual test-only .webidl source file that requires
-    preprocessing."""
-
-    __slots__ = (
-        'basename',
-    )
-
-    def __init__(self, context, path):
-        ContextDerived.__init__(self, context)
-
-        self.basename = path
-
-class PreprocessedWebIDLFile(ContextDerived):
-    """Describes an individual .webidl source file that requires preprocessing."""
-
-    __slots__ = (
-        'basename',
-    )
-
-    def __init__(self, context, path):
-        ContextDerived.__init__(self, context)
-
-        self.basename = path
-
-class GeneratedWebIDLFile(ContextDerived):
-    """Describes an individual .webidl source file that is generated from
-    build rules."""
-
-    __slots__ = (
-        'basename',
-    )
-
-    def __init__(self, context, path):
-        ContextDerived.__init__(self, context)
-
-        self.basename = path
-
-
-class ExampleWebIDLInterface(ContextDerived):
-    """An individual WebIDL interface to generate."""
-
-    __slots__ = (
-        'name',
-    )
-
-    def __init__(self, context, name):
-        ContextDerived.__init__(self, context)
-
-        self.name = name
+    def all_source_files(self):
+        return sorted(set(p for p, _ in self.unified_source_mapping))
 
 
 class LinkageWrongKindError(Exception):
@@ -347,6 +388,10 @@ class Linkable(ContextDerived):
         'lib_defines',
         'linked_libraries',
         'linked_system_libs',
+        'no_pgo_sources',
+        'pgo_gen_only_sources',
+        'no_pgo',
+        'sources',
     )
 
     def __init__(self, context):
@@ -355,6 +400,10 @@ class Linkable(ContextDerived):
         self.linked_libraries = []
         self.linked_system_libs = []
         self.lib_defines = Defines(context, {})
+        self.sources = defaultdict(list)
+        self.no_pgo_sources = []
+        self.pgo_gen_only_sources = set()
+        self.no_pgo = False
 
     def link_library(self, obj):
         assert isinstance(obj, BaseLibrary)
@@ -386,6 +435,37 @@ class Linkable(ContextDerived):
                 )
         self.linked_system_libs.append(lib)
 
+    def source_files(self):
+        all_sources = []
+        # This is ordered for reproducibility and consistently w/
+        # config/rules.mk
+        for suffix in ('.c', '.S', '.cpp', '.m', '.mm', '.s'):
+            all_sources += self.sources.get(suffix, [])
+        return all_sources
+
+    def _get_objs(self, sources):
+        obj_prefix = ''
+        if self.KIND == 'host':
+            obj_prefix = 'host_'
+
+        return [mozpath.join(self.objdir, '%s%s.%s' % (obj_prefix,
+                                                       mozpath.splitext(mozpath.basename(f))[0],
+                                                       self.config.substs.get('OBJ_SUFFIX', '')))
+                for f in sources]
+
+    @property
+    def no_pgo_objs(self):
+        return self._get_objs(self.no_pgo_sources)
+
+    @property
+    def objs(self):
+        return self._get_objs(self.source_files())
+
+    @property
+    def pgo_gen_only_objs(self):
+        return self._get_objs(self.pgo_gen_only_sources)
+
+
 class BaseProgram(Linkable):
     """Context derived container object for programs, which is a unicode
     string.
@@ -414,8 +494,19 @@ class BaseProgram(Linkable):
         self.program = program
         self.is_unit_test = is_unit_test
 
+    @property
+    def output_path(self):
+        if self.installed:
+            return ObjDirPath(self._context, '!/' + mozpath.join(self.install_target, self.program))
+        else:
+            return ObjDirPath(self._context, '!' + self.program)
+
     def __repr__(self):
         return '<%s: %s/%s>' % (type(self).__name__, self.relobjdir, self.program)
+
+    @property
+    def name(self):
+        return self.program
 
 
 class Program(BaseProgram):
@@ -429,11 +520,22 @@ class HostProgram(HostMixin, BaseProgram):
     SUFFIX_VAR = 'HOST_BIN_SUFFIX'
     KIND = 'host'
 
+    @property
+    def install_target(self):
+        return 'dist/host/bin'
+
 
 class SimpleProgram(BaseProgram):
     """Context derived container object for each program in SIMPLE_PROGRAMS"""
     SUFFIX_VAR = 'BIN_SUFFIX'
     KIND = 'target'
+
+    def source_files(self):
+        for srcs in self.sources.values():
+            for f in srcs:
+                if mozpath.basename(mozpath.splitext(f)[0]) == mozpath.splitext(self.program)[0]:
+                    return [f]
+        return []
 
 
 class HostSimpleProgram(HostMixin, BaseProgram):
@@ -511,6 +613,10 @@ class BaseLibrary(Linkable):
 
     def __repr__(self):
         return '<%s: %s/%s>' % (type(self).__name__, self.relobjdir, self.lib_name)
+
+    @property
+    def name(self):
+        return self.lib_name
 
 
 class Library(BaseLibrary):
@@ -644,6 +750,22 @@ class SharedLibrary(Library):
             # Explicitly provided name.
             self.symbols_file = symbols_file
 
+
+class HostSharedLibrary(HostMixin, Library):
+    """Context derived container object for a host shared library.
+
+    This class supports less things than SharedLibrary does for target shared
+    libraries. Currently has enough build system support to build the clang
+    plugin."""
+    KIND = 'host'
+
+    def __init__(self, context, basename):
+        Library.__init__(self, context, basename)
+        self.lib_name = '%s%s%s' % (
+            context.config.host_dll_prefix,
+            self.basename,
+            context.config.host_dll_suffix,
+        )
 
 
 class ExternalLibrary(object):
@@ -865,6 +987,15 @@ class Sources(BaseSources):
         BaseSources.__init__(self, context, files, canonical_suffix)
 
 
+class PgoGenerateOnlySources(BaseSources):
+    """Represents files to be compiled during the build.
+
+    These files are only used during the PGO generation phase."""
+
+    def __init__(self, context, files):
+        BaseSources.__init__(self, context, files, '.cpp')
+
+
 class GeneratedSources(BaseSources):
     """Represents generated files to be compiled during the build."""
 
@@ -874,6 +1005,13 @@ class GeneratedSources(BaseSources):
 
 class HostSources(HostMixin, BaseSources):
     """Represents files to be compiled for the host during the build."""
+
+    def __init__(self, context, files, canonical_suffix):
+        BaseSources.__init__(self, context, files, canonical_suffix)
+
+
+class HostGeneratedSources(HostMixin, BaseSources):
+    """Represents generated files to be compiled for the host during the build."""
 
     def __init__(self, context, files, canonical_suffix):
         BaseSources.__init__(self, context, files, canonical_suffix)

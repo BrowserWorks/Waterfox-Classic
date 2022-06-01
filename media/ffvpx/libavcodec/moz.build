@@ -63,12 +63,12 @@ SOURCES += [
     'xiph.c'
 ]
 # Dummy functions are required for windows NoOpt/PGO builds.
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
     SOURCES += [
         'dummy_funcs.c'
     ]
 	
-if CONFIG['CLANG_CL']:
+if CONFIG['CC_TYPE'] == 'clang-cl':
     LDFLAGS += ['-FORCE:MULTIPLE']
 
 if CONFIG['MOZ_LIBAV_FFT']:

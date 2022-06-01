@@ -646,20 +646,26 @@ class TestRecursiveMakeBackend(BackendTester):
             self.assertEqual(m, m2)
 
     def test_ipdl_sources(self):
-        """Test that IPDL_SOURCES are written to ipdlsrcs.mk correctly."""
-        env = self._consume('ipdl_sources', RecursiveMakeBackend)
+        """Test that PREPROCESSED_IPDL_SOURCES and IPDL_SOURCES are written to ipdlsrcs.mk correctly."""
+        env = self._get_environment('ipdl_sources')
 
-        manifest_path = mozpath.join(env.topobjdir,
-            'ipc', 'ipdl', 'ipdlsrcs.mk')
+        # Make substs writable so we can set the value of IPDL_ROOT to reflect
+        # the correct objdir.
+        env.substs = dict(env.substs)
+        env.substs['IPDL_ROOT'] = env.topobjdir
+
+        self._consume('ipdl_sources', RecursiveMakeBackend, env)
+
+        manifest_path = mozpath.join(env.topobjdir, 'ipdlsrcs.mk')
         lines = [l.strip() for l in open(manifest_path, 'rt').readlines()]
 
         # Handle Windows paths correctly
         topsrcdir = env.topsrcdir.replace(os.sep, '/')
 
         expected = [
-            "ALL_IPDLSRCS := %s/bar/bar.ipdl %s/bar/bar2.ipdlh %s/foo/foo.ipdl %s/foo/foo2.ipdlh" % tuple([topsrcdir] * 4),
+            "ALL_IPDLSRCS := bar1.ipdl foo1.ipdl %s/bar/bar.ipdl %s/bar/bar2.ipdlh %s/foo/foo.ipdl %s/foo/foo2.ipdlh" % tuple([topsrcdir] * 4),
             "CPPSRCS := UnifiedProtocols0.cpp",
-            "IPDLDIRS := %s/bar %s/foo" % (topsrcdir, topsrcdir),
+            "IPDLDIRS := %s %s/bar %s/foo" % (env.topobjdir, topsrcdir, topsrcdir),
         ]
 
         found = [str for str in lines if str.startswith(('ALL_IPDLSRCS',
@@ -905,6 +911,74 @@ class TestRecursiveMakeBackend(BackendTester):
             for line in lines:
                 self.assertNotIn('LIB_IS_C_ONLY', line)
 
+    def test_linkage(self):
+        env = self._consume('linkage', RecursiveMakeBackend)
+        expected_linkage = {
+            'prog': {
+                'SHARED_LIBS': ['qux/qux.so',
+                                '../shared/baz.so'],
+                'STATIC_LIBS': ['../real/foo.a'],
+                'OS_LIBS': ['-lfoo', '-lbaz', '-lbar'],
+            },
+            'shared': {
+                'OS_LIBS': ['-lfoo'],
+                'SHARED_LIBS': ['../prog/qux/qux.so'],
+                'STATIC_LIBS': [],
+            },
+            'static': {
+                'STATIC_LIBS': ['../real/foo.a'],
+                'OS_LIBS': ['-lbar'],
+                'SHARED_LIBS': ['../prog/qux/qux.so'],
+            },
+            'real': {
+                'STATIC_LIBS': [],
+                'SHARED_LIBS': ['../prog/qux/qux.so'],
+                'OS_LIBS': ['-lbaz'],
+            }
+        }
+        actual_linkage = {}
+        for name in expected_linkage.keys():
+            with open(os.path.join(env.topobjdir, name, 'backend.mk'), 'rb') as fh:
+                actual_linkage[name] = [line.rstrip() for line in fh.readlines()]
+        for name in expected_linkage:
+            for var in expected_linkage[name]:
+                for val in expected_linkage[name][var]:
+                    val = os.path.normpath(val)
+                    line = '%s += %s' % (var, val)
+                    self.assertIn(line,
+                                  actual_linkage[name])
+                    actual_linkage[name].remove(line)
+                for line in actual_linkage[name]:
+                    self.assertNotIn('%s +=' % var, line)
+
+    def test_list_files(self):
+        env = self._consume('linkage', RecursiveMakeBackend)
+        expected_list_files = {
+            'prog/MyProgram_exe.list': [
+                '../static/bar/bar1.o',
+                '../static/bar/bar2.o',
+                '../static/bar/bar_helper/bar_helper1.o',
+            ],
+            'shared/baz_so.list': [
+                'baz/baz1.o',
+            ],
+        }
+        actual_list_files = {}
+        for name in expected_list_files.keys():
+            with open(os.path.join(env.topobjdir, name), 'rb') as fh:
+                actual_list_files[name] = [line.rstrip()
+                                           for line in fh.readlines()]
+        for name in expected_list_files:
+            self.assertEqual(actual_list_files[name],
+                             [os.path.normpath(f) for f in expected_list_files[name]])
+
+        # We don't produce a list file for a shared library composed only of
+        # object files in its directory, but instead list them in a variable.
+        with open(os.path.join(env.topobjdir, 'prog', 'qux', 'backend.mk'), 'rb') as fh:
+            lines = [line.rstrip() for line in fh.readlines()]
+
+        self.assertIn('qux.so_OBJS := qux1.o', lines)
+
     def test_jar_manifests(self):
         env = self._consume('jar-manifests', RecursiveMakeBackend)
 
@@ -943,6 +1017,25 @@ class TestRecursiveMakeBackend(BackendTester):
         # processing time.  This is a fragile test because there's currently no
         # way to iterate the manifest.
         self.assertFalse('instrumentation/./not_packaged.java' in m)
+
+    def test_program_paths(self):
+        """PROGRAMs with various moz.build settings that change the destination should produce
+        the expected paths in backend.mk."""
+        env = self._consume('program-paths', RecursiveMakeBackend)
+
+        expected = [
+            ('dist-bin', '$(DEPTH)/dist/bin/dist-bin.prog'),
+            ('dist-subdir', '$(DEPTH)/dist/bin/foo/dist-subdir.prog'),
+            ('final-target', '$(DEPTH)/final/target/final-target.prog'),
+            ('not-installed', 'not-installed.prog'),
+        ]
+        prefix = 'PROGRAM = '
+        for (subdir, expected_program) in expected:
+            with open(os.path.join(env.topobjdir, subdir, 'backend.mk'), 'rb') as fh:
+                lines = fh.readlines()
+                program = [line.rstrip().split(prefix, 1)[1] for line in lines
+                           if line.startswith(prefix)][0]
+                self.assertEqual(program, expected_program)
 
 
 if __name__ == '__main__':

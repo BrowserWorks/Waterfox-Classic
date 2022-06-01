@@ -355,6 +355,8 @@ class BuildOptionParser(object):
         'debug': 'builds/releng_sub_%s_configs/%s_debug.py',
         'asan-and-debug': 'builds/releng_sub_%s_configs/%s_asan_and_debug.py',
         'asan-tc-and-debug': 'builds/releng_sub_%s_configs/%s_asan_tc_and_debug.py',
+        'lto-tc': 'builds/releng_sub_%s_configs/%s_lto_tc.py',
+        'lto-tc-and-debug': 'builds/releng_sub_%s_configs/%s_lto_tc_and_debug.py',
         'stat-and-debug': 'builds/releng_sub_%s_configs/%s_stat_and_debug.py',
         'code-coverage': 'builds/releng_sub_%s_configs/%s_code_coverage.py',
         'source': 'builds/releng_sub_%s_configs/%s_source.py',

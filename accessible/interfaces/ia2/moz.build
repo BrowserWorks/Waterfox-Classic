@@ -84,6 +84,10 @@ GENERATED_FILES += [
     'IA2Typelib.tlb',
 ]
 
+SOURCES += [
+    '!%s' % p for p in GENERATED_FILES if p.endswith('.c')
+]
+
 RCINCLUDE = 'IA2Marshal.rc'
 
 # The Windows MIDL code generator creates things like:
@@ -91,6 +95,6 @@ RCINCLUDE = 'IA2Marshal.rc'
 #   #endif !_MIDL_USE_GUIDDEF_
 #
 # which clang-cl complains about.  MSVC doesn't, so turn this warning off.
-if CONFIG['CLANG_CL']:
+if CONFIG['CC_TYPE'] == 'clang-cl':
     CXXFLAGS += ['-Wno-extra-tokens']
     LDFLAGS += ['-FORCE:MULTIPLE']

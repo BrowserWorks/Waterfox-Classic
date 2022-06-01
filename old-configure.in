@@ -78,6 +78,8 @@ dnl ========================================================
 MOZ_USE_PTHREADS=
 _PTHREAD_LDFLAGS=""
 
+LDFLAGS="$LDFLAGS $LINKER_LDFLAGS"
+
 MOZ_DEFAULT_COMPILER
 
 if test "$COMPILE_ENVIRONMENT"; then
@@ -159,7 +161,7 @@ case "$target" in
         AC_CHECK_PROGS(MIDL, midl)
 
         # Make sure compilers are valid
-        CFLAGS="$CFLAGS -TC -nologo"
+        CFLAGS="$CFLAGS -nologo"
         CXXFLAGS="$CXXFLAGS -TP -nologo"
         AC_LANG_SAVE
         AC_LANG_C
@@ -235,12 +237,18 @@ case "$target" in
           WIN32_REDIST_DIR=`cd "$WIN32_REDIST_DIR" && pwd -W`
         fi
 
-        # Check linker version
-        _LD_FULL_VERSION=`"${LINK}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
-        _LD_MAJOR_VERSION=`echo ${_LD_FULL_VERSION} | $AWK -F\. '{ print $1 }'`
-        if test "$_LD_MAJOR_VERSION" != "$_CC_SUITE"; then
-            AC_MSG_ERROR([The linker major version, $_LD_FULL_VERSION,  does not match the compiler suite version, $_CC_SUITE.])
-        fi
+        # Check linker version, except in lld builds
+        case "$LINKER" in
+        *lld*)
+            ;;
+        *)
+            _LD_FULL_VERSION=`"${LINKER}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
+            _LD_MAJOR_VERSION=`echo ${_LD_FULL_VERSION} | $AWK -F\. '{ print $1 }'`
+            if test "$_LD_MAJOR_VERSION" != "$_CC_SUITE"; then
+                AC_MSG_ERROR([The linker major version, $_LD_FULL_VERSION,  does not match the compiler suite version, $_CC_SUITE.])
+            fi
+            ;;
+        esac
 
         INCREMENTAL_LINKER=1
 
@@ -579,7 +587,7 @@ if test "$GNU_CC"; then
         # Some tools like ASan use a runtime library that is only
         # linked against executables, so we must allow undefined
         # symbols for shared objects in some cases.
-        if test -z "$MOZ_NO_WLZDEFS"; then
+        if test -z "$MOZ_ASAN$MOZ_MSAN$MOZ_UBSAN$MOZ_TSAN"; then
             # Don't allow undefined symbols in libraries
             DSO_LDOPTS="$DSO_LDOPTS -Wl,-z,defs"
 
@@ -653,7 +661,7 @@ case "$host" in
     if test -n "$_WIN32_MSVC"; then
         HOST_AR=lib
         HOST_AR_FLAGS='-NOLOGO -OUT:$@'
-        HOST_CFLAGS="$HOST_CFLAGS -TC -nologo"
+        HOST_CFLAGS="$HOST_CFLAGS -nologo"
         HOST_RANLIB='echo ranlib'
     else
         HOST_CFLAGS="$HOST_CFLAGS -mwindows"
@@ -860,14 +868,22 @@ case "$target" in
         if test "$AS_BIN"; then
             AS="$(basename "$AS_BIN")"
         fi
-        AR='lib'
-        AR_FLAGS='-NOLOGO -OUT:$@'
+        case "$LINKER" in
+        *lld*)
+            AR='llvm-lib'
+            AR_FLAGS='-llvmlibthin -out:$@'
+            ;;
+        *)
+            AR='lib'
+            AR_FLAGS='-NOLOGO -OUT:$@'
+            ;;
+        esac
         AR_EXTRACT=
         RANLIB='echo not_ranlib'
         STRIP='echo not_strip'
         PKG_SKIP_STRIP=1
-        MKSHLIB='$(LINK) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
-        MKCSHLIB='$(LINK) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
+        MKSHLIB='$(LINKER) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
+        MKCSHLIB='$(LINKER) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
         WIN32_SUBSYSTEM_VERSION=6.01
         WIN32_CONSOLE_EXE_LDFLAGS=-SUBSYSTEM:CONSOLE,$WIN32_SUBSYSTEM_VERSION
         WIN32_GUI_EXE_LDFLAGS=-SUBSYSTEM:WINDOWS,$WIN32_SUBSYSTEM_VERSION
@@ -996,9 +1012,6 @@ case "$target" in
         MOZ_OPTIMIZE_FLAGS='-O1 -Oi'
         MOZ_FIX_LINK_PATHS=
         LDFLAGS="$LDFLAGS -LARGEADDRESSAWARE -NXCOMPAT"
-        if test -z "$DEVELOPER_OPTIONS"; then
-            LDFLAGS="$LDFLAGS -RELEASE"
-        fi
         LDFLAGS="$LDFLAGS -DYNAMICBASE"
         RCFLAGS="-nologo"
         dnl Minimum reqiurement of Gecko is VS2015 or later which supports
@@ -1052,7 +1065,7 @@ case "$target" in
     if $CC -E - -dM </dev/null | grep __ELF__ >/dev/null; then
         DSO_PIC_CFLAGS='-fPIC -DPIC'
         DSO_LDOPTS='-shared'
-        BIN_FLAGS='-Wl,--export-dynamic'
+        MOZ_PROGRAM_LDFLAGS="$MOZ_PROGRAM_LDFLAGS -Wl,--export-dynamic"
     else
         DSO_PIC_CFLAGS='-fPIC -DPIC'
         DSO_LDOPTS='-shared'
@@ -3886,35 +3899,6 @@ MOZ_ARG_ENABLE_BOOL(install-strip,
     PKG_SKIP_STRIP=1)
 
 dnl ========================================================
-dnl = --disable-elf-hack
-dnl ========================================================
-
-USE_ELF_HACK=1
-MOZ_ARG_DISABLE_BOOL(elf-hack,
-[  --disable-elf-hack      Disable elf hacks],
-    [USE_ELF_HACK=],
-    [USE_ELF_HACK=1])
-
-# Only enable elfhack where supported
-if test "$USE_ELF_HACK" = 1; then
-    case "${HOST_OS_ARCH},${OS_ARCH}" in
-    Linux,Linux)
-        case "${CPU_ARCH}" in
-        arm | x86 | x86_64)
-            USE_ELF_HACK=1
-            ;;
-        *)
-            USE_ELF_HACK=
-            ;;
-        esac
-        ;;
-    *)
-        USE_ELF_HACK=
-        ;;
-    esac
-fi
-
-dnl ========================================================
 dnl = libstdc++ compatibility hacks
 dnl ========================================================
 
@@ -4468,20 +4452,24 @@ dnl
 dnl option to disable necko's wifi scanner
 dnl
 
-case "$OS_TARGET" in
-  Darwin)
-    if test -z "$MOZ_IOS"; then
+if test "$MOZ_WIDGET_TOOLKIT"; then
+
+  case "$OS_TARGET" in
+    Darwin)
+      if test -z "$MOZ_IOS"; then
+	NECKO_WIFI=1
+      fi
+      ;;
+    DragonFly|FreeBSD|WINNT)
       NECKO_WIFI=1
-    fi
-    ;;
-  DragonFly|FreeBSD|WINNT)
-    NECKO_WIFI=1
-    ;;
-  Linux)
-    NECKO_WIFI=1
-    NECKO_WIFI_DBUS=1
-    ;;
-esac
+      ;;
+    Linux)
+      NECKO_WIFI=1
+      NECKO_WIFI_DBUS=1
+      ;;
+  esac
+
+fi
 
 MOZ_ARG_DISABLE_BOOL(necko-wifi,
 [  --disable-necko-wifi    Disable necko wifi scanner],
@@ -4521,6 +4509,7 @@ AC_SUBST(AR)
 AC_SUBST(AR_FLAGS)
 AC_SUBST(AR_EXTRACT)
 AC_SUBST(AS)
+AC_SUBST(NM)
 AC_SUBST_LIST(ASFLAGS)
 AC_SUBST(AS_DASH_C_FLAG)
 AC_SUBST(RC)
@@ -4528,7 +4517,6 @@ AC_SUBST(RCFLAGS)
 AC_SUBST(WINDRES)
 AC_SUBST(IMPLIB)
 AC_SUBST(FILTER)
-AC_SUBST(BIN_FLAGS)
 AC_SUBST(MOZ_AUTH_EXTENSION)
 AC_SUBST(MOZ_PREF_EXTENSIONS)
 AC_SUBST_LIST(MOZ_DEBUG_LDFLAGS)
@@ -4563,7 +4551,6 @@ AC_SUBST(MOZ_EXCLUDE_HYPHENATION_DICTIONARIES)
 AC_SUBST(ENABLE_STRIP)
 AC_SUBST(PKG_SKIP_STRIP)
 AC_SUBST(STRIP_FLAGS)
-AC_SUBST(USE_ELF_HACK)
 AC_SUBST(INCREMENTAL_LINKER)
 
 AC_SUBST_LIST(MOZ_FIX_LINK_PATHS)
@@ -4873,7 +4860,6 @@ AC_SUBST(HAVE_X86_AVX2)
 AC_SUBST(HAVE_ALTIVEC)
 AC_SUBST(GCC_USE_GNU_LD)
 
-AC_SUBST(WRAP_LDFLAGS)
 AC_SUBST(MKSHLIB)
 AC_SUBST(MKCSHLIB)
 AC_SUBST_LIST(DSO_CFLAGS)
@@ -5013,18 +4999,6 @@ HAVE_SYS_MOUNT_H
 "
 
 dnl ========================================================
-dnl Determine options to use for running the preprocessor.
-dnl ========================================================
-
-if test -z "$GNU_CC" -a "$OS_ARCH" = "WINNT"; then
-    PREPROCESS_OPTION="-P -Fi"
-else
-    PREPROCESS_OPTION="-E -o "
-fi
-
-AC_SUBST(PREPROCESS_OPTION)
-
-dnl ========================================================
 dnl mask as shorthand property
 dnl ========================================================
 
@@ -5075,9 +5049,8 @@ if test -n "$_subconfigure_subdir"; then
   srcdir="$_save_srcdir"
 fi
 
-if test "$COMPILE_ENVIRONMENT"; then
+if test "$COMPILE_ENVIRONMENT" -a "$MOZ_WIDGET_TOOLKIT"; then
 
-export WRAP_LDFLAGS
 
 dnl ========================================================
 dnl = Setup a nice relatively clean build environment for
@@ -5144,6 +5117,7 @@ export HOST_CFLAGS
 export HOST_CPPFLAGS
 export HOST_CXXFLAGS
 export HOST_LDFLAGS
+export MOZ_PGO
 
 if ! test -e js; then
     mkdir js

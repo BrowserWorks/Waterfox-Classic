@@ -4,7 +4,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-if not CONFIG['JS_STANDALONE']:
+if CONFIG['MOZ_WIDGET_TOOLKIT']:
     TEST_DIRS += [
         'gtest',
     ]
@@ -71,7 +71,7 @@ DEFINES['IMPL_MFBT'] = True
 
 DisableStlWrapping()
 
-if CONFIG['_MSC_VER']:
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
   CXXFLAGS += [
     '-wd4275', # non dll-interface class used as base for dll-interface class
     '-wd4530', # C++ exception handler used, but unwind semantics are not enabled
@@ -81,5 +81,5 @@ USE_LIBS += [
     'mfbt',
 ]
 
-if CONFIG['GNU_CXX']:
+if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     CXXFLAGS += ['-Wno-error=shadow']

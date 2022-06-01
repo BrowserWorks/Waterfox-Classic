@@ -151,19 +151,13 @@ endif
 # Enable profile-based feedback
 ifneq (1,$(NO_PROFILE_GUIDED_OPTIMIZE))
 ifdef MOZ_PROFILE_GENERATE
-PGO_CFLAGS += $(if $(filter $(notdir $<),$(notdir $(NO_PROFILE_GUIDED_OPTIMIZE))),,$(PROFILE_GEN_CFLAGS))
+PGO_CFLAGS += $(if $(filter $(notdir $<),$(notdir $(NO_PROFILE_GUIDED_OPTIMIZE))),,$(PROFILE_GEN_CFLAGS) $(COMPUTED_PROFILE_GEN_DYN_CFLAGS))
 PGO_LDFLAGS += $(PROFILE_GEN_LDFLAGS)
-ifeq (WINNT,$(OS_ARCH))
-AR_FLAGS += -LTCG
-endif
 endif # MOZ_PROFILE_GENERATE
 
 ifdef MOZ_PROFILE_USE
 PGO_CFLAGS += $(if $(filter $(notdir $<),$(notdir $(NO_PROFILE_GUIDED_OPTIMIZE))),,$(PROFILE_USE_CFLAGS))
 PGO_LDFLAGS += $(PROFILE_USE_LDFLAGS)
-ifeq (WINNT,$(OS_ARCH))
-AR_FLAGS += -LTCG
-endif
 endif # MOZ_PROFILE_USE
 endif # NO_PROFILE_GUIDED_OPTIMIZE
 
@@ -198,16 +192,44 @@ INCLUDES = \
 
 include $(MOZILLA_DIR)/config/static-checking-config.mk
 
-LDFLAGS		= $(COMPUTED_LDFLAGS) $(PGO_LDFLAGS) $(MK_LDFLAGS)
+ifdef MOZ_PROFILE_GENERATE
+MOZ_LTO_CFLAGS :=
+MOZ_LTO_LDFLAGS :=
+endif
 
-COMPILE_CFLAGS	= $(COMPUTED_CFLAGS) $(PGO_CFLAGS) $(_DEPEND_CFLAGS) $(MK_COMPILE_DEFINES)
-COMPILE_CXXFLAGS = $(COMPUTED_CXXFLAGS) $(PGO_CFLAGS) $(_DEPEND_CFLAGS) $(MK_COMPILE_DEFINES)
-COMPILE_CMFLAGS = $(OS_COMPILE_CMFLAGS) $(MOZBUILD_CMFLAGS)
-COMPILE_CMMFLAGS = $(OS_COMPILE_CMMFLAGS) $(MOZBUILD_CMMFLAGS)
+LDFLAGS		= $(MOZ_LTO_LDFLAGS) $(COMPUTED_LDFLAGS) $(PGO_LDFLAGS) $(MK_LDFLAGS)
+
+COMPILE_CFLAGS	= $(MOZ_LTO_CFLAGS) $(COMPUTED_CFLAGS) $(PGO_CFLAGS) $(_DEPEND_CFLAGS) $(MK_COMPILE_DEFINES)
+COMPILE_CXXFLAGS = $(MOZ_LTO_CFLAGS) $(COMPUTED_CXXFLAGS) $(PGO_CFLAGS) $(_DEPEND_CFLAGS) $(MK_COMPILE_DEFINES)
+COMPILE_CMFLAGS = $(MOZ_LTO_CFLAGS) $(OS_COMPILE_CMFLAGS) $(MOZBUILD_CMFLAGS)
+COMPILE_CMMFLAGS = $(MOZ_LTO_CFLAGS) $(OS_COMPILE_CMMFLAGS) $(MOZBUILD_CMMFLAGS)
 ASFLAGS = $(COMPUTED_ASFLAGS)
+SFLAGS = $(COMPUTED_SFLAGS)
 
 HOST_CFLAGS = $(COMPUTED_HOST_CFLAGS) $(_DEPEND_CFLAGS)
 HOST_CXXFLAGS = $(COMPUTED_HOST_CXXFLAGS) $(_DEPEND_CFLAGS)
+HOST_C_LDFLAGS = $(COMPUTED_HOST_C_LDFLAGS)
+HOST_CXX_LDFLAGS = $(COMPUTED_HOST_CXX_LDFLAGS)
+
+ifdef MOZ_LTO
+ifeq (Darwin,$(OS_TARGET))
+# When linking on macOS, debug info is not linked along with the final binary,
+# and the dwarf data stays in object files until they are "linked" with the
+# dsymutil tool.
+# With LTO, object files are temporary, and are not kept around, which
+# means there's no object file for dsymutil to do its job. Consequently,
+# there is no debug info for LTOed compilation units.
+# The macOS linker has however an option to explicitly keep those object
+# files, which dsymutil will then find.
+# The catch is that the linker uses sequential numbers for those object
+# files, and doesn't avoid conflicts from multiple linkers running at
+# the same time. So in directories with multiple binaries, object files
+# from the first linked binaries would be overwritten by those of the
+# last linked binary. So we use a subdirectory containing the name of the
+# linked binary.
+LDFLAGS += -Wl,-object_path_lto,$(@F).lto.o/
+endif
+endif
 
 # We only add color flags if neither the flag to disable color
 # (e.g. "-fno-color-diagnostics" nor a flag to control color
@@ -333,7 +355,7 @@ else
 
 # This isn't laid out as conditional directives so that NSDISTMODE can be
 # target-specific.
-INSTALL         = $(if $(filter copy, $(NSDISTMODE)), $(NSINSTALL) -t, $(if $(filter absolute_symlink, $(NSDISTMODE)), $(NSINSTALL) -L $(PWD), $(NSINSTALL) -R))
+INSTALL         = $(if $(filter absolute_symlink, $(NSDISTMODE)), $(NSINSTALL) -L $(PWD), $(NSINSTALL) -R)
 
 endif # WINNT
 
@@ -421,83 +443,22 @@ CREATE_PRECOMPLETE_CMD = $(PYTHON) $(abspath $(MOZILLA_DIR)/config/createprecomp
 # MDDEPDIR is the subdirectory where dependency files are stored
 MDDEPDIR := .deps
 
-EXPAND_LIBS_EXEC = $(PYTHON) $(MOZILLA_DIR)/config/expandlibs_exec.py
-EXPAND_LIBS_GEN = $(PYTHON) $(MOZILLA_DIR)/config/expandlibs_gen.py
-EXPAND_AR = $(EXPAND_LIBS_EXEC) --extract -- $(AR)
-EXPAND_CC = $(EXPAND_LIBS_EXEC) --uselist -- $(CC)
-EXPAND_CCC = $(EXPAND_LIBS_EXEC) --uselist -- $(CCC)
-EXPAND_LINK = $(EXPAND_LIBS_EXEC) --uselist -- $(LINK)
-EXPAND_MKSHLIB_ARGS = --uselist
-ifdef SYMBOL_ORDER
-EXPAND_MKSHLIB_ARGS += --symbol-order $(SYMBOL_ORDER)
-endif
-EXPAND_MKSHLIB = $(EXPAND_LIBS_EXEC) $(EXPAND_MKSHLIB_ARGS) -- $(MKSHLIB)
-
-# $(call CHECK_SYMBOLS,lib,PREFIX,dep_name,test)
-# Checks that the given `lib` doesn't contain dependency on symbols with a
-# version starting with `PREFIX`_ and matching the `test`. `dep_name` is only
-# used for the error message.
-# `test` is an awk expression using the information in the variable `v` which
-# contains a list of version items ([major, minor, ...]).
-define CHECK_SYMBOLS
-@$(TOOLCHAIN_PREFIX)readelf -sW $(1) | \
-awk '$$8 ~ /@$(2)_/ { \
-	split($$8,a,"@"); \
-	split(a[2],b,"_"); \
-	split(b[2],v,"."); \
-	if ($(4)) { \
-		if (!found) { \
-			print "TEST-UNEXPECTED-FAIL | check_stdcxx | We do not want these $(3) symbol versions to be used:" \
-		} \
-		print " ",$$8; \
-		found=1 \
-	} \
-} \
-END { \
-	if (found) { \
-		exit(1) \
-	} \
-}'
-endef
-
-ifneq (,$(MOZ_LIBSTDCXX_TARGET_VERSION)$(MOZ_LIBSTDCXX_HOST_VERSION))
-CHECK_STDCXX = $(call CHECK_SYMBOLS,$(1),GLIBCXX,libstdc++,v[1] > 3 || (v[1] == 3 && v[2] == 4 && v[3] > 16))
-CHECK_GLIBC = $(call CHECK_SYMBOLS,$(1),GLIBC,libc,v[1] > 2 || (v[1] == 2 && v[2] > 12))
-endif
-
-ifeq (,$(filter $(OS_TARGET),WINNT Darwin))
-CHECK_TEXTREL = @$(TOOLCHAIN_PREFIX)readelf -d $(1) | grep TEXTREL > /dev/null && echo 'TEST-UNEXPECTED-FAIL | check_textrel | We do not want text relocations in libraries and programs' || true
-endif
-
-ifeq ($(MOZ_WIDGET_TOOLKIT),android)
-# While this is very unlikely (libc being added by the compiler at the end
-# of the linker command line), if libmozglue.so ends up after libc.so, all
-# hell breaks loose, so better safe than sorry, and check it's actually the
-# case.
-CHECK_MOZGLUE_ORDER = @$(TOOLCHAIN_PREFIX)readelf -d $(1) | grep NEEDED | awk '{ libs[$$NF] = ++n } END { if (libs["[libmozglue.so]"] && libs["[libc.so]"] < libs["[libmozglue.so]"]) { print "libmozglue.so must be linked before libc.so"; exit 1 } }'
-endif
-
-define CHECK_BINARY
-$(call CHECK_GLIBC,$(1))
-$(call CHECK_STDCXX,$(1))
-$(call CHECK_TEXTREL,$(1))
-$(call LOCAL_CHECKS,$(1))
-$(call CHECK_MOZGLUE_ORDER,$(1))
-endef
-
 # autoconf.mk sets OBJ_SUFFIX to an error to avoid use before including
 # this file
 OBJ_SUFFIX := $(_OBJ_SUFFIX)
 
-# PGO builds with GCC build objects with instrumentation in a first pass,
-# then objects optimized, without instrumentation, in a second pass. If
-# we overwrite the objects from the first pass with those from the second,
-# we end up not getting instrumentation data for better optimization on
-# incremental builds. As a consequence, we use a different object suffix
-# for the first pass.
-ifndef NO_PROFILE_GUIDED_OPTIMIZE
+OBJS_VAR_SUFFIX := OBJS
+
+# PGO builds with GCC and clang-cl build objects with instrumentation in
+# a first pass, then objects optimized, without instrumentation, in a
+# second pass. If we overwrite the objects from the first pass with
+# those from the second, we end up not getting instrumentation data for
+# better optimization on incremental builds. As a consequence, we use a
+# different object suffix for the first pass.
 ifdef MOZ_PROFILE_GENERATE
-ifdef GNU_CC
+ifneq (,$(GNU_CC)$(CLANG_CL))
+OBJS_VAR_SUFFIX := PGO_OBJS
+ifndef NO_PROFILE_GUIDED_OPTIMIZE
 OBJ_SUFFIX := i_o
 endif
 endif

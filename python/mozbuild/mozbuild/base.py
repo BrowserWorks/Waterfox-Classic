@@ -211,8 +211,7 @@ class MozbuildObject(ProcessExecutionMixin):
         """
         if not isinstance(self._mozconfig, dict):
             loader = MozconfigLoader(self.topsrcdir)
-            self._mozconfig = loader.read_mozconfig(path=self._mozconfig,
-                moz_build_app=os.environ.get('MOZ_CURRENT_PROJECT'))
+            self._mozconfig = loader.read_mozconfig(path=self._mozconfig)
 
         return self._mozconfig
 
@@ -361,7 +360,7 @@ class MozbuildObject(ProcessExecutionMixin):
         args = o._normalize_command([p], True)
 
         _config_guess_output.append(
-                subprocess.check_output(args, cwd=self.topsrcdir).strip())
+                subprocess.check_output(args, cwd=self.topsrcdir, shell=True).strip())
         return _config_guess_output[0]
 
     def notify(self, msg):

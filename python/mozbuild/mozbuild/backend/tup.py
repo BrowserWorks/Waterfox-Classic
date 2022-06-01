@@ -42,9 +42,8 @@ class BackendTupfile(object):
     """Represents a generated Tupfile.
     """
 
-    def __init__(self, srcdir, objdir, environment, topsrcdir, topobjdir):
+    def __init__(self, objdir, environment, topsrcdir, topobjdir):
         self.topsrcdir = topsrcdir
-        self.srcdir = srcdir
         self.objdir = objdir
         self.relobjdir = mozpath.relpath(objdir, topobjdir)
         self.environment = environment
@@ -144,17 +143,16 @@ class TupOnly(CommonBackend, PartialBackend):
         # will be built before any rules that list this as an input.
         self._installed_files = '$(MOZ_OBJ_ROOT)/<installed-files>'
 
-    def _get_backend_file(self, relativedir):
-        objdir = mozpath.join(self.environment.topobjdir, relativedir)
-        srcdir = mozpath.join(self.environment.topsrcdir, relativedir)
+    def _get_backend_file(self, relobjdir):
+        objdir = mozpath.join(self.environment.topobjdir, relobjdir)
         if objdir not in self._backend_files:
             self._backend_files[objdir] = \
-                    BackendTupfile(srcdir, objdir, self.environment,
+                    BackendTupfile(objdir, self.environment,
                                    self.environment.topsrcdir, self.environment.topobjdir)
         return self._backend_files[objdir]
 
     def _get_backend_file_for(self, obj):
-        return self._get_backend_file(obj.relativedir)
+        return self._get_backend_file(obj.relobjdir)
 
     def _py_action(self, action):
         cmd = [
@@ -443,8 +441,8 @@ class TupOnly(CommonBackend, PartialBackend):
             outputs=[output],
         )
 
-    def _handle_ipdl_sources(self, ipdl_dir, sorted_ipdl_sources,
-                             unified_ipdl_cppsrcs_mapping):
+    def _handle_ipdl_sources(self, ipdl_dir, sorted_ipdl_sources, sorted_nonstatic_ipdl_sources,
+                             sorted_static_ipdl_sources, unified_ipdl_cppsrcs_mapping):
         # TODO: This isn't implemented yet in the tup backend, but it is called
         # by the CommonBackend.
         pass
