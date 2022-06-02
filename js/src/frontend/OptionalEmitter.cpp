@@ -22,10 +22,19 @@ OptionalEmitter::OptionalEmitter(BytecodeEmitter* bce, int32_t initialDepth,
       initialDepth_(initialDepth), op_(op), kind_(kind) {}
 
 bool OptionalEmitter::emitOptionalJumpLabel() {
-    return bce_->emitJump(JSOP_LABEL, &top_);
+    MOZ_ASSERT(state_ == State::Start);
+    if (!bce_->emitJump(JSOP_LABEL, &top_)) {
+        return false;
+    }
+#ifdef DEBUG
+    state_ = State::Label;
+#endif
+    return true;
 }
 
 bool OptionalEmitter::emitJumpShortCircuit() {
+    MOZ_ASSERT(state_ == State::Label || state_ == State::ShortCircuit ||
+               state_ == State::ShortCircuitForCall);
     MOZ_ASSERT(initialDepth_ + 1 == bce_->stackDepth);
     InternalIfEmitter ifEmitter(bce_);
     if (!bce_->emitPushNotUndefinedOrNull())
@@ -55,10 +64,15 @@ bool OptionalEmitter::emitJumpShortCircuit() {
     if (!ifEmitter.emitEnd()) {
         return false;
     }
+#ifdef DEBUG
+    state_ = State::ShortCircuit;
+#endif
     return true;
 }
 
 bool OptionalEmitter::emitJumpShortCircuitForCall() {
+    MOZ_ASSERT(state_ == State::Label || state_ == State::ShortCircuit ||
+               state_ == State::ShortCircuitForCall);
     int32_t depth = bce_->stackDepth;
     MOZ_ASSERT(initialDepth_ + 2 == depth);
     if (!bce_->emit1(JSOP_SWAP))
@@ -99,10 +113,15 @@ bool OptionalEmitter::emitJumpShortCircuitForCall() {
 
     if (!bce_->emit1(JSOP_SWAP))
         return false;
+#ifdef DEBUG
+    state_ = State::ShortCircuitForCall;
+#endif
     return true;
 }
 
 bool OptionalEmitter::emitOptionalJumpTarget() {
+    MOZ_ASSERT(state_ == State::ShortCircuit ||
+               state_ == State::ShortCircuitForCall);
     // Patch the JSOP_LABEL offset.
     JumpTarget brk{ bce_->lastNonJumpTargetOffset() };
     bce_->patchJumpsToTarget(top_, brk);
@@ -114,6 +133,8 @@ bool OptionalEmitter::emitOptionalJumpTarget() {
     // XXX: Commented out due to workaround for missing JSOP_GOTO functionality
     /*// reset stack depth to the depth when we jumped
     bce_->stackDepth = initialDepth_ + 1;*/
-
+#ifdef DEBUG
+    state_ = State::JumpEnd;
+#endif
     return true;
 }
