@@ -117,13 +117,12 @@ class CallOrNewEmitter;
 class ElemOpEmitter;
 class EmitterScope;
 class NestableControl;
+class OptionalEmitter;
 class PropOpEmitter;
 class TDZCheckCache;
 
 struct MOZ_STACK_CLASS BytecodeEmitter
 {
-    class OptionalEmitter;
-
     SharedContext* const sc;      /* context shared between parsing and bytecode generation */
 
     JSContext* const cx;
