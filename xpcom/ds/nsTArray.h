@@ -2034,6 +2034,9 @@ nsTArray_Impl<E, Alloc>::ReplaceElementsAt(index_type aStart, size_type aCount,
   if (MOZ_UNLIKELY(aStart > Length())) {
     InvalidArrayIndex_CRASH(aStart, Length());
   }
+  if (MOZ_UNLIKELY(aCount > Length() - aStart)) {
+    InvalidArrayIndex_CRASH(aStart + aCount, Length());
+  }
 
   // Adjust memory allocation up-front to catch errors.
   if (!ActualAlloc::Successful(this->template EnsureCapacity<ActualAlloc>(
