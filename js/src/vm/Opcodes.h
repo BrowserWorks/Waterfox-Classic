@@ -2259,8 +2259,16 @@
      *   Stack: => %BuiltinPrototype%
      */ \
     macro(JSOP_BUILTINPROTO, 221, "builtinproto", NULL, 2,  0,  1,  JOF_UINT8) \
-    macro(JSOP_UNUSED222,     222,"unused222",     NULL,  1,  0,  0,  JOF_BYTE) \
-    macro(JSOP_UNUSED223,     223,"unused223",     NULL,  1,  0,  0,  JOF_BYTE) \
+    \
+    /*
+     * NOP opcode to hint to IonBuilder that the value on top of the stack is
+     * the (likely string) key in a for-in loop.
+     *   Category: Other
+     *   Operands:
+     *   Stack: val => val
+     */ \
+    macro(JSOP_ITERNEXT,      222, "iternext",   NULL,  1,  1,  1,  JOF_BYTE) \
+    macro(JSOP_UNUSED223,     223, "unused223",  NULL,  1,  0,  0,  JOF_BYTE) \
     \
     /*
      * Creates rest parameter array for current function call, and pushes it
@@ -2339,14 +2347,23 @@
      *   Stack: callee, this, args[0], ..., args[argc-1] => rval
      *   nuses: (argc+2)
      */ \
-    macro(JSOP_CALL_IGNORES_RV, 231, "call-ignores-rv", NULL, 3, -1, 1, JOF_UINT16|JOF_INVOKE|JOF_TYPESET)
+    macro(JSOP_CALL_IGNORES_RV, 231, "call-ignores-rv", NULL, 3, -1, 1, JOF_UINT16|JOF_INVOKE|JOF_TYPESET)\
+    /*
+     * If the value on top of the stack is not null or undefined, jumps to a 32-bit offset from the
+     * current bytecode.
+     *
+     *   Category: Statements
+     *   Type: Jumps
+     *   Operands: int32_t offset
+     *   Stack: cond => cond
+     */ \
+    macro(JSOP_COALESCE, 232, "coalesce", NULL, 5, 1, 1, JOF_JUMP|JOF_DETECTING)
 
 /*
  * In certain circumstances it may be useful to "pad out" the opcode space to
  * a power of two.  Use this macro to do so.
  */
 #define FOR_EACH_TRAILING_UNUSED_OPCODE(macro) \
-    macro(232) \
     macro(233) \
     macro(234) \
     macro(235) \

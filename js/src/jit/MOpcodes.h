@@ -276,6 +276,7 @@ namespace jit {
     _(IsArray)                                                              \
     _(IsTypedArray)                                                         \
     _(IsObject)                                                             \
+    _(IsNullOrUndefined)                                                    \
     _(HasClass)                                                             \
     _(ObjectClassToString)                                                  \
     _(CopySign)                                                             \

@@ -1093,17 +1093,6 @@ class MOZ_RAII JSAutoRequest
 extern JS_PUBLIC_API(JSVersion)
 JS_GetVersion(JSContext* cx);
 
-/**
- * Mutate the version on the compartment. This is generally discouraged, but
- * necessary to support the version mutation in the js and xpc shell command
- * set.
- *
- * It would be nice to put this in jsfriendapi, but the linkage requirements
- * of the shells make that impossible.
- */
-JS_PUBLIC_API(void)
-JS_SetVersionForCompartment(JSCompartment* compartment, JSVersion version);
-
 extern JS_PUBLIC_API(const char*)
 JS_VersionToString(JSVersion version);
 
@@ -6156,7 +6145,7 @@ enum TranscodeResult
     TranscodeResult_Failure_BadBuildId =          TranscodeResult_Failure | 0x1,
     TranscodeResult_Failure_RunOnceNotSupported = TranscodeResult_Failure | 0x2,
     TranscodeResult_Failure_AsmJSNotSupported =   TranscodeResult_Failure | 0x3,
-    TranscodeResult_Failure_UnknownClassKind =    TranscodeResult_Failure | 0x4,
+    TranscodeResult_Failure_BadDecode =           TranscodeResult_Failure | 0x4,
     TranscodeResult_Failure_WrongCompileOption =  TranscodeResult_Failure | 0x5,
     TranscodeResult_Failure_NotInterpretedFun =   TranscodeResult_Failure | 0x6,
 

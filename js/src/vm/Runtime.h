@@ -28,7 +28,6 @@
 #include "builtin/AtomicsObject.h"
 #include "builtin/intl/SharedIntlData.h"
 #include "builtin/Promise.h"
-#include "ds/FixedSizeHash.h"
 #include "frontend/NameCollections.h"
 #include "gc/GCRuntime.h"
 #include "gc/Tracer.h"
@@ -138,7 +137,7 @@ struct JSAtomState
 #define PROPERTYNAME_FIELD(idpart, id, text) js::ImmutablePropertyNamePtr id;
     FOR_EACH_COMMON_PROPERTYNAME(PROPERTYNAME_FIELD)
 #undef PROPERTYNAME_FIELD
-#define PROPERTYNAME_FIELD(name, code, init, clasp) js::ImmutablePropertyNamePtr name;
+#define PROPERTYNAME_FIELD(name, init, clasp) js::ImmutablePropertyNamePtr name;
     JS_FOR_EACH_PROTOTYPE(PROPERTYNAME_FIELD)
 #undef PROPERTYNAME_FIELD
 #define PROPERTYNAME_FIELD(name) js::ImmutablePropertyNamePtr name;
@@ -381,6 +380,12 @@ struct JSRuntime : public js::MallocProvider<JSRuntime>
 
     /* Call this to get the name of a compartment. */
     js::MainThreadData<JSCompartmentNameCallback> compartmentNameCallback;
+
+    /* Realm destroy callback. */
+    js::MainThreadData<JS::DestroyRealmCallback> destroyRealmCallback;
+
+    /* Call this to get the name of a realm. */
+    js::MainThreadData<JS::RealmNameCallback> realmNameCallback;
 
     /* Callback for doing memory reporting on external strings. */
     js::MainThreadData<JSExternalStringSizeofCallback> externalStringSizeofCallback;
@@ -1056,8 +1061,10 @@ VersionIsKnown(JSVersion version)
 /*
  * RAII class that takes the GC lock while it is live.
  *
- * Note that the lock may be temporarily released by use of AutoUnlockGC when
- * passed a non-const reference to this class.
+ * Usually functions will pass const references of this class.  However
+ * non-const references can be used to either temporarily release the lock by
+ * use of AutoUnlockGC or to start background allocation when the lock is
+ * released.
  */
 class MOZ_RAII AutoLockGC
 {
@@ -1071,7 +1078,7 @@ class MOZ_RAII AutoLockGC
     }
 
     ~AutoLockGC() {
-        unlock();
+        lockGuard_.reset();
     }
 
     void lock() {
@@ -1088,6 +1095,9 @@ class MOZ_RAII AutoLockGC
         return lockGuard_.ref();
     }
 
+  protected:
+    JSRuntime* runtime() const { return runtime_; }
+
   private:
     JSRuntime* runtime_;
     mozilla::Maybe<js::LockGuard<js::Mutex>> lockGuard_;
@@ -1095,6 +1105,46 @@ class MOZ_RAII AutoLockGC
 
     AutoLockGC(const AutoLockGC&) = delete;
     AutoLockGC& operator=(const AutoLockGC&) = delete;
+};
+
+/*
+ * Same as AutoLockGC except it can optionally start a background chunk
+ * allocation task when the lock is released.
+ */
+class MOZ_RAII AutoLockGCBgAlloc : public AutoLockGC
+{
+  public:
+    explicit AutoLockGCBgAlloc(JSRuntime* rt)
+      : AutoLockGC(rt)
+      , startBgAlloc(false)
+    {}
+
+    ~AutoLockGCBgAlloc() {
+        unlock();
+
+        /*
+         * We have to do this after releasing the lock because it may acquire
+         * the helper lock which could cause lock inversion if we still held
+         * the GC lock.
+         */
+        if (startBgAlloc)
+            runtime()->gc.startBackgroundAllocTaskIfIdle();
+    }
+
+    /*
+     * This can be used to start a background allocation task (if one isn't
+     * already running) that allocates chunks and makes them available in the
+     * free chunks list.  This happens after the lock is released in order to
+     * avoid lock inversion.
+     */
+    void tryToStartBackgroundAllocation() {
+        startBgAlloc = true;
+    }
+
+  private:
+    // true if we should start a background chunk allocation task after the
+    // lock is released.
+    bool startBgAlloc;
 };
 
 class MOZ_RAII AutoUnlockGC

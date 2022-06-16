@@ -907,6 +907,9 @@ class DebugEnvironmentProxy : public ProxyObject
     static DebugEnvironmentProxy* create(JSContext* cx, EnvironmentObject& env,
                                          HandleObject enclosing);
 
+    // NOTE: The environment may be a debug hollow with invalid
+    // enclosingEnvironment. Always use the enclosingEnvironment accessor on
+    // the DebugEnvironmentProxy in order to walk the environment chain.
     EnvironmentObject& environment() const;
     JSObject& enclosingEnvironment() const;
 
@@ -981,7 +984,7 @@ class DebugEnvironments
 
   public:
     void trace(JSTracer* trc);
-    void sweep(JSRuntime* rt);
+    void sweep();
     void finish();
 #ifdef JS_GC_ZEAL
     void checkHashTablesAfterMovingGC(JSRuntime* rt);

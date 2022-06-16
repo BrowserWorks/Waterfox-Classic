@@ -571,6 +571,7 @@ class IonBuilder
     AbortReasonOr<Ok> jsop_itermore();
     AbortReasonOr<Ok> jsop_isnoiter();
     AbortReasonOr<Ok> jsop_iterend();
+    AbortReasonOr<Ok> jsop_iternext();
     AbortReasonOr<Ok> jsop_in();
     AbortReasonOr<Ok> jsop_hasown();
     AbortReasonOr<Ok> jsop_instanceof();
@@ -1057,9 +1058,6 @@ class IonBuilder
     // an outer script.
     bool failedLexicalCheck_;
 
-    // Has an iterator other than 'for in'.
-    bool nonStringIteration_;
-
 #ifdef DEBUG
     // If this script uses the lazy arguments object.
     bool hasLazyArguments_;
@@ -1100,6 +1098,8 @@ class IonBuilder
     }
 
     MGetPropertyCache* maybeFallbackFunctionGetter_;
+
+    bool needsPostBarrier(MDefinition* value);
 
     // Used in tracking outcomes of optimization strategies for devtools.
     void startTrackingOptimizations();
@@ -1324,8 +1324,6 @@ class CallInfo
             getArg(i)->setImplicitlyUsedUnchecked();
     }
 };
-
-bool NeedsPostBarrier(MDefinition* value);
 
 } // namespace jit
 } // namespace js

@@ -92,11 +92,6 @@ CompileStandaloneAsyncGenerator(JSContext* cx, MutableHandleFunction fun,
                                 JS::SourceBufferHolder& srcBuf,
                                 const mozilla::Maybe<uint32_t>& parameterListEnd);
 
-MOZ_MUST_USE bool
-CompileAsyncFunctionBody(JSContext* cx, MutableHandleFunction fun,
-                         const ReadOnlyCompileOptions& options,
-                         Handle<PropertyNameVector> formals, JS::SourceBufferHolder& srcBuf);
-
 ScriptSourceObject*
 CreateScriptSourceObject(JSContext* cx, const ReadOnlyCompileOptions& options,
                          const mozilla::Maybe<uint32_t>& parameterListEnd = mozilla::Nothing());
@@ -139,9 +134,6 @@ class MOZ_STACK_CLASS AutoFrontendTraceLog
 #endif
 
   public:
-    AutoFrontendTraceLog(JSContext* cx, const TraceLoggerTextId id,
-                         const char* filename, size_t line, size_t column);
-
     AutoFrontendTraceLog(JSContext* cx, const TraceLoggerTextId id,
                          const ErrorReporter& reporter);
 

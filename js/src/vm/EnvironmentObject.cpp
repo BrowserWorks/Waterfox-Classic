@@ -2441,7 +2441,7 @@ DebugEnvironments::trace(JSTracer* trc)
 }
 
 void
-DebugEnvironments::sweep(JSRuntime* rt)
+DebugEnvironments::sweep()
 {
     /*
      * missingEnvs points to debug envs weakly so that debug envs can be

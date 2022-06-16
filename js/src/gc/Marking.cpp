@@ -2808,7 +2808,6 @@ js::TenuringTracer::moveToTenured(JSObject* src)
     insertIntoFixupList(overlay);
 
     TracePromoteToTenured(src, dst);
-    MemProfiler::MoveNurseryToTenured(src, dst);
     return dst;
 }
 

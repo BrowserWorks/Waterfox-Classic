@@ -376,6 +376,7 @@ class CFGCompare : public CFGAryControlInstruction<2>
     }
 };
 
+enum class CFGTestKind { Coalesce, ToBoolean, ToBooleanAndPop };
 /**
  * CFGTest
  *
@@ -384,24 +385,18 @@ class CFGCompare : public CFGAryControlInstruction<2>
  * IFNEQ JUMP succ2
  *
  */
-class CFGTest : public CFGAryControlInstruction<2>
-{
-    // By default the condition gets popped. This variable
-    // keeps track if we want to keep the condition.
-    bool keepCondition_;
+class CFGTest : public CFGAryControlInstruction<2> {
+  CFGTestKind kind_;
 
-    CFGTest(CFGBlock* succ1, CFGBlock* succ2)
-      : keepCondition_(false)
-    {
-        replaceSuccessor(0, succ1);
-        replaceSuccessor(1, succ2);
-    }
-    CFGTest(CFGBlock* succ1, CFGBlock* succ2, bool keepCondition)
-      : keepCondition_(keepCondition)
-    {
-        replaceSuccessor(0, succ1);
-        replaceSuccessor(1, succ2);
-    }
+  CFGTest(CFGBlock* succ1, CFGBlock* succ2)
+      : kind_(CFGTestKind::ToBooleanAndPop) {
+    replaceSuccessor(0, succ1);
+    replaceSuccessor(1, succ2);
+  }
+  CFGTest(CFGBlock* succ1, CFGBlock* succ2, CFGTestKind kind) : kind_(kind) {
+    replaceSuccessor(0, succ1);
+    replaceSuccessor(1, succ2);
+  }
 
   public:
     CFG_CONTROL_HEADER(Test);
@@ -410,7 +405,7 @@ class CFGTest : public CFGAryControlInstruction<2>
     static CFGTest* CopyWithNewTargets(TempAllocator& alloc, CFGTest* old,
                                        CFGBlock* succ1, CFGBlock* succ2)
     {
-        return new(alloc) CFGTest(succ1, succ2, old->mustKeepCondition());
+        return new (alloc) CFGTest(succ1, succ2, old->getKind());
     }
 
     CFGBlock* trueBranch() const {
@@ -419,12 +414,7 @@ class CFGTest : public CFGAryControlInstruction<2>
     CFGBlock* falseBranch() const {
         return getSuccessor(1);
     }
-    void keepCondition() {
-        keepCondition_ = true;
-    }
-    bool mustKeepCondition() const {
-        return keepCondition_;
-    }
+    CFGTestKind getKind() const { return kind_; }
 };
 
 /**
@@ -552,19 +542,23 @@ class CFGBackEdge : public CFGUnaryControlInstruction
 class CFGLoopEntry : public CFGUnaryControlInstruction
 {
     bool canOsr_;
+    bool isForIn_;
     size_t stackPhiCount_;
     jsbytecode* loopStopPc_;
 
     CFGLoopEntry(CFGBlock* block, size_t stackPhiCount)
       : CFGUnaryControlInstruction(block),
         canOsr_(false),
+        isForIn_(false),
         stackPhiCount_(stackPhiCount),
         loopStopPc_(nullptr)
     {}
 
-    CFGLoopEntry(CFGBlock* block, bool canOsr, size_t stackPhiCount, jsbytecode* loopStopPc)
+    CFGLoopEntry(CFGBlock* block, bool canOsr, bool isForIn, size_t stackPhiCount,
+                 jsbytecode* loopStopPc)
       : CFGUnaryControlInstruction(block),
         canOsr_(canOsr),
+        isForIn_(isForIn),
         stackPhiCount_(stackPhiCount),
         loopStopPc_(loopStopPc)
     {}
@@ -576,8 +570,8 @@ class CFGLoopEntry : public CFGUnaryControlInstruction
     static CFGLoopEntry* CopyWithNewTargets(TempAllocator& alloc, CFGLoopEntry* old,
                                             CFGBlock* loopEntry)
     {
-        return new(alloc) CFGLoopEntry(loopEntry, old->canOsr(), old->stackPhiCount(),
-                                       old->loopStopPc());
+        return new(alloc) CFGLoopEntry(loopEntry, old->canOsr(), old->isForIn(),
+                                       old->stackPhiCount(), old->loopStopPc());
     }
 
     void setCanOsr() {
@@ -586,6 +580,13 @@ class CFGLoopEntry : public CFGUnaryControlInstruction
 
     bool canOsr() const {
         return canOsr_;
+    }
+
+    void setIsForIn() {
+        isForIn_ = true;
+    }
+    bool isForIn() const {
+        return isForIn_;
     }
 
     size_t stackPhiCount() const {
@@ -706,7 +707,7 @@ class ControlFlowGenerator
             TABLE_SWITCH,       // switch() { x }
             COND_SWITCH_CASE,   // switch() { case X: ... }
             COND_SWITCH_BODY,   // switch() { case ...: X }
-            AND_OR,             // && x, || x
+            SHORT_CIRCUIT,      // && x, || x, ?? x
             LABEL,              // label: x
             TRY                 // try { x } catch(e) { }
         };
@@ -793,7 +794,7 @@ class ControlFlowGenerator
 
         static CFGState If(jsbytecode* join, CFGTest* test);
         static CFGState IfElse(jsbytecode* trueEnd, jsbytecode* falseEnd, CFGTest* test);
-        static CFGState AndOr(jsbytecode* join, CFGBlock* lhs);
+        static CFGState ShortCircuit(jsbytecode* join, CFGBlock* lhs);
         static CFGState TableSwitch(TempAllocator& alloc, jsbytecode* exitpc);
         static CFGState CondSwitch(TempAllocator& alloc, jsbytecode* exitpc,
                                    jsbytecode* defaultTarget);
@@ -864,8 +865,8 @@ class ControlFlowGenerator
     ControlStatus snoopControlFlow(JSOp op);
     ControlStatus processBrokenLoop(CFGState& state);
     ControlStatus finishLoop(CFGState& state, CFGBlock* successor);
-    ControlStatus processAndOr(JSOp op);
-    ControlStatus processAndOrEnd(CFGState& state);
+    ControlStatus processShortCircuit(JSOp op);
+    ControlStatus processShortCircuitEnd(CFGState& state);
     ControlStatus processLabel();
     ControlStatus processLabelEnd(CFGState& state);
 

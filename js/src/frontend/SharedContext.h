@@ -430,7 +430,7 @@ class FunctionBox : public ObjectBox, public SharedContext
 
     FunctionContextFlags funCxFlags;
 
-    FunctionBox(JSContext* cx, LifoAlloc& alloc, ObjectBox* traceListHead, JSFunction* fun,
+    FunctionBox(JSContext* cx, ObjectBox* traceListHead, JSFunction* fun,
                 uint32_t toStringStart, Directives directives, bool extraWarnings,
                 GeneratorKind generatorKind, FunctionAsyncKind asyncKind);
 
@@ -560,17 +560,21 @@ class FunctionBox : public ObjectBox, public SharedContext
         return useAsm || insideUseAsm;
     }
 
-    void setStart(const TokenStream& tokenStream) {
-        uint32_t offset = tokenStream.currentToken().pos.begin;
-        bufStart = offset;
-        tokenStream.srcCoords.lineNumAndColumnIndex(offset, &startLine, &startColumn);
+    void setStart(const TokenStreamAnyChars& anyChars) {
+        uint32_t offset = anyChars.currentToken().pos.begin;
+        setStart(anyChars, offset);
     }
 
-    void setEnd(const TokenStream& tokenStream) {
+    void setStart(const TokenStreamAnyChars& anyChars, uint32_t offset) {
+        bufStart = offset;
+        anyChars.srcCoords.lineNumAndColumnIndex(offset, &startLine, &startColumn);
+    }
+
+    void setEnd(const TokenStreamAnyChars& anyChars) {
         // For all functions except class constructors, the buffer and
         // toString ending positions are the same. Class constructors override
         // the toString ending position with the end of the class definition.
-        uint32_t offset = tokenStream.currentToken().pos.end;
+        uint32_t offset = anyChars.currentToken().pos.end;
         bufEnd = offset;
         toStringEnd = offset;
     }

@@ -11,6 +11,7 @@
 #include "nsIConsoleService.h"
 #include "nsICryptoHash.h"
 #include "nsIDataSignatureVerifier.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/Omnijar.h"
 #include "mozilla/Unused.h"
 

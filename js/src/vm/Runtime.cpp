@@ -114,6 +114,8 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     destroyCompartmentCallback(nullptr),
     sizeOfIncludingThisCompartmentCallback(nullptr),
     compartmentNameCallback(nullptr),
+    destroyRealmCallback(nullptr),
+    realmNameCallback(nullptr),
     externalStringSizeofCallback(nullptr),
     securityCallbacks(&NullSecurityCallbacks),
     DOMcallbacks(nullptr),
@@ -172,7 +174,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     oomCallback(nullptr),
     debuggerMallocSizeOf(ReturnZeroSize),
     lastAnimationTime(0),
-    performanceMonitoring_(thisFromCtor()),
+    performanceMonitoring_(),
     stackFormat_(parentRuntime ? js::StackFormat::Default
                                : js::StackFormat::SpiderMonkey),
     moduleResolveHook()

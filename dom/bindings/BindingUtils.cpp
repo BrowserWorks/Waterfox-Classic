@@ -287,8 +287,8 @@ TErrorResult<CleanupPolicy>::ThrowJSException(JSContext* cx, JS::Handle<JS::Valu
   // Make sure mJSException is initialized _before_ we try to root it.  But
   // don't set it to exn yet, because we don't want to do that until after we
   // root.
-  mJSException.setUndefined();
-  if (!js::AddRawValueRoot(cx, &mJSException, "TErrorResult::mJSException")) {
+  mJSException.asValueRef().setUndefined();
+  if (!js::AddRawValueRoot(cx, &mJSException.asValueRef(), "TErrorResult::mJSException")) {
     // Don't use NS_ERROR_INTERNAL_ERRORRESULT_JS_EXCEPTION, because that
     // indicates we have in fact rooted mJSException.
     mResult = NS_ERROR_OUT_OF_MEMORY;
@@ -317,7 +317,7 @@ TErrorResult<CleanupPolicy>::SetPendingJSException(JSContext* cx)
   mJSException = exception;
   // If JS_WrapValue failed, not much we can do about it...  No matter
   // what, go ahead and unroot mJSException.
-  js::RemoveRawValueRoot(cx, &mJSException);
+  js::RemoveRawValueRoot(cx, &mJSException.asValueRef());
 
   mResult = NS_OK;
 #ifdef DEBUG
@@ -423,8 +423,8 @@ TErrorResult<CleanupPolicy>::ClearUnionData()
   if (IsJSException()) {
     JSContext* cx = dom::danger::GetJSContext();
     MOZ_ASSERT(cx);
-    mJSException.setUndefined();
-    js::RemoveRawValueRoot(cx, &mJSException);
+    mJSException.asValueRef().setUndefined();
+    js::RemoveRawValueRoot(cx, &mJSException.asValueRef());
 #ifdef DEBUG
     mUnionState = HasNothing;
 #endif // DEBUG
@@ -467,13 +467,13 @@ TErrorResult<CleanupPolicy>::operator=(TErrorResult<CleanupPolicy>&& aRHS)
   } else if (aRHS.IsJSException()) {
     JSContext* cx = dom::danger::GetJSContext();
     MOZ_ASSERT(cx);
-    mJSException.setUndefined();
-    if (!js::AddRawValueRoot(cx, &mJSException, "TErrorResult::mJSException")) {
+    mJSException.asValueRef().setUndefined();
+    if (!js::AddRawValueRoot(cx, &mJSException.asValueRef(), "TErrorResult::mJSException")) {
       MOZ_CRASH("Could not root mJSException, we're about to OOM");
     }
     mJSException = aRHS.mJSException;
-    aRHS.mJSException.setUndefined();
-    js::RemoveRawValueRoot(cx, &aRHS.mJSException);
+    aRHS.mJSException.asValueRef().setUndefined();
+    js::RemoveRawValueRoot(cx, &aRHS.mJSException.asValueRef());
   } else if (aRHS.IsDOMException()) {
     mDOMExceptionInfo = aRHS.mDOMExceptionInfo;
     aRHS.mDOMExceptionInfo = nullptr;
@@ -525,7 +525,7 @@ TErrorResult<CleanupPolicy>::CloneTo(TErrorResult& aRv) const
     aRv.mUnionState = HasJSException;
 #endif
     JSContext* cx = dom::danger::GetJSContext();
-    JS::Rooted<JS::Value> exception(cx, mJSException);
+    JS::Rooted<JS::Value> exception(cx, mJSException.asValueRef());
     aRv.ThrowJSException(cx, exception);
   }
 }
@@ -1619,7 +1619,7 @@ DEBUG_CheckXBLCallable(JSContext *cx, JSObject *obj)
     // has been adopted into another compartment, those prototypes will now point
     // to a different XBL scope (which is ok).
     MOZ_ASSERT_IF(js::IsCrossCompartmentWrapper(obj),
-                  xpc::IsContentXBLScope(js::GetObjectCompartment(js::UncheckedUnwrap(obj))));
+                  xpc::IsInContentXBLScope(js::UncheckedUnwrap(obj)));
     MOZ_ASSERT(JS::IsCallable(obj));
 }
 
@@ -1718,7 +1718,7 @@ XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
     // Make sure to assert that.
     JS::Rooted<JSObject*> maybeElement(cx, obj);
     Element* element;
-    if (xpc::ObjectScope(wrapper)->IsContentXBLScope() &&
+    if (xpc::IsInContentXBLScope(wrapper) &&
         NS_SUCCEEDED(UNWRAP_OBJECT(Element, &maybeElement, element))) {
       if (!nsContentUtils::LookupBindingMember(cx, element, id, desc)) {
         return false;

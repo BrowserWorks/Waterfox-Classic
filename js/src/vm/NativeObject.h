@@ -41,7 +41,7 @@ Debug_SetValueRangeToCrashOnTouch(Value* beg, Value* end)
 {
 #ifdef DEBUG
     for (Value* v = beg; v != end; ++v)
-        v->setObject(*reinterpret_cast<JSObject*>(0x48));
+        *v = js::PoisonedObjectValue(0x48);
 #endif
 }
 
@@ -1153,8 +1153,7 @@ class NativeObject : public ShapedObject
     }
 
   private:
-    inline void ensureDenseInitializedLengthNoPackedCheck(JSContext* cx,
-                                                          uint32_t index, uint32_t extra);
+    inline void ensureDenseInitializedLengthNoPackedCheck(uint32_t index, uint32_t extra);
 
     // Run a post write barrier that encompasses multiple contiguous elements in a
     // single step.
@@ -1444,16 +1443,6 @@ extern bool
 NativeDefineProperty(JSContext* cx, HandleNativeObject obj, HandleId id, HandleValue value,
                      JSGetterOp getter, JSSetterOp setter, unsigned attrs,
                      ObjectOpResult& result);
-
-extern bool
-NativeDefineProperty(JSContext* cx, HandleNativeObject obj, PropertyName* name,
-                     HandleValue value, GetterOp getter, SetterOp setter,
-                     unsigned attrs, ObjectOpResult& result);
-
-extern bool
-NativeDefineElement(JSContext* cx, HandleNativeObject obj, uint32_t index, HandleValue value,
-                    JSGetterOp getter, JSSetterOp setter, unsigned attrs,
-                    ObjectOpResult& result);
 
 /* If the result out-param is omitted, throw on failure. */
 extern bool

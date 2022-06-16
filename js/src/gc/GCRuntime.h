@@ -26,6 +26,7 @@
 namespace js {
 
 class AutoLockGC;
+class AutoLockGCBgAlloc;
 class AutoLockHelperThreadState;
 class VerifyPreTracer;
 
@@ -34,7 +35,7 @@ namespace gc {
 using BlackGrayEdgeVector = Vector<TenuredCell*, 0, SystemAllocPolicy>;
 using ZoneVector = Vector<JS::Zone*, 4, SystemAllocPolicy>;
 
-class AutoMaybeStartBackgroundAllocation;
+class AutoCallGCCallbacks;
 class AutoRunParallelTask;
 class AutoTraceSession;
 class MarkingValidator;
@@ -893,8 +894,7 @@ class GCRuntime
         return NonEmptyChunksIter(ChunkPool::Iter(availableChunks_.ref()), ChunkPool::Iter(fullChunks_.ref()));
     }
 
-    Chunk* getOrAllocChunk(const AutoLockGC& lock,
-                           AutoMaybeStartBackgroundAllocation& maybeStartBGAlloc);
+    Chunk* getOrAllocChunk(AutoLockGCBgAlloc& lock);
     void recycleChunk(Chunk* chunk, const AutoLockGC& lock);
 
 #ifdef JS_GC_ZEAL
@@ -951,8 +951,7 @@ class GCRuntime
 
     // For ArenaLists::allocateFromArena()
     friend class ArenaLists;
-    Chunk* pickChunk(const AutoLockGC& lock,
-                     AutoMaybeStartBackgroundAllocation& maybeStartBGAlloc);
+    Chunk* pickChunk(AutoLockGCBgAlloc& lock);
     Arena* allocateArena(Chunk* chunk, Zone* zone, AllocKind kind,
                          ShouldCheckThresholds checkThresholds, const AutoLockGC& lock);
 
@@ -979,7 +978,6 @@ class GCRuntime
     void prepareToFreeChunk(ChunkInfo& info);
 
     friend class BackgroundAllocTask;
-    friend class AutoMaybeStartBackgroundAllocation;
     bool wantBackgroundAllocation(const AutoLockGC& lock) const;
     void startBackgroundAllocTaskIfIdle();
 
@@ -1004,6 +1002,10 @@ class GCRuntime
     bool shouldRepeatForDeadZone(JS::gcreason::Reason reason);
     void incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason reason,
                                  AutoLockForExclusiveAccess& lock);
+
+    friend class AutoCallGCCallbacks;
+    void maybeCallBeginCallback();
+    void maybeCallEndCallback();
 
     void pushZealSelectedObjects();
     void purgeRuntime(AutoLockForExclusiveAccess& lock);
@@ -1122,8 +1124,6 @@ class GCRuntime
     /* GC scheduling state and parameters. */
     GCSchedulingTunables tunables;
     GCSchedulingState schedulingState;
-
-    MemProfiler mMemProfiler;
 
     // State used for managing atom mark bitmaps in each zone. Protected by the
     // exclusive access lock.
@@ -1350,6 +1350,8 @@ class GCRuntime
 
     MainThreadData<bool> fullCompartmentChecks;
 
+    MainThreadData<uint32_t> gcBeginCallbackDepth;
+
     Callback<JSGCCallback> gcCallback;
     Callback<JS::DoCycleCollectionCallback> gcDoCycleCollectionCallback;
     Callback<JSObjectsTenuredCallback> tenuredCallback;
@@ -1377,6 +1379,7 @@ class GCRuntime
 
     /* Synchronize GC heap access among GC helper threads and the main thread. */
     friend class js::AutoLockGC;
+    friend class js::AutoLockGCBgAlloc;
     js::Mutex lock;
 
     BackgroundAllocTask allocTask;
@@ -1433,30 +1436,6 @@ class MOZ_RAII AutoEnterIteration {
     ~AutoEnterIteration() {
         MOZ_ASSERT(gc->numActiveZoneIters);
         --gc->numActiveZoneIters;
-    }
-};
-
-// After pulling a Chunk out of the empty chunks pool, we want to run the
-// background allocator to refill it. The code that takes Chunks does so under
-// the GC lock. We need to start the background allocation under the helper
-// threads lock. To avoid lock inversion we have to delay the start until after
-// we are outside the GC lock. This class handles that delay automatically.
-class MOZ_RAII AutoMaybeStartBackgroundAllocation
-{
-    GCRuntime* gc;
-
-  public:
-    AutoMaybeStartBackgroundAllocation()
-      : gc(nullptr)
-    {}
-
-    void tryToStartBackgroundAllocation(GCRuntime& gc) {
-        this->gc = &gc;
-    }
-
-    ~AutoMaybeStartBackgroundAllocation() {
-        if (gc)
-            gc->startBackgroundAllocTaskIfIdle();
     }
 };
 

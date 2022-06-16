@@ -27,10 +27,10 @@ void DestroyIsolate(Isolate* isolate);
 size_t IsolateSizeOfIncludingThis(Isolate* isolate,
                                   mozilla::MallocSizeOf mallocSizeOf);
 
-bool CheckPatternSyntax(JSContext* cx, frontend::TokenStream& ts,
+bool CheckPatternSyntax(JSContext* cx, frontend::TokenStreamAnyChars& ts,
                         const mozilla::Range<const char16_t> chars,
                         JS::RegExpFlags flags);
-bool CheckPatternSyntax(JSContext* cx, frontend::TokenStream& ts,
+bool CheckPatternSyntax(JSContext* cx, frontend::TokenStreamAnyChars& ts,
                         HandleAtom pattern, JS::RegExpFlags flags);
 bool CompilePattern(JSContext* cx, MutableHandleRegExpShared re,
                     HandleLinearString input, RegExpShared::CodeKind codeKind);

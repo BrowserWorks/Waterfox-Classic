@@ -11,6 +11,7 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/Casting.h"
+#include "mozilla/EndianUtils.h"
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/Likely.h"
 
@@ -137,11 +138,15 @@ static_assert(sizeof(JSValueShiftedTag) == sizeof(uint64_t),
 
 #define JSVAL_TYPE_TO_TAG(type)      ((JSValueTag)(JSVAL_TAG_CLEAR | (type)))
 
+#define JSVAL_RAW64_UNDEFINED        (uint64_t(JSVAL_TAG_UNDEFINED) << 32)
+
 #define JSVAL_UPPER_EXCL_TAG_OF_PRIMITIVE_SET           JSVAL_TAG_OBJECT
 #define JSVAL_UPPER_INCL_TAG_OF_NUMBER_SET              JSVAL_TAG_INT32
 #define JSVAL_LOWER_INCL_TAG_OF_GCTHING_SET             JSVAL_TAG_STRING
 
 #elif defined(JS_PUNBOX64)
+
+#define JSVAL_RAW64_UNDEFINED        (uint64_t(JSVAL_TAG_UNDEFINED) << JSVAL_TAG_SHIFT)
 
 #define JSVAL_PAYLOAD_MASK           0x00007FFFFFFFFFFFLL
 #define JSVAL_TAG_MASK               0xFFFF800000000000LL
@@ -214,10 +219,13 @@ typedef enum JSWhyMagic
     JS_WHY_MAGIC_COUNT
 } JSWhyMagic;
 
+namespace js {
+static inline JS::Value PoisonedObjectValue(uintptr_t poison);
+} // namespace js
+
 namespace JS {
 
 static inline constexpr JS::Value UndefinedValue();
-static inline JS::Value PoisonedObjectValue(JSObject* obj);
 
 namespace detail {
 
@@ -351,17 +359,17 @@ class MOZ_NON_PARAM alignas(8) Value
     }
 
     void setString(JSString* str) {
-        MOZ_ASSERT(uintptr_t(str) > 0x1000);
+        MOZ_ASSERT(js::gc::IsCellPointerValid(str));
         data.asBits = bitsFromTagAndPayload(JSVAL_TAG_STRING, PayloadType(str));
     }
 
     void setSymbol(JS::Symbol* sym) {
-        MOZ_ASSERT(uintptr_t(sym) > 0x1000);
+        MOZ_ASSERT(js::gc::IsCellPointerValid(sym));
         data.asBits = bitsFromTagAndPayload(JSVAL_TAG_SYMBOL, PayloadType(sym));
     }
 
     void setObject(JSObject& obj) {
-        MOZ_ASSERT(uintptr_t(&obj) > 0x1000 || uintptr_t(&obj) == 0x48);
+        MOZ_ASSERT(js::gc::IsCellPointerValid(&obj));
 #if defined(JS_PUNBOX64)
         // VisualStudio cannot contain parenthesized C++ style cast and shift
         // inside decltype in template parameter:
@@ -377,7 +385,7 @@ class MOZ_NON_PARAM alignas(8) Value
         data.asBits = bitsFromTagAndPayload(JSVAL_TAG_OBJECT, PayloadType(obj));
     }
 
-    friend inline Value PoisonedObjectValue(JSObject* obj);
+    friend inline Value js::PoisonedObjectValue(uintptr_t poison);
 
   public:
     void setBoolean(bool b) {
@@ -758,7 +766,7 @@ class MOZ_NON_PARAM alignas(8) Value
         MOZ_ASSERT(JS::GCThingTraceKind(cell) != JS::TraceKind::Object,
                    "Private GC thing Values must not be objects. Make an ObjectValue instead.");
 
-        MOZ_ASSERT(uintptr_t(cell) > 0x1000);
+        MOZ_ASSERT(js::gc::IsCellPointerValid(cell));
 #if defined(JS_PUNBOX64)
         // VisualStudio cannot contain parenthesized C++ style cast and shift
         // inside decltype in template parameter:
@@ -819,7 +827,7 @@ class MOZ_NON_PARAM alignas(8) Value
         double asDouble;
         void* asPtr;
 
-        layout() = default;
+        layout() : asBits(JSVAL_RAW64_UNDEFINED) {}
         explicit constexpr layout(uint64_t bits) : asBits(bits) {}
         explicit constexpr layout(double d) : asDouble(d) {}
     } data;
@@ -845,7 +853,7 @@ class MOZ_NON_PARAM alignas(8) Value
         size_t asWord;
         uintptr_t asUIntPtr;
 
-        layout() = default;
+        layout() : asBits(JSVAL_RAW64_UNDEFINED) {}
         explicit constexpr layout(uint64_t bits) : asBits(bits) {}
         explicit constexpr layout(double d) : asDouble(d) {}
     } data;
@@ -873,7 +881,7 @@ class MOZ_NON_PARAM alignas(8) Value
         double asDouble;
         void* asPtr;
 
-        layout() = default;
+        layout() : asBits(JSVAL_RAW64_UNDEFINED) {}
         explicit constexpr layout(uint64_t bits) : asBits(bits) {}
         explicit constexpr layout(double d) : asDouble(d) {}
     } data;
@@ -897,7 +905,7 @@ class MOZ_NON_PARAM alignas(8) Value
         size_t asWord;
         uintptr_t asUIntPtr;
 
-        layout() = default;
+        layout() : asBits(JSVAL_RAW64_UNDEFINED) {}
         explicit constexpr layout(uint64_t bits) : asBits(bits) {}
         explicit constexpr layout(double d) : asDouble(d) {}
     } data;
@@ -950,7 +958,50 @@ class MOZ_NON_PARAM alignas(8) Value
     }
 } JS_HAZ_GC_POINTER;
 
+/**
+ * This is a null-constructible structure that can convert to and from
+ * a Value, allowing UninitializedValue to be stored in unions.
+ */
+struct MOZ_NON_PARAM alignas(8) UninitializedValue
+{
+  private:
+    uint64_t bits;
+
+  public:
+    UninitializedValue() = default;
+    UninitializedValue(const UninitializedValue&) = default;
+    MOZ_IMPLICIT UninitializedValue(const Value& val) : bits(val.asRawBits()) {}
+
+    inline uint64_t asRawBits() const {
+        return bits;
+    }
+
+    inline Value& asValueRef() {
+        return *reinterpret_cast<Value*>(this);
+    }
+    inline const Value& asValueRef() const {
+        return *reinterpret_cast<const Value*>(this);
+    }
+
+    inline operator Value&() {
+        return asValueRef();
+    }
+    inline operator Value const&() const {
+        return asValueRef();
+    }
+    inline operator Value() const {
+        return asValueRef();
+    }
+
+    inline void operator=(Value const& other) {
+        asValueRef() = other;
+    }
+};
+
 static_assert(sizeof(Value) == 8, "Value size must leave three tag bits, be a binary power, and is ubiquitously depended upon everywhere");
+
+static_assert(sizeof(UninitializedValue) == sizeof(Value), "Value and UninitializedValue must be the same size");
+static_assert(alignof(UninitializedValue) == alignof(Value), "Value and UninitializedValue must have same alignment");
 
 inline bool
 IsOptimizedPlaceholderMagicValue(const Value& v)
@@ -1083,14 +1134,6 @@ ObjectValue(JSObject& obj)
 {
     Value v;
     v.setObject(obj);
-    return v;
-}
-
-static inline Value
-ObjectValueCrashOnTouch()
-{
-    Value v;
-    v.setObject(*reinterpret_cast<JSObject*>(0x48));
     return v;
 }
 
@@ -1240,14 +1283,6 @@ PrivateGCThingValue(js::gc::Cell* cell)
     return v;
 }
 
-static inline Value
-PoisonedObjectValue(JSObject* obj)
-{
-    Value v;
-    v.setObjectNoCheck(obj);
-    return v;
-}
-
 inline bool
 SameType(const Value& lhs, const Value& rhs)
 {
@@ -1276,6 +1311,9 @@ struct GCPolicy<JS::Value>
     }
     static bool isTenured(const Value& thing) {
         return !thing.isGCThing() || !IsInsideNursery(thing.toGCThing());
+    }
+    static bool isValid(const Value& value) {
+        return !value.isGCThing() || js::gc::IsCellPointerValid(value.toGCThing());
     }
 };
 
@@ -1458,6 +1496,14 @@ DispatchTyped(F f, const JS::Value& val, Args&&... args)
 template <class S> struct VoidDefaultAdaptor { static void defaultValue(const S&) {} };
 template <class S> struct IdentityDefaultAdaptor { static S defaultValue(const S& v) {return v;} };
 template <class S, bool v> struct BoolDefaultAdaptor { static bool defaultValue(const S&) { return v; } };
+
+static inline JS::Value
+PoisonedObjectValue(uintptr_t poison)
+{
+    JS::Value v;
+    v.setObjectNoCheck(reinterpret_cast<JSObject*>(poison));
+    return v;
+}
 
 } // namespace js
 

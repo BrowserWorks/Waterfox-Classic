@@ -686,6 +686,7 @@ struct Zone : public JS::shadow::Zone,
     js::ZoneData<js::jit::JitZone*> jitZone_;
 
     js::MainThreadData<bool> gcScheduled_;
+    js::MainThreadData<bool> gcScheduledSaved_;
     js::ZoneData<bool> gcPreserveCode_;
     js::ZoneData<bool> keepShapeTables_;
 
@@ -731,10 +732,6 @@ class ZonesIter
     {
         if (!atomsZone)
             skipHelperThreadZones();
-    }
-
-    bool atAtomsZone(JSRuntime* rt) const {
-        return !!atomsZone;
     }
 
     bool done() const { return !atomsZone && it == end; }

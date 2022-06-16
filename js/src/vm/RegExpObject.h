@@ -44,7 +44,7 @@ struct MatchPair;
 class MatchPairs;
 class RegExpStatics;
 
-namespace frontend { class TokenStream; }
+namespace frontend { class TokenStreamAnyChars; }
 
 extern RegExpObject*
 RegExpAlloc(JSContext* cx, NewObjectKind newKind, HandleObject proto = nullptr);
@@ -72,20 +72,33 @@ class RegExpObject : public NativeObject
     // allocate a bigger MatchResult.
     static const size_t MaxPairCount = 14;
 
+    template<typename CharT>
     static RegExpObject* create(JSContext* cx,
-                                const char16_t* chars,
+                                const CharT* chars,
                                 size_t length,
                                 JS::RegExpFlags flags,
-                                const ReadOnlyCompileOptions* options,
-                                frontend::TokenStream* ts,
+                                LifoAlloc& alloc,
+                                NewObjectKind newKind);
+
+    template<typename CharT>
+    static RegExpObject* create(JSContext* cx,
+                                const CharT* chars,
+                                size_t length,
+                                JS::RegExpFlags flags,
+                                frontend::TokenStreamAnyChars& ts,
+                                LifoAlloc& alloc,
+                                NewObjectKind kind);
+
+    static RegExpObject* create(JSContext* cx,
+                                HandleAtom atom,
+                                JS::RegExpFlags flags,
                                 LifoAlloc& alloc,
                                 NewObjectKind newKind);
 
     static RegExpObject* create(JSContext* cx,
                                 HandleAtom atom,
                                 JS::RegExpFlags flags,
-                                const ReadOnlyCompileOptions* options,
-                                frontend::TokenStream* ts,
+                                frontend::TokenStreamAnyChars& ts,
                                 LifoAlloc& alloc,
                                 NewObjectKind newKind);
 

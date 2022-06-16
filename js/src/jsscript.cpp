@@ -78,24 +78,19 @@ js::XDRScriptConst(XDRState<mode>* xdr, MutableHandleValue vp)
 {
     JSContext* cx = xdr->cx();
 
-    /*
-     * A script constant can be an arbitrary primitive value as they are used
-     * to implement JSOP_LOOKUPSWITCH. But they cannot be objects, see
-     * bug 407186.
-     */
     enum ConstTag {
-        SCRIPT_INT     = 0,
-        SCRIPT_DOUBLE  = 1,
-        SCRIPT_ATOM    = 2,
-        SCRIPT_TRUE    = 3,
-        SCRIPT_FALSE   = 4,
-        SCRIPT_NULL    = 5,
-        SCRIPT_OBJECT  = 6,
-        SCRIPT_VOID    = 7,
-        SCRIPT_HOLE    = 8
+        SCRIPT_INT,
+        SCRIPT_DOUBLE,
+        SCRIPT_ATOM,
+        SCRIPT_TRUE,
+        SCRIPT_FALSE,
+        SCRIPT_NULL,
+        SCRIPT_OBJECT,
+        SCRIPT_VOID,
+        SCRIPT_HOLE
     };
 
-    uint32_t tag;
+    ConstTag tag;
     if (mode == XDR_ENCODE) {
         if (vp.isInt32()) {
             tag = SCRIPT_INT;
@@ -119,7 +114,7 @@ js::XDRScriptConst(XDRState<mode>* xdr, MutableHandleValue vp)
         }
     }
 
-    if (!xdr->codeUint32(&tag))
+    if (!xdr->codeEnum32(&tag))
         return false;
 
     switch (tag) {
@@ -185,6 +180,10 @@ js::XDRScriptConst(XDRState<mode>* xdr, MutableHandleValue vp)
         if (mode == XDR_DECODE)
             vp.setMagic(JS_ELEMENTS_HOLE);
         break;
+      default:
+        // Fail in debug, but only soft-fail in release
+        MOZ_ASSERT(false, "Bad XDR value kind");
+        return xdr->fail(JS::TranscodeResult_Failure_BadDecode);
     }
     return true;
 }
@@ -797,11 +796,20 @@ js::XDRScript(XDRState<mode>* xdr, HandleScope scriptEnclosingScope,
               case ScopeKind::WasmFunction:
                 MOZ_CRASH("wasm functions cannot be nested in JSScripts");
                 break;
+              default:
+                // Fail in debug, but only soft-fail in release
+                MOZ_ASSERT(false, "Bad XDR scope kind");
+                return xdr->fail(JS::TranscodeResult_Failure_BadDecode);
             }
 
             if (mode == XDR_DECODE)
                 vector[i].init(scope);
         }
+
+        // Verify marker to detect data corruption after decoding scope data. A
+        // mismatch here indicates we will almost certainly crash in release.
+        if (!xdr->codeMarker(0x48922BAB))
+            return false;
     }
 
     /*
@@ -887,11 +895,17 @@ js::XDRScript(XDRState<mode>* xdr, HandleScope scriptEnclosingScope,
           }
 
           default: {
-            MOZ_ASSERT(false, "Unknown class kind.");
-            return xdr->fail(JS::TranscodeResult_Failure_UnknownClassKind);
+            // Fail in debug, but only soft-fail in release
+            MOZ_ASSERT(false, "Bad XDR class kind");
+            return xdr->fail(JS::TranscodeResult_Failure_BadDecode);
           }
         }
     }
+
+    // Verify marker to detect data corruption after decoding object data. A
+    // mismatch here indicates we will almost certainly crash in release.
+    if (!xdr->codeMarker(0xF83B989A))
+        return false;
 
     if (ntrynotes != 0) {
         JSTryNote* tnfirst = script->trynotes()->vector;
@@ -2073,6 +2087,10 @@ ScriptSource::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
 bool
 ScriptSource::xdrEncodeTopLevel(JSContext* cx, HandleScript script)
 {
+    // Encoding failures are reported by the xdrFinalizeEncoder function.
+    if (containsAsmJS())
+        return true;
+
     xdrEncoder_ = js::MakeUnique<XDRIncrementalEncoder>(cx);
     if (!xdrEncoder_) {
         ReportOutOfMemory(cx);
@@ -2090,8 +2108,12 @@ ScriptSource::xdrEncodeTopLevel(JSContext* cx, HandleScript script)
     }
 
     RootedScript s(cx, script);
-    if (!xdrEncoder_->codeScript(&s))
-        return false;
+    if (!xdrEncoder_->codeScript(&s)) {
+        if (xdrEncoder_->resultCode() == JS::TranscodeResult_Throw)
+            return false;
+        // Encoding failures are reported by the xdrFinalizeEncoder function.
+        return true;
+    }
 
     failureCase.release();
     return true;
@@ -3184,8 +3206,6 @@ JSScript::finalize(FreeOp* fop)
 
     if (scriptData_)
         scriptData_->decRefCount();
-
-    fop->runtime()->caches().lazyScriptCache.remove(this);
 
     // In most cases, our LazyScript's script pointer will reference this
     // script, and thus be nulled out by normal weakref processing. However, if
@@ -4503,76 +4523,6 @@ bool
 JSScript::mayReadFrameArgsDirectly()
 {
     return argumentsHasVarBinding() || hasRest();
-}
-
-static inline void
-LazyScriptHash(uint32_t lineno, uint32_t column, uint32_t begin, uint32_t end,
-               HashNumber hashes[3])
-{
-    HashNumber hash = lineno;
-    hash = RotateLeft(hash, 4) ^ column;
-    hash = RotateLeft(hash, 4) ^ begin;
-    hash = RotateLeft(hash, 4) ^ end;
-
-    hashes[0] = hash;
-    hashes[1] = RotateLeft(hashes[0], 4) ^ begin;
-    hashes[2] = RotateLeft(hashes[1], 4) ^ end;
-}
-
-void
-LazyScriptHashPolicy::hash(const Lookup& lookup, HashNumber hashes[3])
-{
-    LazyScript* lazy = lookup.lazy;
-    LazyScriptHash(lazy->lineno(), lazy->column(), lazy->begin(), lazy->end(), hashes);
-}
-
-void
-LazyScriptHashPolicy::hash(JSScript* script, HashNumber hashes[3])
-{
-    LazyScriptHash(script->lineno(), script->column(), script->sourceStart(), script->sourceEnd(), hashes);
-}
-
-bool
-LazyScriptHashPolicy::match(JSScript* script, const Lookup& lookup)
-{
-    JSContext* cx = lookup.cx;
-    LazyScript* lazy = lookup.lazy;
-
-    // To be a match, the script and lazy script need to have the same line
-    // and column and to be at the same position within their respective
-    // source blobs, and to have the same source contents and version.
-    //
-    // While the surrounding code in the source may differ, this is
-    // sufficient to ensure that compiling the lazy script will yield an
-    // identical result to compiling the original script.
-    //
-    // Note that the filenames and origin principals of the lazy script and
-    // original script can differ. If there is a match, these will be fixed
-    // up in the resulting clone by the caller.
-
-    if (script->lineno() != lazy->lineno() ||
-        script->column() != lazy->column() ||
-        script->getVersion() != lazy->version() ||
-        script->sourceStart() != lazy->begin() ||
-        script->sourceEnd() != lazy->end())
-    {
-        return false;
-    }
-
-    UncompressedSourceCache::AutoHoldEntry holder;
-
-    size_t scriptBegin = script->sourceStart();
-    size_t length = script->sourceEnd() - scriptBegin;
-    ScriptSource::PinnedChars scriptChars(cx, script->scriptSource(), holder, scriptBegin, length);
-    if (!scriptChars.get())
-        return false;
-
-    MOZ_ASSERT(scriptBegin == lazy->begin());
-    ScriptSource::PinnedChars lazyChars(cx, lazy->scriptSource(), holder, scriptBegin, length);
-    if (!lazyChars.get())
-        return false;
-
-    return !memcmp(scriptChars.get(), lazyChars.get(), length);
 }
 
 void

@@ -627,12 +627,14 @@ static bool
 array_length_setter(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp,
                     ObjectOpResult& result)
 {
+    MOZ_ASSERT(id == NameToId(cx->names().length));
+
     if (!obj->is<ArrayObject>()) {
         // This array .length property was found on the prototype
         // chain. Ideally the setter should not have been called, but since
         // we're here, do an impression of SetPropertyByDefining.
         const Class* clasp = obj->getClass();
-        return DefineProperty(cx, obj, cx->names().length, vp,
+        return DefineProperty(cx, obj, id, vp,
                               clasp->getGetProperty(), clasp->getSetProperty(),
                               JSPROP_ENUMERATE, result);
     }

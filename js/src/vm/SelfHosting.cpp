@@ -20,7 +20,6 @@
 #include "jshashutil.h"
 #include "jsiter.h"
 #include "jsstr.h"
-#include "jsweakmap.h"
 #include "jswrapper.h"
 #include "selfhosted.out.h"
 
@@ -40,7 +39,7 @@
 #include "builtin/SIMD.h"
 #include "builtin/Stream.h"
 #include "builtin/TypedObject.h"
-#include "builtin/WeakSetObject.h"
+#include "builtin/WeakMapObject.h"
 #include "gc/Marking.h"
 #include "gc/Policy.h"
 #include "jit/AtomicOperations.h"
@@ -50,6 +49,7 @@
 #include "vm/Compression.h"
 #include "vm/GeneratorObject.h"
 #include "vm/Interpreter.h"
+#include "vm/Printer.h"
 #include "vm/RegExpObject.h"
 #include "vm/String.h"
 #include "vm/StringBuffer.h"
@@ -439,9 +439,10 @@ intrinsic_AssertionFailed(JSContext* cx, unsigned argc, Value* vp)
         // try to dump the informative string
         JSString* str = ToString<CanGC>(cx, args[0]);
         if (str) {
-            fprintf(stderr, "Self-hosted JavaScript assertion info: ");
-            str->dumpCharsNoNewline();
-            fputc('\n', stderr);
+            js::Fprinter out(stderr);
+            out.put("Self-hosted JavaScript assertion info: ");
+            str->dumpCharsNoNewline(out);
+            out.putChar('\n');
         }
     }
 #endif
@@ -459,10 +460,11 @@ intrinsic_DumpMessage(JSContext* cx, unsigned argc, Value* vp)
 #ifdef DEBUG
     if (args.length() > 0) {
         // try to dump the informative string
+        js::Fprinter out(stderr);
         JSString* str = ToString<CanGC>(cx, args[0]);
         if (str) {
-            str->dumpCharsNoNewline();
-            fputc('\n', stderr);
+            str->dumpCharsNoNewline(out);
+            out.putChar('\n');
         } else {
             cx->recoverFromOutOfMemory();
         }
@@ -2320,10 +2322,8 @@ static const JSFunctionSpec intrinsic_functions[] = {
 
     JS_FN("std_TypedArray_buffer",               js::TypedArray_bufferGetter,  1,0),
 
-    JS_FN("std_WeakMap_has",                     WeakMap_has,                  1,0),
-    JS_FN("std_WeakMap_get",                     WeakMap_get,                  2,0),
+    JS_FN("std_WeakMap_get",                     WeakMap_get,                  1,0),
     JS_FN("std_WeakMap_set",                     WeakMap_set,                  2,0),
-    JS_FN("std_WeakMap_delete",                  WeakMap_delete,               1,0),
 
     JS_FN("std_SIMD_Int8x16_extractLane",        simd_int8x16_extractLane,     2,0),
     JS_FN("std_SIMD_Int16x8_extractLane",        simd_int16x8_extractLane,     2,0),
@@ -2539,10 +2539,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_INLINABLE_FN("IsSetObject", intrinsic_IsInstanceOfBuiltin<SetObject>, 1, 0,
                     IntrinsicIsSetObject),
     JS_FN("CallSetMethodIfWrapped", CallNonGenericSelfhostedMethod<Is<SetObject>>, 2, 0),
-
-    JS_FN("IsWeakSet", intrinsic_IsInstanceOfBuiltin<WeakSetObject>, 1,0),
-    JS_FN("CallWeakSetMethodIfWrapped",
-          CallNonGenericSelfhostedMethod<Is<WeakSetObject>>, 2, 0),
 
     JS_FN("IsReadableStreamBYOBRequest",
           intrinsic_IsInstanceOfBuiltin<ReadableStreamBYOBRequest>, 1, 0),
@@ -3098,8 +3094,7 @@ CloneObject(JSContext* cx, HandleNativeObject selfHostedObject)
         RegExpObject& reobj = selfHostedObject->as<RegExpObject>();
         RootedAtom source(cx, reobj.getSource());
         MOZ_ASSERT(source->isPermanentAtom());
-        clone = RegExpObject::create(cx, source, reobj.getFlags(),
-                                     nullptr, nullptr, cx->tempLifoAlloc(),
+        clone = RegExpObject::create(cx, source, reobj.getFlags(), cx->tempLifoAlloc(),
                                      TenuredObject);
     } else if (selfHostedObject->is<DateObject>()) {
         clone = JS::NewDateObject(cx, selfHostedObject->as<DateObject>().clippedTime());

@@ -7,6 +7,7 @@
 #include "jit/Lowering.h"
 
 #include "mozilla/DebugOnly.h"
+#include "mozilla/EndianUtils.h"
 
 #include "jit/JitSpewer.h"
 #include "jit/LIR.h"
@@ -2312,14 +2313,14 @@ LIRGenerator::visitToString(MToString* ins)
 
     switch (opd->type()) {
       case MIRType::Null: {
-        const JSAtomState& names = GetJitContext()->runtime->names();
+        const JSAtomState& names = gen->runtime->names();
         LPointer* lir = new(alloc()) LPointer(names.null);
         define(lir, ins);
         break;
       }
 
       case MIRType::Undefined: {
-        const JSAtomState& names = GetJitContext()->runtime->names();
+        const JSAtomState& names = gen->runtime->names();
         LPointer* lir = new(alloc()) LPointer(names.undefined);
         define(lir, ins);
         break;
@@ -4331,6 +4332,14 @@ LIRGenerator::visitIsObject(MIsObject* ins)
     MOZ_ASSERT(opd->type() == MIRType::Value);
     LIsObject* lir = new(alloc()) LIsObject(useBoxAtStart(opd));
     define(lir, ins);
+}
+
+void LIRGenerator::visitIsNullOrUndefined(MIsNullOrUndefined* ins) {
+  MDefinition* opd = ins->input();
+  MOZ_ASSERT(opd->type() == MIRType::Value);
+  LIsNullOrUndefined* lir =
+      new (alloc()) LIsNullOrUndefined(useBoxAtStart(opd));
+  define(lir, ins);
 }
 
 void

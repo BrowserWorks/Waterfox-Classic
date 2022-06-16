@@ -117,7 +117,7 @@ js::Nursery::Nursery(JSRuntime* rt)
 {}
 
 bool
-js::Nursery::init(uint32_t maxNurseryBytes, AutoLockGC& lock)
+js::Nursery::init(uint32_t maxNurseryBytes, AutoLockGCBgAlloc& lock)
 {
     if (!mallocedBuffers.init())
         return false;
@@ -133,8 +133,7 @@ js::Nursery::init(uint32_t maxNurseryBytes, AutoLockGC& lock)
     if (maxNurseryChunks_ == 0)
         return true;
 
-    AutoMaybeStartBackgroundAllocation maybeBgAlloc;
-    updateNumChunksLocked(1, maybeBgAlloc, lock);
+    updateNumChunksLocked(1, lock);
     if (numChunks() == 0)
         return false;
 
@@ -315,7 +314,6 @@ js::Nursery::allocate(size_t size)
     }
 #endif
 
-    MemProfiler::SampleNursery(reinterpret_cast<void*>(thing), size);
     return thing;
 }
 
@@ -889,7 +887,6 @@ js::Nursery::sweep()
 
     /* Set current start position for isEmpty checks. */
     setStartPosition();
-    MemProfiler::SweepNursery(runtime());
 }
 
 size_t
@@ -998,16 +995,14 @@ void
 js::Nursery::updateNumChunks(unsigned newCount)
 {
     if (numChunks() != newCount) {
-        AutoMaybeStartBackgroundAllocation maybeBgAlloc;
-        AutoLockGC lock(runtime());
-        updateNumChunksLocked(newCount, maybeBgAlloc, lock);
+        AutoLockGCBgAlloc lock(runtime());
+        updateNumChunksLocked(newCount, lock);
     }
 }
 
 void
 js::Nursery::updateNumChunksLocked(unsigned newCount,
-                                   AutoMaybeStartBackgroundAllocation& maybeBgAlloc,
-                                   AutoLockGC& lock)
+                                   AutoLockGCBgAlloc& lock)
 {
     // The GC nursery is an optimization and so if we fail to allocate nursery
     // chunks we do not report an error.
@@ -1030,7 +1025,7 @@ js::Nursery::updateNumChunksLocked(unsigned newCount,
         return;
 
     for (unsigned i = priorCount; i < newCount; i++) {
-        auto newChunk = runtime()->gc.getOrAllocChunk(lock, maybeBgAlloc);
+        auto newChunk = runtime()->gc.getOrAllocChunk(lock);
         if (!newChunk) {
             chunks_.shrinkTo(i);
             return;

@@ -31,11 +31,14 @@
 #include "js/TracingAPI.h"
 #include "js/TraceKind.h"
 
+#include "vm/Printer.h"
+
 struct JSRuntime;
 
 namespace js {
 
 class AutoLockGC;
+class AutoLockGCBgAlloc;
 class FreeOp;
 
 extern bool
@@ -296,7 +299,7 @@ struct Cell
 
 #ifdef DEBUG
     inline bool isAligned() const;
-    void dump(FILE* fp) const;
+    void dump(js::GenericPrinter& out) const;
     void dump() const;
 #endif
 
@@ -478,7 +481,6 @@ class FreeSpan
         }
         checkSpan(arena);
         JS_EXTRA_POISON(reinterpret_cast<void*>(thing), JS_ALLOCATED_TENURED_PATTERN, thingSize);
-        MemProfiler::SampleTenured(reinterpret_cast<void*>(thing), thingSize);
         return reinterpret_cast<TenuredCell*>(thing);
     }
 
@@ -1124,6 +1126,9 @@ static_assert(js::gc::ChunkRuntimeOffset == offsetof(Chunk, trailer) +
 static_assert(js::gc::ChunkLocationOffset == offsetof(Chunk, trailer) +
                                              offsetof(ChunkTrailer, location),
               "The hardcoded API location offset must match the actual offset.");
+static_assert(js::gc::ChunkStoreBufferOffset == offsetof(Chunk, trailer) +
+                                                offsetof(ChunkTrailer, storeBuffer),
+              "The hardcoded API storeBuffer offset must match the actual offset.");
 
 /*
  * Tracks the used sizes for owned heap data and automatically maintains the

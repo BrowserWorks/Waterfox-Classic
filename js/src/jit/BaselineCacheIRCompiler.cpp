@@ -841,7 +841,7 @@ BaselineCacheIRCompiler::emitLoadTypedObjectResult()
     masm.addPtr(scratch2, scratch1);
 
     Address fieldAddr(scratch1, 0);
-    emitLoadTypedObjectResultShared(fieldAddr, scratch2, layout, typeDescr, output);
+    emitLoadTypedObjectResultShared(fieldAddr, scratch2, typeDescr, output);
     return true;
 }
 
