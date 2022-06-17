@@ -145,6 +145,38 @@ function runChecks(dbgObject, dbgEnv) {
   do_print("Test that suggestions are not given if there is an hyphen in the chain.");
   results = JSPropertyProvider(dbgObject, dbgEnv, "testHyphenated['prop-A'].");
   do_check_null(results);
+
+  do_print("Test that expression with optional chaining operator are completed");
+  results = JSPropertyProvider(dbgObject, dbgEnv, "testObject?.prop");
+  test_has_result(results, "propA");
+
+  results = JSPropertyProvider(dbgObject, dbgEnv, "testObject?.propA[0]?.propB?.to");
+  test_has_result(results, "toString");
+
+  results = JSPropertyProvider(dbgObject, dbgEnv, "testObject?.propA?.[0]?.propB?.to");
+  test_has_result(results, "toString");
+
+  results = JSPropertyProvider(dbgObject, dbgEnv, "[1,2,3]?.");
+  test_has_result(results, "indexOf");
+
+  results = JSPropertyProvider(dbgObject, dbgEnv, "'foo'?.");
+  test_has_result(results, "charAt");
+
+  // Check this doesn't throw since `propC` is not defined.
+  results = JSPropertyProvider(dbgObject, dbgEnv, "testObject?.propC?.this?.does?.not?.exist?.d");
+
+  // Test more ternary
+  results = JSPropertyProvider(dbgObject, dbgEnv, "true ? t");
+  test_has_result(results, "testObject");
+
+  results = JSPropertyProvider(dbgObject, dbgEnv, "true ?? t");
+  test_has_result(results, "testObject");
+
+  results = JSPropertyProvider(dbgObject, dbgEnv, "true ? /* comment */ t");
+  test_has_result(results, "testObject");
+
+  results = JSPropertyProvider(dbgObject, dbgEnv, "true?<t");
+  test_has_no_results(results);
 }
 
 /**
