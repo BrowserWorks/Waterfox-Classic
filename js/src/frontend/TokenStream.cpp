@@ -35,7 +35,6 @@
 
 using mozilla::ArrayLength;
 using mozilla::Maybe;
-using mozilla::PodArrayZero;
 using mozilla::PodAssign;
 using mozilla::PodCopy;
 using mozilla::PodZero;
@@ -424,18 +423,13 @@ TokenStreamAnyChars::TokenStreamAnyChars(JSContext* cx, const ReadOnlyCompileOpt
     mutedErrors(options.mutedErrors()),
     strictModeGetter(smg)
 {
-    // Nb: the following tables could be static, but initializing them here is
-    // much easier.  Don't worry, the time to initialize them for each
-    // TokenStream is trivial.  See bug 639420.
-
-    // See Parser::assignExpr() for an explanation of isExprEnding[].
-    PodArrayZero(isExprEnding);
-    isExprEnding[size_t(TokenKind::Comma)] = 1;
-    isExprEnding[size_t(TokenKind::Semi)] = 1;
-    isExprEnding[size_t(TokenKind::Colon)] = 1;
-    isExprEnding[size_t(TokenKind::Rp)] = 1;
-    isExprEnding[size_t(TokenKind::Rb)] = 1;
-    isExprEnding[size_t(TokenKind::Rc)] = 1;
+    // |isExprEnding| was initially zeroed: overwrite the true entries here.
+    isExprEnding[size_t(TokenKind::Comma)] = true;
+    isExprEnding[size_t(TokenKind::Semi)] = true;
+    isExprEnding[size_t(TokenKind::Colon)] = true;
+    isExprEnding[size_t(TokenKind::RightParen)] = true;
+    isExprEnding[size_t(TokenKind::RightBracket)] = true;
+    isExprEnding[size_t(TokenKind::RightCurly)] = true;
 }
 
 template<typename CharT>
@@ -1396,13 +1390,13 @@ enum FirstCharKind {
 #define T_COMMA     size_t(TokenKind::Comma)
 #define T_COLON     size_t(TokenKind::Colon)
 #define T_BITNOT    size_t(TokenKind::BitNot)
-#define T_LP        size_t(TokenKind::Lp)
-#define T_RP        size_t(TokenKind::Rp)
+#define T_LP        size_t(TokenKind::LeftParen)
+#define T_RP        size_t(TokenKind::RightParen)
 #define T_SEMI      size_t(TokenKind::Semi)
-#define T_LB        size_t(TokenKind::Lb)
-#define T_RB        size_t(TokenKind::Rb)
-#define T_LC        size_t(TokenKind::Lc)
-#define T_RC        size_t(TokenKind::Rc)
+#define T_LB        size_t(TokenKind::LeftBracket)
+#define T_RB        size_t(TokenKind::RightBracket)
+#define T_LC        size_t(TokenKind::LeftCurly)
+#define T_RC        size_t(TokenKind::RightCurly)
 #define Templat     String
 #define _______     Other
 static const uint8_t firstCharKinds[] = {
@@ -1939,7 +1933,23 @@ TokenStreamSpecific<CharT, AnyCharsAccess>::getTokenInternal(TokenKind* ttp, Mod
         goto out;
 
       case '?':
-        tp->type = matchChar('?') ? TokenKind::Coalesce : TokenKind::Hook;
+        if (matchChar('.')) {
+            c = getCharIgnoreEOL();
+            if (JS7_ISDEC(c)) {
+                // if the code unit is followed by a number, for example it has the
+                // following form `<...> ?.5 <..> then it should be treated as a
+                // ternary rather than as an optional chain
+                tp->type = TokenKind::Hook;
+                ungetCharIgnoreEOL(c);
+                ungetCharIgnoreEOL('.');
+            } else {
+                ungetCharIgnoreEOL(c);
+                tp->type = TokenKind::OptionalChain;
+            }
+        } else {
+            tp->type = matchChar('?') ? TokenKind::Coalesce : TokenKind::Hook;
+        }
+
         goto out;
 
       case '!':

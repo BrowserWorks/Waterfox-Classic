@@ -59,6 +59,8 @@ class SyntaxParseHandler
         // noticed).
         NodeFunctionCall,
 
+        NodeOptionalFunctionCall,
+
         // Node representing normal names which don't require any special
         // casing.
         NodeName,
@@ -72,7 +74,9 @@ class SyntaxParseHandler
         NodePotentialAsyncKeyword,
 
         NodeDottedProperty,
+        NodeOptionalDottedProperty,
         NodeElement,
+        NodeOptionalElement,
 
         // Destructuring target patterns can't be parenthesized: |([a]) = [3];|
         // must be a syntax error.  (We can't use NodeGeneric instead of these
@@ -129,6 +133,10 @@ class SyntaxParseHandler
 
     bool isPropertyAccess(Node node) {
         return node == NodeDottedProperty || node == NodeElement;
+    }
+
+    bool isOptionalPropertyAccess(Node node) {
+        return node == NodeOptionalDottedProperty || node == NodeOptionalElement;
     }
 
     bool isFunctionCall(Node node) {
@@ -241,9 +249,12 @@ class SyntaxParseHandler
     MOZ_MUST_USE bool addSpreadElement(Node literal, uint32_t begin, Node inner) { return true; }
     void addArrayElement(Node literal, Node element) { }
 
-    Node newCall(const TokenPos& pos) { return NodeFunctionCall; }
-    Node newSuperCall(Node callee) { return NodeGeneric; }
-    Node newTaggedTemplate(const TokenPos& pos) { return NodeGeneric; }
+    Node newArguments(const TokenPos& pos) { return NodeGeneric; }
+    Node newCall(Node callee, Node args) { return NodeFunctionCall; }
+    Node newOptionalCall(Node callee, Node args) { return NodeOptionalFunctionCall; }
+
+    Node newSuperCall(Node callee, Node args) { return NodeGeneric; }
+    Node newTaggedTemplate(Node callee, Node args) { return NodeGeneric; }
 
     Node newObjectLiteral(uint32_t begin) { return NodeUnparenthesizedObject; }
     Node newClassMethodList(uint32_t begin) { return NodeGeneric; }
@@ -263,6 +274,7 @@ class SyntaxParseHandler
     Node newYieldExpression(uint32_t begin, Node value) { return NodeGeneric; }
     Node newYieldStarExpression(uint32_t begin, Node value) { return NodeGeneric; }
     Node newAwaitExpression(uint32_t begin, Node value) { return NodeGeneric; }
+    Node newOptionalChain(uint32_t begin, Node value) { return NodeGeneric; }
 
     // Statements
 
@@ -316,12 +328,24 @@ class SyntaxParseHandler
     }
     Node newDebuggerStatement(const TokenPos& pos) { return NodeGeneric; }
 
-    Node newPropertyAccess(Node pn, PropertyName* name, uint32_t end) {
+    Node newPropertyName(PropertyName* name, const TokenPos& pos) {
         lastAtom = name;
+        return NodeGeneric;
+    }
+
+    Node newPropertyAccess(Node expr, Node key) {
         return NodeDottedProperty;
     }
 
+    Node newOptionalPropertyAccess(Node expr, Node key) {
+        return NodeOptionalDottedProperty;
+    }
+
     Node newPropertyByValue(Node pn, Node kid, uint32_t end) { return NodeElement; }
+
+    Node newOptionalPropertyByValue(Node pn, Node kid, uint32_t end) {
+        return NodeOptionalElement;
+    }
 
     MOZ_MUST_USE bool addCatchBlock(Node catchList, Node letBlock, Node catchName,
                                     Node catchGuard, Node catchBody) { return true; }
@@ -441,7 +465,7 @@ class SyntaxParseHandler
                    list == NodeFunctionCall);
     }
 
-    Node newNewExpression(uint32_t begin, Node ctor) {
+    Node newNewExpression(uint32_t begin, Node ctor, Node args) {
         return NodeGeneric;
     }
 
@@ -537,7 +561,7 @@ class SyntaxParseHandler
         // |this|.  It's not really eligible for the funapply/funcall
         // optimizations as they're currently implemented (assuming a single
         // value is used for both retrieval and |this|).
-        if (node != NodeDottedProperty)
+        if (node != NodeDottedProperty && node != NodeOptionalDottedProperty)
             return nullptr;
         return lastAtom->asPropertyName();
     }

@@ -51,6 +51,11 @@ class FullParseHandler
         return node->isKind(ParseNodeKind::Dot) || node->isKind(ParseNodeKind::Elem);
     }
 
+    bool isOptionalPropertyAccess(ParseNode* node) {
+        return node->isKind(ParseNodeKind::OptionalDot) ||
+               node->isKind(ParseNodeKind::OptionalElem);
+    }
+
     bool isFunctionCall(ParseNode* node) {
         // Note: super() is a special form, *not* a function call.
         return node->isKind(ParseNodeKind::Call);
@@ -179,6 +184,18 @@ class FullParseHandler
         if (expr->isKind(ParseNodeKind::Elem))
             return newUnary(ParseNodeKind::DeleteElem, begin, expr);
 
+        if (expr->isKind(ParseNodeKind::OptionalChain)) {
+          ParseNode* kid = expr->pn_kid;
+          // Handle property deletion explicitly. OptionalCall is handled
+          // via DeleteExpr.
+          if (kid->isKind(ParseNodeKind::Dot) ||
+              kid->isKind(ParseNodeKind::OptionalDot) ||
+              kid->isKind(ParseNodeKind::Elem) ||
+              kid->isKind(ParseNodeKind::OptionalElem)) {
+            return newUnary(ParseNodeKind::DeleteOptionalChain, begin, kid);
+          }
+        }
+
         return newUnary(ParseNodeKind::DeleteExpr, begin, expr);
     }
 
@@ -285,16 +302,24 @@ class FullParseHandler
         literal->append(element);
     }
 
-    ParseNode* newCall(const TokenPos& pos) {
-        return new_<ListNode>(ParseNodeKind::Call, JSOP_CALL, pos);
+    ParseNode* newCall(ParseNode* callee, ParseNode* args) {
+        return new_<BinaryNode>(ParseNodeKind::Call, JSOP_CALL, callee, args);
     }
 
-    ParseNode* newSuperCall(ParseNode* callee) {
-        return new_<ListNode>(ParseNodeKind::SuperCall, JSOP_SUPERCALL, callee);
+    ParseNode* newOptionalCall(ParseNode* callee, ParseNode* args) {
+        return new_<BinaryNode>(ParseNodeKind::OptionalCall, JSOP_CALL, callee, args);
     }
 
-    ParseNode* newTaggedTemplate(const TokenPos& pos) {
-        return new_<ListNode>(ParseNodeKind::TaggedTemplate, JSOP_CALL, pos);
+    ParseNode* newArguments(const TokenPos& pos) {
+        return new_<ListNode>(ParseNodeKind::Arguments, JSOP_NOP, pos);
+    }
+
+    ParseNode* newSuperCall(ParseNode* callee, ParseNode* args) {
+        return new_<BinaryNode>(ParseNodeKind::SuperCall, JSOP_SUPERCALL, callee, args);
+    }
+
+    ParseNode* newTaggedTemplate(ParseNode* tag, ParseNode* args) {
+        return new_<BinaryNode>(ParseNodeKind::TaggedTemplate, JSOP_CALL, tag, args);
     }
 
     ParseNode* newObjectLiteral(uint32_t begin) {
@@ -432,6 +457,11 @@ class FullParseHandler
     ParseNode* newAwaitExpression(uint32_t begin, ParseNode* value) {
         TokenPos pos(begin, value ? value->pn_pos.end : begin + 1);
         return new_<UnaryNode>(ParseNodeKind::Await, pos, value);
+    }
+
+    ParseNode* newOptionalChain(uint32_t begin, Node value) {
+        TokenPos pos(begin, value->pn_pos.end);
+        return new_<UnaryNode>(ParseNodeKind::OptionalChain, pos, value);
     }
 
     // Statements
@@ -670,12 +700,24 @@ class FullParseHandler
         return new_<DebuggerStatement>(pos);
     }
 
-    ParseNode* newPropertyAccess(ParseNode* pn, PropertyName* name, uint32_t end) {
-        return new_<PropertyAccess>(pn, name, pn->pn_pos.begin, end);
+    ParseNode* newPropertyName(PropertyName* name, const TokenPos& pos) {
+        return new_<NameNode>(ParseNodeKind::PropertyName, JSOP_NOP, name, pos);
+    }
+
+    ParseNode* newPropertyAccess(ParseNode* expr, ParseNode* key) {
+        return new_<PropertyAccess>(expr, key, expr->pn_pos.begin, key->pn_pos.end);
     }
 
     ParseNode* newPropertyByValue(ParseNode* lhs, ParseNode* index, uint32_t end) {
         return new_<PropertyByValue>(lhs, index, lhs->pn_pos.begin, end);
+    }
+
+    ParseNode* newOptionalPropertyAccess(ParseNode* expr, ParseNode* key) {
+        return new_<OptionalPropertyAccess>(expr, key, expr->pn_pos.begin, key->pn_pos.end);
+    }
+  
+    ParseNode* newOptionalPropertyByValue(ParseNode* lhs, ParseNode* index, uint32_t end) {
+        return new_<OptionalPropertyByValue>(lhs, index, lhs->pn_pos.begin, end);
     }
 
     inline MOZ_MUST_USE bool addCatchBlock(ParseNode* catchList, ParseNode* lexicalScope,
@@ -735,13 +777,8 @@ class FullParseHandler
         return new_<LexicalScopeNode>(bindings, body);
     }
 
-    Node newNewExpression(uint32_t begin, ParseNode* ctor) {
-        ParseNode* newExpr = new_<ListNode>(ParseNodeKind::New, JSOP_NEW, TokenPos(begin, begin + 1));
-        if (!newExpr)
-            return nullptr;
-
-        addList(newExpr, ctor);
-        return newExpr;
+    Node newNewExpression(uint32_t begin, ParseNode* ctor, ParseNode* args) {
+        return new_<BinaryNode>(ParseNodeKind::New, JSOP_NEW, TokenPos(begin, args->pn_pos.end), ctor, args);
     }
 
     ParseNode* newAssignment(ParseNodeKind kind, ParseNode* lhs, ParseNode* rhs) {
@@ -907,7 +944,7 @@ class FullParseHandler
     }
 
     PropertyName* maybeDottedProperty(ParseNode* pn) {
-        return pn->is<PropertyAccess>() ? &pn->as<PropertyAccess>().name() : nullptr;
+        return pn->is<PropertyAccessBase>() ? &pn->as<PropertyAccessBase>().name() : nullptr;
     }
     JSAtom* isStringExprStatement(ParseNode* pn, TokenPos* pos) {
         if (JSAtom* atom = pn->isStringExprStatement()) {

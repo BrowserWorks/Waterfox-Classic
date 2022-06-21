@@ -34,14 +34,20 @@ class ObjectBox;
     F(PostIncrement) \
     F(PreDecrement) \
     F(PostDecrement) \
+    F(PropertyName) \
     F(Dot) \
     F(Elem) \
+    F(OptionalDot) \
+    F(OptionalChain) \
+    F(OptionalElem) \
+    F(OptionalCall) \
     F(Array) \
     F(Elision) \
     F(StatementList) \
     F(Label) \
     F(Object) \
     F(Call) \
+    F(Arguments) \
     F(Name) \
     F(ObjectPropertyName) \
     F(ComputedName) \
@@ -77,6 +83,7 @@ class ObjectBox;
     F(DeleteName) \
     F(DeleteProp) \
     F(DeleteElem) \
+    F(DeleteOptionalChain) \
     F(DeleteExpr) \
     F(Try) \
     F(Catch) \
@@ -374,9 +381,8 @@ IsTypeofKind(ParseNodeKind kind)
  * PostIncrement,
  * PreDecrement,
  * PostDecrement
- * New      list        pn_head: list of ctor, arg1, arg2, ... argN
- *                          pn_count: 1 + N (where N is number of args)
- *                          ctor is a MEMBER expr
+ * New      binary      pn_left: ctor expression on the left of the (
+ *                          pn_right: Arguments
  * DeleteName unary     pn_kid: Name expr
  * DeleteProp unary     pn_kid: Dot expr
  * DeleteElem unary     pn_kid: Elem expr
@@ -385,13 +391,15 @@ IsTypeofKind(ParseNodeKind kind)
  *                          for a more-specific PNK_DELETE* unless constant
  *                          folding (or a similar parse tree manipulation) has
  *                          occurred
- * Dot      name        pn_expr: MEMBER expr to left of .
- *                          pn_atom: name to right of .
+ * PropertyName name    pn_atom: property name being accessed
+ * Dot      binary      pn_left: MEMBER expr to left of .
+ *                          pn_right: PropertyName to right of .
  * Elem     binary      pn_left: MEMBER expr to left of [
  *                          pn_right: expr between [ and ]
- * Call     list        pn_head: list of call, arg1, arg2, ... argN
- *                          pn_count: 1 + N (where N is number of args)
- *                          call is a MEMBER expr naming a callable object
+ * Call     binary      pn_left: callee expression on the left of the (
+ *                          pn_right: Arguments
+ * Arguments list       pn_head: list of arg1, arg2, ... argN
+ *                          pn_count: N (where N is number of args)
  * GenExp   list        Exactly like Call, used for the implicit call
  *                          in the desugaring of a generator-expression.
  * Array    list        pn_head: list of pn_count array element exprs
@@ -413,8 +421,9 @@ IsTypeofKind(ParseNodeKind kind)
  *              list
  * TemplateString      pn_atom: template string atom
                 nullary     pn_op: JSOP_NOP
- * TaggedTemplate      pn_head: list of call, call site object, arg1, arg2, ... argN
- *              list        pn_count: 2 + N (N is the number of substitutions)
+ * TaggedTemplate      pn_left: tag expression
+ *              binary       pn_right: Arguments, with the first being the
+ *                           call site object, then arg1, arg2, ... argN
  * CallSiteObj list     pn_head: a Array node followed by
  *                          list of pn_count - 1 TemplateString nodes
  * RegExp   nullary     pn_objbox: RegExp model object
@@ -426,7 +435,7 @@ IsTypeofKind(ParseNodeKind kind)
  *
  * This,        unary   pn_kid: '.this' Name if function `this`, else nullptr
  * SuperBase    unary   pn_kid: '.this' Name
- *
+ * SuperCall    binary  pn_left: SuperBase pn_right: Arguments
  * SetThis      binary  pn_left: '.this' Name, pn_right: SuperCall
  *
  * LexicalScope scope   pn_u.scope.bindings: scope bindings
@@ -581,8 +590,7 @@ class ParseNode
                 FunctionBox* funbox;    /* function object */
             };
             ParseNode*  expr;           /* module or function body, var
-                                           initializer, argument default, or
-                                           base object of ParseNodeKind::Dot */
+                                           initializer, or argument default */
         } name;
         struct {
             LexicalScope::Data* bindings;
@@ -867,6 +875,10 @@ struct UnaryNode : public ParseNode
         pn_kid = kid;
     }
 
+    static bool test(const ParseNode& node) {
+        return node.isArity(PN_UNARY);
+    }
+
 #ifdef DEBUG
     void dump(GenericPrinter& out, int indent);
 #endif
@@ -886,6 +898,10 @@ struct BinaryNode : public ParseNode
     {
         pn_left = left;
         pn_right = right;
+    }
+
+    static bool test(const ParseNode& node) {
+        return node.isArity(PN_BINARY);
     }
 
 #ifdef DEBUG
@@ -1202,30 +1218,50 @@ class RegExpLiteral : public NullaryNode
     }
 };
 
-class PropertyAccess : public ParseNode
+class PropertyAccessBase : public BinaryNode
 {
   public:
-    PropertyAccess(ParseNode* lhs, PropertyName* name, uint32_t begin, uint32_t end)
-      : ParseNode(ParseNodeKind::Dot, JSOP_NOP, PN_NAME, TokenPos(begin, end))
+    /*
+     * PropertyAccess nodes can have any expression/'super' as left-hand
+     * side, but the name must be a ParseNodeKind::PropertyName node.
+     */
+    PropertyAccessBase(ParseNodeKind kind, ParseNode* lhs, ParseNode* name, uint32_t begin, uint32_t end)
+      : BinaryNode(kind, JSOP_NOP, TokenPos(begin, end), lhs, name)
     {
         MOZ_ASSERT(lhs != nullptr);
         MOZ_ASSERT(name != nullptr);
-        pn_u.name.expr = lhs;
-        pn_u.name.atom = name;
-    }
-
-    static bool test(const ParseNode& node) {
-        bool match = node.isKind(ParseNodeKind::Dot);
-        MOZ_ASSERT_IF(match, node.isArity(PN_NAME));
-        return match;
     }
 
     ParseNode& expression() const {
-        return *pn_u.name.expr;
+        return *pn_u.binary.left;
+    }
+
+    static bool test(const ParseNode& node) {
+        bool match = node.isKind(ParseNodeKind::Dot) ||
+                     node.isKind(ParseNodeKind::OptionalDot);
+        MOZ_ASSERT_IF(match, node.isArity(PN_BINARY));
+        MOZ_ASSERT_IF(match, node.pn_right->isKind(ParseNodeKind::PropertyName));
+        return match;
     }
 
     PropertyName& name() const {
-        return *pn_u.name.atom->asPropertyName();
+        return *pn_u.binary.right->pn_atom->asPropertyName();
+    }
+};
+
+class PropertyAccess : public PropertyAccessBase
+{
+  public:
+    PropertyAccess(ParseNode* lhs, ParseNode* name, uint32_t begin, uint32_t end)
+        : PropertyAccessBase(ParseNodeKind::Dot, lhs, name, begin, end) {
+      MOZ_ASSERT(lhs);
+      MOZ_ASSERT(name);
+    }
+
+    static bool test(const ParseNode& node) {
+      bool match = node.isKind(ParseNodeKind::Dot);
+      MOZ_ASSERT_IF(match, node.is<PropertyAccessBase>());
+      return match;
     }
 
     bool isSuper() const {
@@ -1233,25 +1269,70 @@ class PropertyAccess : public ParseNode
         return expression().isKind(ParseNodeKind::SuperBase);
     }
 };
+  
+class OptionalPropertyAccess : public PropertyAccessBase {
+  public:
+    OptionalPropertyAccess(ParseNode* lhs, ParseNode* name, uint32_t begin, uint32_t end)
+        : PropertyAccessBase(ParseNodeKind::OptionalDot, lhs, name, begin, end) {
+      MOZ_ASSERT(lhs);
+      MOZ_ASSERT(name);
+    }
+  
+    static bool test(const ParseNode& node) {
+      bool match = node.isKind(ParseNodeKind::OptionalDot);
+      MOZ_ASSERT_IF(match, node.is<PropertyAccessBase>());
+      return match;
+    }
+};
 
-class PropertyByValue : public ParseNode
+class PropertyByValueBase : public ParseNode
 {
   public:
-    PropertyByValue(ParseNode* lhs, ParseNode* propExpr, uint32_t begin, uint32_t end)
-      : ParseNode(ParseNodeKind::Elem, JSOP_NOP, PN_BINARY, TokenPos(begin, end))
+    PropertyByValueBase(ParseNodeKind kind, ParseNode* lhs, ParseNode* propExpr,
+                        uint32_t begin, uint32_t end)
+      : ParseNode(kind, JSOP_NOP, PN_BINARY, TokenPos(begin, end))
     {
         pn_u.binary.left = lhs;
         pn_u.binary.right = propExpr;
     }
 
+    ParseNode& expression() const {
+        return *pn_u.binary.left;
+    }
+
     static bool test(const ParseNode& node) {
-        bool match = node.isKind(ParseNodeKind::Elem);
+        bool match = node.isKind(ParseNodeKind::Elem) ||
+                     node.isKind(ParseNodeKind::OptionalElem);
         MOZ_ASSERT_IF(match, node.isArity(PN_BINARY));
         return match;
+    }
+};
+
+class PropertyByValue : public PropertyByValueBase {
+  public:
+    PropertyByValue(ParseNode* lhs, ParseNode* propExpr, uint32_t begin, uint32_t end)
+        : PropertyByValueBase(ParseNodeKind::Elem, lhs, propExpr, begin, end) {}
+  
+    static bool test(const ParseNode& node) {
+      bool match = node.isKind(ParseNodeKind::Elem);
+      MOZ_ASSERT_IF(match, node.is<PropertyByValueBase>());
+      return match;
     }
 
     bool isSuper() const {
         return pn_left->isKind(ParseNodeKind::SuperBase);
+    }
+};
+
+class OptionalPropertyByValue : public PropertyByValueBase {
+  public:
+    OptionalPropertyByValue(ParseNode* lhs, ParseNode* propExpr, uint32_t begin, uint32_t end)
+        : PropertyByValueBase(ParseNodeKind::OptionalElem, lhs, propExpr, begin, end) {}
+  
+    static bool test(const ParseNode& node) {
+      bool match = node.isKind(ParseNodeKind::OptionalElem);
+      MOZ_ASSERT_IF(match, node.is<PropertyByValueBase>());
+      return match;
     }
 };
 

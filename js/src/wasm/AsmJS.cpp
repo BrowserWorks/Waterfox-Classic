@@ -456,22 +456,21 @@ static inline ParseNode*
 CallCallee(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(ParseNodeKind::Call));
-    return ListHead(pn);
+    return BinaryLeft(pn);
 }
 
 static inline unsigned
 CallArgListLength(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(ParseNodeKind::Call));
-    MOZ_ASSERT(ListLength(pn) >= 1);
-    return ListLength(pn) - 1;
+    return ListLength(BinaryRight(pn));
 }
 
 static inline ParseNode*
 CallArgList(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(ParseNodeKind::Call));
-    return NextNode(ListHead(pn));
+    return ListHead(BinaryRight(pn));
 }
 
 static inline ParseNode*
@@ -634,16 +633,16 @@ static ParseNode*
 DotBase(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(ParseNodeKind::Dot));
-    MOZ_ASSERT(pn->isArity(PN_NAME));
-    return pn->expr();
+    MOZ_ASSERT(pn->isArity(PN_BINARY));
+    return pn->pn_left;
 }
 
 static PropertyName*
 DotMember(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(ParseNodeKind::Dot));
-    MOZ_ASSERT(pn->isArity(PN_NAME));
-    return pn->pn_atom->asPropertyName();
+    MOZ_ASSERT(pn->isArity(PN_BINARY));
+    return pn->pn_right->pn_atom->asPropertyName();
 }
 
 static ParseNode*
@@ -3472,9 +3471,11 @@ IsArrayViewCtorName(ModuleValidator& m, PropertyName* name, Scalar::Type* type)
 }
 
 static bool
-CheckNewArrayViewArgs(ModuleValidator& m, ParseNode* ctorExpr, PropertyName* bufferName)
+CheckNewArrayViewArgs(ModuleValidator& m, ParseNode* newExpr, PropertyName* bufferName)
 {
-    ParseNode* bufArg = NextNode(ctorExpr);
+    ParseNode* ctorExpr = BinaryLeft(newExpr);
+    ParseNode* ctorArgs = BinaryRight(newExpr);
+    ParseNode* bufArg = ListHead(ctorArgs);
     if (!bufArg || NextNode(bufArg) != nullptr)
         return m.fail(ctorExpr, "array view constructor takes exactly one argument");
 
@@ -3495,7 +3496,7 @@ CheckNewArrayView(ModuleValidator& m, PropertyName* varName, ParseNode* newExpr)
     if (!bufferName)
         return m.fail(newExpr, "cannot create array view without an asm.js heap parameter");
 
-    ParseNode* ctorExpr = ListHead(newExpr);
+    ParseNode* ctorExpr = BinaryLeft(newExpr);
 
     PropertyName* field;
     Scalar::Type type;
@@ -3524,7 +3525,7 @@ CheckNewArrayView(ModuleValidator& m, PropertyName* varName, ParseNode* newExpr)
         type = global->viewType();
     }
 
-    if (!CheckNewArrayViewArgs(m, ctorExpr, bufferName))
+    if (!CheckNewArrayViewArgs(m, newExpr, bufferName))
         return false;
 
     return m.addArrayView(varName, type, field);
@@ -7404,7 +7405,7 @@ CheckModuleReturn(ModuleValidator& m)
         return false;
     auto& ts = m.parser().tokenStream;
     if (tk != TokenKind::Return) {
-        return m.failCurrentOffset((tk == TokenKind::Rc || tk == TokenKind::Eof)
+        return m.failCurrentOffset((tk == TokenKind::RightCurly || tk == TokenKind::Eof)
                                    ? "expecting return statement"
                                    : "invalid asm.js. statement");
     }
@@ -7436,7 +7437,7 @@ CheckModuleEnd(ModuleValidator &m)
     if (!GetToken(m.parser(), &tk))
         return false;
 
-    if (tk != TokenKind::Eof && tk != TokenKind::Rc)
+    if (tk != TokenKind::Eof && tk != TokenKind::RightCurly)
         return m.failCurrentOffset("top-level export (return) must be the last statement");
 
     m.parser().tokenStream.anyCharsAccess().ungetToken();

@@ -745,22 +745,22 @@ class Parser final
     Node yieldExpression(InHandling inHandling);
     Node condExpr(InHandling inHandling, YieldHandling yieldHandling,
                   TripledotHandling tripledotHandling,
-                  PossibleError* possibleError,
-                  InvokedPrediction invoked = PredictUninvoked);
+                  PossibleError* possibleError, InvokedPrediction invoked);
     Node orExpr(InHandling inHandling, YieldHandling yieldHandling,
                 TripledotHandling tripledotHandling,
-                PossibleError* possibleError,
-                InvokedPrediction invoked = PredictUninvoked);
+                PossibleError* possibleError, InvokedPrediction invoked);
     Node unaryExpr(YieldHandling yieldHandling, TripledotHandling tripledotHandling,
                    PossibleError* possibleError = nullptr,
                    InvokedPrediction invoked = PredictUninvoked);
+    Node optionalExpr(YieldHandling yieldHandling, TripledotHandling tripledotHandling,
+                      TokenKind tt, PossibleError* possibleError = nullptr,
+                      InvokedPrediction invoked = PredictUninvoked);
     Node memberExpr(YieldHandling yieldHandling, TripledotHandling tripledotHandling,
-                    TokenKind tt, bool allowCallSyntax = true,
-                    PossibleError* possibleError = nullptr,
-                    InvokedPrediction invoked = PredictUninvoked);
+                    TokenKind tt, bool allowCallSyntax,
+                    PossibleError* possibleError, InvokedPrediction invoked);
     Node primaryExpr(YieldHandling yieldHandling, TripledotHandling tripledotHandling,
                      TokenKind tt, PossibleError* possibleError,
-                     InvokedPrediction invoked = PredictUninvoked);
+                     InvokedPrediction invoked);
     Node exprInParens(InHandling inHandling, YieldHandling yieldHandling,
                       TripledotHandling tripledotHandling, PossibleError* possibleError = nullptr);
 
@@ -800,7 +800,7 @@ class Parser final
     Node arrayComprehension(uint32_t begin);
     Node generatorComprehension(uint32_t begin);
 
-    bool argumentList(YieldHandling yieldHandling, Node listNode, bool* isSpread,
+    Node argumentList(YieldHandling yieldHandling, bool* isSpread,
                       PossibleError* possibleError = nullptr);
     Node destructuringDeclaration(DeclarationKind kind, YieldHandling yieldHandling,
                                   TokenKind tt);
@@ -948,6 +948,18 @@ class Parser final
     Node newNumber(const Token& tok) {
         return handler.newNumber(tok.number(), tok.decimalPoint(), tok.pos);
     }
+
+    enum class OptionalKind {
+        NonOptional = 0,
+        Optional,
+    };
+    Node memberPropertyAccess(Node lhs, OptionalKind optionalKind = OptionalKind::NonOptional);
+    Node memberElemAccess(Node lhs, YieldHandling yieldHandling,
+                          OptionalKind optionalKind = OptionalKind::NonOptional);
+    Node memberSuperCall(Node lhs, YieldHandling yieldHandling);
+    Node memberCall(TokenKind tt, Node lhs, YieldHandling yieldHandling,
+                    PossibleError* possibleError,
+                    OptionalKind optionalKind = OptionalKind::NonOptional);
 
     static Node null() { return ParseHandler::null(); }
 

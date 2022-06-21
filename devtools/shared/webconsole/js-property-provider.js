@@ -179,6 +179,22 @@ function JSPropertyProvider(dbgObject, anEnvironment, inputValue, cursor) {
   }
 
   let completionPart = inputValue.substring(beginning.startPos);
+
+  // Strip optional chaining characters from completion part, which we check
+  // by looking if it has ?. and if there are no digits (marker for ternary).
+  let optionalChainRegex = /\?\./g;
+  let optionalElemAccessRegex = /\?\.\[/g;
+  let digitRegex = /\?\.\d/;
+  // Handle optional element access
+  if (optionalElemAccessRegex.test(completionPart)) {
+    completionPart = completionPart.replace(optionalElemAccessRegex, "[");
+  }
+  // Handle optional chaining characters
+  if (optionalChainRegex.test(completionPart) &&
+      !digitRegex.test(completionPart)) {
+    completionPart = completionPart.replace(optionalChainRegex, ".");
+  }
+
   let lastDot = completionPart.lastIndexOf(".");
 
   // Don't complete on just an empty string.
