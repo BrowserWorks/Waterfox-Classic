@@ -185,7 +185,10 @@ public:
   NS_IMETHOD Run() override
   {
     MOZ_ASSERT(NS_IsMainThread(), "wrong thread");
-    mPACMan->mLoader = nullptr;
+    {
+      auto loader = mPACMan->mLoader.Lock();
+      loader.ref() = nullptr;
+    }
     mPACMan->PostProcessPendingQ();
     return NS_OK;
   }
@@ -332,6 +335,7 @@ static const char *kPACIncludePath =
 
 nsPACMan::nsPACMan(nsIEventTarget *mainThreadEventTarget)
   : NeckoTargetHolder(mainThreadEventTarget)
+  , mLoader("nsPACMan::mLoader")
   , mLoadPending(false)
   , mShutdown(false)
   , mLoadFailureCount(0)
@@ -358,7 +362,13 @@ nsPACMan::~nsPACMan()
     }
   }
 
-  NS_ASSERTION(mLoader == nullptr, "pac man not shutdown properly");
+#ifdef DEBUG
+  {
+    auto loader = mLoader.Lock();
+    NS_ASSERTION(loader.ref() == nullptr, "pac man not shutdown properly");
+  }
+#endif
+
   NS_ASSERTION(mPendingQ.isEmpty(), "pac man not shutdown properly");
 }
 
@@ -453,7 +463,10 @@ nsPACMan::LoadPACFromURI(const nsCString &spec)
 
   CancelExistingLoad();
 
-  mLoader = loader;
+  {
+    auto locked = mLoader.Lock();
+    locked.ref() = loader.forget();
+  }
   if (!spec.IsEmpty()) {
     mPACURISpec = spec;
     mPACURIRedirectSpec.Truncate();
@@ -473,12 +486,17 @@ nsPACMan::StartLoading()
   mLoadPending = false;
 
   // CancelExistingLoad was called...
-  if (!mLoader) {
+  nsCOMPtr<nsIStreamLoader> loader;
+  {
+    auto locked = mLoader.Lock();
+    loader = locked.ref();
+  }
+  if (!loader) {
     PostCancelPendingQ(NS_ERROR_ABORT);
     return;
   }
 
-  if (NS_SUCCEEDED(mLoader->Init(this, nullptr))) {
+  if (NS_SUCCEEDED(loader->Init(this, nullptr))) {
     // Always hit the origin server when loading PAC.
     nsCOMPtr<nsIIOService> ios = do_GetIOService();
     if (ios) {
@@ -508,7 +526,7 @@ nsPACMan::StartLoading()
       if (channel) {
         channel->SetLoadFlags(nsIRequest::LOAD_BYPASS_CACHE);
         channel->SetNotificationCallbacks(this);
-        if (NS_SUCCEEDED(channel->AsyncOpen2(mLoader)))
+        if (NS_SUCCEEDED(channel->AsyncOpen2(loader)))
           return;
       }
     }
@@ -518,10 +536,14 @@ nsPACMan::StartLoading()
   PostCancelPendingQ(NS_ERROR_UNEXPECTED);
 }
 
+void nsPACMan::OnLoadFailure() {
+  // We have to clear the loader to indicate that we are not loading PAC
+  // currently.
+  {
+    auto loader = mLoader.Lock();
+    loader.ref() = nullptr;
+  }
 
-void
-nsPACMan::OnLoadFailure()
-{
   int32_t minInterval = 5;    // 5 seconds
   int32_t maxInterval = 300;  // 5 minutes
 
@@ -550,12 +572,17 @@ nsPACMan::OnLoadFailure()
 void
 nsPACMan::CancelExistingLoad()
 {
-  if (mLoader) {
+  nsCOMPtr<nsIStreamLoader> loader;
+  {
+    auto locked = mLoader.Lock();
+    loader.swap(*locked);
+  }
+  if (loader) {
     nsCOMPtr<nsIRequest> request;
-    mLoader->GetRequest(getter_AddRefs(request));
-    if (request)
+    loader->GetRequest(getter_AddRefs(request));
+    if (request) {
       request->Cancel(NS_ERROR_ABORT);
-    mLoader = nullptr;
+    }
   }
 }
 
@@ -678,14 +705,16 @@ nsPACMan::OnStreamComplete(nsIStreamLoader *loader,
                            const uint8_t *data)
 {
   MOZ_ASSERT(NS_IsMainThread(), "wrong thread");
-  if (mLoader != loader) {
-    // If this happens, then it means that LoadPACFromURI was called more
-    // than once before the initial call completed.  In this case, status
-    // should be NS_ERROR_ABORT, and if so, then we know that we can and
-    // should delay any processing.
-    LOG(("OnStreamComplete: called more than once\n"));
-    if (status == NS_ERROR_ABORT)
-      return NS_OK;
+ {
+    auto locked = mLoader.Lock();
+    if (locked.ref() != loader) {
+      // If this happens, then it means that LoadPACFromURI was called more
+      // than once before the initial call completed.  In this case, status
+      // should be NS_ERROR_ABORT, and if so, then we know that we can and
+      // should delay any processing.
+      LOG(("OnStreamComplete: called more than once\n"));
+      if (status == NS_ERROR_ABORT) return NS_OK;
+    }
   }
 
   LOG(("OnStreamComplete: entry\n"));

@@ -684,7 +684,7 @@ ContentPrefService2.prototype = {
     });
   },
 
-  destroy: function CPS2_destroy() {
+  destroy() {
     if (this._statements) {
       for (let sql in this._statements) {
         let stmt = this._statements[sql];
@@ -787,11 +787,11 @@ ContentPrefService2.prototype = {
     Services.tm.dispatchToMainThread(fn.bind(this));
   },
 
-  addObserverForName: function CPS2_addObserverForName(name, observer) {
+  addObserverForName(name, observer) {
     this._cps._addObserver(name, observer);
   },
 
-  removeObserverForName: function CPS2_removeObserverForName(name, observer) {
+  removeObserverForName(name, observer) {
     this._cps._removeObserver(name, observer);
   },
 
@@ -829,8 +829,8 @@ ContentPrefService2.prototype = {
     this._cache.removeAll();
 
     let cps = this._cps;
-    cps._observers = {};
-    cps._genericObservers = [];
+    cps._observers = new Map();
+    cps._genericObservers = new Set();
 
     let tables = ["prefs", "groups", "settings"];
     let stmts = tables.map(t => this._stmt(`DELETE FROM ${t}`));

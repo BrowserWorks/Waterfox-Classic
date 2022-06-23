@@ -1674,12 +1674,19 @@ WebGLContext::ReadPixelsImpl(GLint x, GLint y, GLsizei rawWidth, GLsizei rawHeig
     } else {
         // I *did* say "hilariously slow".
 
-        uint8_t* row = (uint8_t*)dest + writeX * bytesPerPixel;
-        row += writeY * rowStride;
+        const auto skipBytes = writeX * bytesPerPixel;
+        const auto usedRowBytes = rwWidth * bytesPerPixel;
         for (uint32_t j = 0; j < uint32_t(rwHeight); j++) {
+            uint8_t* destWriteBegin = (uint8_t*)dest + skipBytes + (writeY + j) * rowStride;
+            MOZ_RELEASE_ASSERT((uint8_t*)dest <= destWriteBegin);
+            MOZ_RELEASE_ASSERT(destWriteBegin <= (uint8_t*)dest + dataLen);
+
+            uint8_t* destWriteEnd = destWriteBegin + usedRowBytes;
+            MOZ_RELEASE_ASSERT((uint8_t*)dest <= destWriteEnd);
+            MOZ_RELEASE_ASSERT(destWriteEnd <= (uint8_t*)dest + dataLen);
             DoReadPixelsAndConvert(srcFormat->format, readX, readY+j, rwWidth, 1,
-                                   packFormat, packType, row, dataLen, rowStride);
-            row += rowStride;
+                                   packFormat, packType, destWriteBegin,
+                                    destWriteEnd - destWriteBegin, rowStride);
         }
     }
 }
