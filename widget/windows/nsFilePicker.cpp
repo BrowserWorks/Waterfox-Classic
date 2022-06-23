@@ -505,10 +505,7 @@ nsFilePicker::ShowFilePicker(const nsString& aInitialDir)
     nsAutoString sanitizedFilename(mDefaultFilename);
     sanitizedFilename.ReplaceChar('%', '_');
 
-    hr = dialog->SetFileName(sanitizedFilename.get());
-    if (FAILED(hr)) {
-      return false;
-    }
+    dialog->SetFileName(sanitizedFilename.get());
   }
   
   // default extension to append to new files
