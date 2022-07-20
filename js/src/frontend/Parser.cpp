@@ -4445,8 +4445,6 @@ Parser<ParseHandler, CharT>::bindingInitializer(Node lhs, DeclarationKind kind,
     if (!rhs)
         return null();
 
-    handler.checkAndSetIsDirectRHSAnonFunction(rhs);
-
     Node assign = handler.newAssignment(ParseNodeKind::Assign, lhs, rhs);
     if (!assign)
         return null();
@@ -4826,8 +4824,6 @@ Parser<ParseHandler, CharT>::declarationPattern(DeclarationKind declKind, TokenK
     if (!init)
         return null();
 
-    handler.checkAndSetIsDirectRHSAnonFunction(init);
-
     return handler.newAssignment(ParseNodeKind::Assign, pattern, init);
 }
 
@@ -4850,8 +4846,6 @@ Parser<ParseHandler, CharT>::initializerInNameDeclaration(Node binding,
                                   yieldHandling, TripledotProhibited);
     if (!initializer)
         return false;
-
-    handler.checkAndSetIsDirectRHSAnonFunction(initializer);
 
     if (forHeadKind && initialDeclaration) {
         bool isForIn, isForOf;
@@ -5770,8 +5764,6 @@ Parser<ParseHandler, CharT>::exportDefaultAssignExpr(uint32_t begin)
     Node kid = assignExpr(InAllowed, YieldIsName, TripledotProhibited);
     if (!kid)
         return null();
-
-    handler.checkAndSetIsDirectRHSAnonFunction(kid);
 
     if (!matchOrInsertSemicolon())
         return null();
@@ -7297,18 +7289,16 @@ Parser<ParseHandler, CharT>::classDefinition(YieldHandling yieldHandling,
 
         bool isStatic = false;
         if (tt == TokenKind::Static) {
-            if (!tokenStream.peekToken(&tt))
-                return null();
-            if (tt == TokenKind::RightCurly) {
-                tokenStream.consumeKnownToken(tt);
-                error(JSMSG_UNEXPECTED_TOKEN, "property name", TokenKindToDesc(tt));
+            if (!tokenStream.peekToken(&tt)) {
                 return null();
             }
 
-            if (tt != TokenKind::LeftParen)
+            if (tt != TokenKind::LeftParen && tt != TokenKind::Assign &&
+                tt != TokenKind::Semi && tt != TokenKind::RightCurly) {
                 isStatic = true;
-            else
+            } else {
                 anyChars.ungetToken();
+            }
         } else {
             anyChars.ungetToken();
         }
@@ -7378,8 +7368,6 @@ Parser<ParseHandler, CharT>::classDefinition(YieldHandling yieldHandling,
                                    propType, funName);
         if (!fn)
             return null();
-
-        handler.checkAndSetIsDirectRHSAnonFunction(fn);
 
         AccessorType atype = ToAccessorType(propType);
         if (!handler.addClassMethodDefinition(classMethods, propName, fn, atype, isStatic))
@@ -8327,6 +8315,15 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
       case TokenKind::Assign:       kind = ParseNodeKind::Assign;       break;
       case TokenKind::AddAssign:    kind = ParseNodeKind::AddAssign;    break;
       case TokenKind::SubAssign:    kind = ParseNodeKind::SubAssign;    break;
+      case TokenKind::CoalesceAssign:
+          kind = ParseNodeKind::CoalesceAssignExpr;
+          break;
+      case TokenKind::OrAssign:
+          kind = ParseNodeKind::OrAssignExpr;
+          break;
+      case TokenKind::AndAssign:
+          kind = ParseNodeKind::AndAssignExpr;
+          break;
       case TokenKind::BitOrAssign:  kind = ParseNodeKind::BitOrAssign;  break;
       case TokenKind::BitXorAssign: kind = ParseNodeKind::BitXorAssign; break;
       case TokenKind::BitAndAssign: kind = ParseNodeKind::BitAndAssign; break;
@@ -8371,11 +8368,24 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
     } else if (handler.isPropertyAccess(lhs)) {
         // Permitted: no additional testing/fixup needed.
     } else if (handler.isFunctionCall(lhs)) {
-        if (!strictModeErrorAt(exprPos.begin, JSMSG_BAD_LEFTSIDE_OF_ASS))
+        // We don't have to worry about backward compatibility issues with the new
+        // compound assignment operators, so we always throw here. Also that way we
+        // don't have to worry if |f() &&= expr| should always throw an error or
+        // only if |f()| returns true.
+        if (kind == ParseNodeKind::CoalesceAssignExpr ||
+            kind == ParseNodeKind::OrAssignExpr ||
+            kind == ParseNodeKind::AndAssignExpr) {
+            errorAt(exprPos.begin, JSMSG_BAD_LEFTSIDE_OF_ASS);
             return null();
+        }
 
-        if (possibleError)
+        if (!strictModeErrorAt(exprPos.begin, JSMSG_BAD_LEFTSIDE_OF_ASS)) {
+            return null();
+        }
+
+        if (possibleError) {
             possibleError->setPendingDestructuringErrorAt(exprPos, JSMSG_BAD_DESTRUCT_TARGET);
+        }
     } else {
         errorAt(exprPos.begin, JSMSG_BAD_LEFTSIDE_OF_ASS);
         return null();
@@ -8387,9 +8397,6 @@ Parser<ParseHandler, CharT>::assignExpr(InHandling inHandling, YieldHandling yie
     Node rhs = assignExpr(inHandling, yieldHandling, TripledotProhibited);
     if (!rhs)
         return null();
-
-    if (kind == ParseNodeKind::Assign)
-        handler.checkAndSetIsDirectRHSAnonFunction(rhs);
 
     return handler.newAssignment(kind, lhs, rhs);
 }
@@ -10159,16 +10166,11 @@ Parser<ParseHandler, CharT>::objectLiteral(YieldHandling yieldHandling,
                 if (!propExpr)
                     return null();
 
-                handler.checkAndSetIsDirectRHSAnonFunction(propExpr);
-
                 if (!checkDestructuringAssignmentElement(propExpr, exprPos, &possibleErrorInner,
                                                          possibleError))
                 {
                     return null();
                 }
-
-                if (foldConstants && !FoldConstants(context, &propExpr, this))
-                    return null();
 
                 if (propAtom == context->names().proto) {
                     if (seenPrototypeMutation) {
@@ -10186,18 +10188,25 @@ Parser<ParseHandler, CharT>::objectLiteral(YieldHandling yieldHandling,
                     }
                     seenPrototypeMutation = true;
 
-                    // Note: this occurs *only* if we observe TokenKind::Colon!
-                    // Only __proto__: v mutates [[Prototype]].  Getters, setters,
-                    // method/generator definitions, computed property name
-                    // versions of all of these, and shorthands do not.
+                    if (foldConstants && !FoldConstants(context, &propExpr, this))
+                        return null();
+
+                    // This occurs *only* if we observe PropertyType::Normal!
+                    // Only |__proto__: v| mutates [[Prototype]]. Getters,
+                    // setters, method/generator definitions, computed
+                    // property name versions of all of these, and shorthands
+                    // do not.
                     if (!handler.addPrototypeMutation(literal, namePos.begin, propExpr))
                         return null();
                 } else {
-                    if (!handler.isConstant(propExpr))
-                        handler.setListFlag(literal, PNX_NONCONST);
-
-                    if (!handler.addPropertyDefinition(literal, propName, propExpr))
+                    Node propDef = handler.newPropertyDefinition(propName, propExpr);
+                    if (!propDef)
                         return null();
+
+                    if (foldConstants && !FoldConstants(context, &propDef, this))
+                        return null();
+
+                    handler.addPropertyDefinition(literal, propDef);
                 }
             } else if (propType == PropertyType::Shorthand) {
                 /*
@@ -10265,8 +10274,6 @@ Parser<ParseHandler, CharT>::objectLiteral(YieldHandling yieldHandling,
                 if (!rhs)
                     return null();
 
-                handler.checkAndSetIsDirectRHSAnonFunction(rhs);
-
                 Node propExpr = handler.newAssignment(ParseNodeKind::Assign, lhs, rhs);
                 if (!propExpr)
                     return null();
@@ -10288,8 +10295,6 @@ Parser<ParseHandler, CharT>::objectLiteral(YieldHandling yieldHandling,
                 Node fn = methodDefinition(namePos.begin, propType, funName);
                 if (!fn)
                     return null();
-
-                handler.checkAndSetIsDirectRHSAnonFunction(fn);
 
                 AccessorType atype = ToAccessorType(propType);
                 if (!handler.addObjectMethodDefinition(literal, propName, fn, atype))

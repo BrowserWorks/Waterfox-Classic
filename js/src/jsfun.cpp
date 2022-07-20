@@ -591,7 +591,7 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleScope enclosingScope,
         if (!fun->isInterpreted())
             return xdr->fail(JS::TranscodeResult_Failure_NotInterpretedFun);
 
-        if (fun->explicitName() || fun->hasCompileTimeName() || fun->hasGuessedAtom())
+        if (fun->explicitName() || fun->hasInferredName() || fun->hasGuessedAtom())
             firstword |= HasAtom;
 
         if (fun->isStarGenerator() || fun->isAsync())
@@ -1395,12 +1395,8 @@ JSFunction::getUnresolvedName(JSContext* cx, HandleFunction fun, MutableHandleAt
     MOZ_ASSERT(!IsInternalFunctionObject(*fun));
     MOZ_ASSERT(!fun->hasResolvedName());
 
-    JSAtom* name = fun->explicitOrCompileTimeName();
+    JSAtom* name = fun->explicitOrInferredName();
     if (fun->isClassConstructor()) {
-        // It's impossible to have an empty named class expression. We use
-        // empty as a sentinel when creating default class constructors.
-        MOZ_ASSERT(name != cx->names().empty);
-
         // Unnamed class expressions should not get a .name property at all.
         if (name)
             v.set(name);
@@ -2163,7 +2159,17 @@ NewFunctionClone(JSContext* cx, HandleFunction fun, NewObjectKind newKind,
         return nullptr;
     RootedFunction clone(cx, &cloneobj->as<JSFunction>());
 
-    uint16_t flags = fun->flags() & ~JSFunction::EXTENDED;
+    // JSFunction::HAS_INFERRED_NAME can be set at compile-time and at
+    // runtime. In the latter case we should actually clear the flag before
+    // cloning the function, but since we can't differentiate between both
+    // cases here, we'll end up with a momentarily incorrect function name.
+    // This will be fixed up in SetFunctionName(), which should happen through
+    // JSOP_SETFUNNAME directly after JSOP_LAMBDA.
+    constexpr uint16_t NonCloneableFlags = JSFunction::EXTENDED |
+                                           JSFunction::RESOLVED_LENGTH |
+                                           JSFunction::RESOLVED_NAME;
+
+    uint16_t flags = fun->flags() & ~NonCloneableFlags;
     if (allocKind == AllocKind::FUNCTION_EXTENDED)
         flags |= JSFunction::EXTENDED;
 
@@ -2278,70 +2284,46 @@ js::CloneFunctionAndScript(JSContext* cx, HandleFunction fun, HandleObject enclo
     return clone;
 }
 
-/*
- * Return an atom for use as the name of a builtin method with the given
- * property id.
- *
- * Function names are always strings. If id is the well-known @@iterator
- * symbol, this returns "[Symbol.iterator]".  If a prefix is supplied the final
- * name is |prefix + " " + name|. A prefix cannot be supplied if id is a
- * symbol value.
- *
- * Implements steps 3-5 of 9.2.11 SetFunctionName in ES2016.
- */
-JSAtom*
-js::IdToFunctionName(JSContext* cx, HandleId id,
-                     FunctionPrefixKind prefixKind /* = FunctionPrefixKind::None */)
+static JSAtom*
+SymbolToFunctionName(JSContext* cx, JS::Symbol* symbol, FunctionPrefixKind prefixKind)
 {
-    // No prefix fastpath.
-    if (JSID_IS_ATOM(id) && prefixKind == FunctionPrefixKind::None)
-        return JSID_TO_ATOM(id);
+    // Step 4.a.
+    JSAtom* desc = symbol->description();
 
-    // Step 3 (implicit).
+    // Step 4.b, no prefix fastpath.
+    if (!desc && prefixKind == FunctionPrefixKind::None)
+        return cx->names().empty;
 
-    // Step 4.
-    if (JSID_IS_SYMBOL(id)) {
-        // Step 4.a.
-        RootedAtom desc(cx, JSID_TO_SYMBOL(id)->description());
-
-        // Step 4.b, no prefix fastpath.
-        if (!desc && prefixKind == FunctionPrefixKind::None)
-            return cx->names().empty;
-
-        // Step 5 (reordered).
-        StringBuffer sb(cx);
-        if (prefixKind == FunctionPrefixKind::Get) {
-            if (!sb.append("get "))
-                return nullptr;
-        } else if (prefixKind == FunctionPrefixKind::Set) {
-            if (!sb.append("set "))
-                return nullptr;
-        }
-
-        // Step 4.b.
-        if (desc) {
-            // Step 4.c.
-            if (!sb.append('[') || !sb.append(desc) || !sb.append(']'))
-                return nullptr;
-        }
-        return sb.finishAtom();
+    // Step 5 (reordered).
+    StringBuffer sb(cx);
+    if (prefixKind == FunctionPrefixKind::Get) {
+        if (!sb.append("get "))
+            return nullptr;
+    } else if (prefixKind == FunctionPrefixKind::Set) {
+        if (!sb.append("set "))
+            return nullptr;
     }
 
-    RootedValue idv(cx, IdToValue(id));
-    RootedAtom name(cx, ToAtom<CanGC>(cx, idv));
-    if (!name)
-        return nullptr;
-
-    // Step 5.
-    return NameToFunctionName(cx, name, prefixKind);
+    // Step 4.b.
+    if (desc) {
+        // Step 4.c.
+        if (!sb.append('[') || !sb.append(desc) || !sb.append(']'))
+            return nullptr;
+    }
+    return sb.finishAtom();
 }
 
-JSAtom*
-js::NameToFunctionName(JSContext* cx, HandleAtom name,
-                       FunctionPrefixKind prefixKind /* = FunctionPrefixKind::None */)
+static JSAtom*
+NameToFunctionName(JSContext* cx, HandleValue name, FunctionPrefixKind prefixKind)
 {
+    MOZ_ASSERT(name.isString() || name.isNumber());
+
     if (prefixKind == FunctionPrefixKind::None)
-        return name;
+        return ToAtom<CanGC>(cx, name);
+
+    JSString* nameStr = ToString(cx, name);
+    if (!nameStr)
+        return nullptr;
 
     StringBuffer sb(cx);
     if (prefixKind == FunctionPrefixKind::Get) {
@@ -2351,45 +2333,71 @@ js::NameToFunctionName(JSContext* cx, HandleAtom name,
         if (!sb.append("set "))
             return nullptr;
     }
-    if (!sb.append(name))
+    if (!sb.append(nameStr))
         return nullptr;
     return sb.finishAtom();
 }
 
+/*
+ * Return an atom for use as the name of a builtin method with the given
+ * property id.
+ *
+ * Function names are always strings. If id is the well-known @@iterator
+ * symbol, this returns "[Symbol.iterator]".  If a prefix is supplied the final
+ * name is |prefix + " " + name|.
+ *
+ * Implements steps 3-5 of 9.2.11 SetFunctionName in ES2016.
+ */
+JSAtom*
+js::IdToFunctionName(JSContext* cx, HandleId id,
+                     FunctionPrefixKind prefixKind /* = FunctionPrefixKind::None */)
+{
+    MOZ_ASSERT(JSID_IS_STRING(id) || JSID_IS_SYMBOL(id) || JSID_IS_INT(id));
+
+    // No prefix fastpath.
+    if (JSID_IS_ATOM(id) && prefixKind == FunctionPrefixKind::None)
+        return JSID_TO_ATOM(id);
+
+    // Step 3 (implicit).
+
+    // Step 4.
+    if (JSID_IS_SYMBOL(id))
+        return SymbolToFunctionName(cx, JSID_TO_SYMBOL(id), prefixKind);
+
+    // Step 5.
+    RootedValue idv(cx, IdToValue(id));
+    return NameToFunctionName(cx, idv, prefixKind);
+}
+
 bool
-js::SetFunctionNameIfNoOwnName(JSContext* cx, HandleFunction fun, HandleValue name,
-                               FunctionPrefixKind prefixKind)
+js::SetFunctionName(JSContext* cx, HandleFunction fun, HandleValue name,
+                    FunctionPrefixKind prefixKind)
 {
     MOZ_ASSERT(name.isString() || name.isSymbol() || name.isNumber());
 
-    if (fun->isClassConstructor()) {
-        // A class may have static 'name' method or accessor.
-        RootedId nameId(cx, NameToId(cx->names().name));
-        bool result;
-        if (!HasOwnProperty(cx, fun, nameId, &result))
-            return false;
-
-        if (result)
-            return true;
-    } else {
-        // Anonymous function shouldn't have own 'name' property at this point.
-        MOZ_ASSERT(!fun->containsPure(cx->names().name));
+    // `fun` is a newly created function, so normally it can't already have an
+    // inferred name. The rare exception is when `fun` was created by cloning
+    // a singleton function; see the comment in NewFunctionClone. In that case,
+    // the inferred name is bogus, so clear it out.
+    if (fun->hasInferredName()) {
+        MOZ_ASSERT(fun->isSingleton());
+        fun->clearInferredName();
     }
 
-    RootedId id(cx);
-    if (!ValueToId<CanGC>(cx, name, &id))
-        return false;
+    // Anonymous functions should neither have an own 'name' property nor a
+    // resolved name at this point.
+    MOZ_ASSERT(!fun->containsPure(cx->names().name));
+    MOZ_ASSERT(!fun->hasResolvedName());
 
-    RootedAtom funNameAtom(cx, IdToFunctionName(cx, id, prefixKind));
-    if (!funNameAtom)
-        return false;
-
-    RootedValue funNameVal(cx, StringValue(funNameAtom));
-    if (!NativeDefineProperty(cx, fun, cx->names().name, funNameVal, nullptr, nullptr,
-                              JSPROP_READONLY))
-    {
+    JSAtom* funName = name.isSymbol()
+                      ? SymbolToFunctionName(cx, name.toSymbol(), prefixKind)
+                      : NameToFunctionName(cx, name, prefixKind);
+    if (!funName) {
         return false;
     }
+
+    fun->setInferredName(funName);
+
     return true;
 }
 

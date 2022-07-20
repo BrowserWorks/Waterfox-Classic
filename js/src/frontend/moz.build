@@ -13,11 +13,26 @@ LOCAL_INCLUDES += ["!..", ".."]
 
 UNIFIED_SOURCES += [
     'BytecodeCompiler.cpp',
+    'BytecodeControlStructures.cpp',
     'BytecodeEmitter.cpp',
+    'CallOrNewEmitter.cpp',
+    'ElemOpEmitter.cpp',
+    'EmitterScope.cpp',
+    'ExpressionStatementEmitter.cpp',
     'FoldConstants.cpp',
+    'ForOfLoopControl.cpp',
+    'IfEmitter.cpp',
+    'JumpList.cpp',
+    'LabelEmitter.cpp',
     'NameFunctions.cpp',
+    'NameOpEmitter.cpp',
+    'ObjectEmitter.cpp',
+    'OptionalEmitter.cpp',
     'ParseNode.cpp',
+    'PropOpEmitter.cpp',
+    'TDZCheckCache.cpp',
     'TokenStream.cpp',
+    'TryEmitter.cpp',
 ]
 
 # frontend/Parser.cpp cannot be built in unified mode because of explicit

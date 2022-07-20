@@ -223,6 +223,9 @@
     range(AssignmentStart, Assign) \
     macro(AddAssign,    "'+='") \
     macro(SubAssign,    "'-='") \
+    macro(CoalesceAssign, "'\?\?='") /* avoid trigraphs warning */ \
+    macro(OrAssign,     "'||='") \
+    macro(AndAssign,    "'&&='") \
     macro(BitOrAssign,  "'|='") \
     macro(BitXorAssign, "'^='") \
     macro(BitAndAssign, "'&='") \

@@ -15,12 +15,14 @@
 
 #include "builtin/ModuleObject.h"
 #include "ds/InlineTable.h"
+#include "frontend/ParseNode.h"
 #include "frontend/TokenStream.h"
 #include "vm/EnvironmentObject.h"
 
 namespace js {
 namespace frontend {
 
+class ParseContext;
 class ParseNode;
 
 enum class StatementKind : uint8_t
@@ -313,10 +315,6 @@ class SharedContext
     // JSOPTION_EXTRA_WARNINGS warnings or strict mode errors.
     bool needStrictChecks() const {
         return strict() || extraWarnings;
-    }
-
-    bool isDotVariable(JSAtom* atom) const {
-        return atom == context->names().dotGenerator || atom == context->names().dotThis;
     }
 };
 
