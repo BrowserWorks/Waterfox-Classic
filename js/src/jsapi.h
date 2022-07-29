@@ -3864,6 +3864,7 @@ class JS_FRIEND_API(TransitiveCompileOptions)
         sourceIsLazy(false),
         allowHTMLComments(true),
         isProbablySystemOrAddonCode(false),
+        hideScriptFromDebugger(false),
         introductionType(nullptr),
         introductionLineno(0),
         introductionOffset(0),
@@ -3901,6 +3902,7 @@ class JS_FRIEND_API(TransitiveCompileOptions)
     bool sourceIsLazy;
     bool allowHTMLComments;
     bool isProbablySystemOrAddonCode;
+    bool hideScriptFromDebugger;
 
     // |introductionType| is a statically allocated C string:
     // one of "eval", "Function", or "GeneratorFunction".
@@ -4308,6 +4310,22 @@ CompileFunction(JSContext* cx, AutoObjectVector& envChain,
                 const char* name, unsigned nargs, const char* const* argnames,
                 const char* bytes, size_t length, JS::MutableHandleFunction fun);
 
+/*
+ * Associate an element wrapper and attribute name with a previously compiled
+ * script, for debugging purposes. Calling this function is optional, but should
+ * be done before script execution if it is required.
+ */
+extern JS_PUBLIC_API(bool)
+InitScriptSourceElement(JSContext* cx, HandleScript script,
+                        HandleObject element, HandleString elementAttrName = nullptr);
+
+/*
+ * For a script compiled with the hideScriptFromDebugger option, expose the
+ * script to the debugger by calling the debugger's onNewScript hook.
+ */
+extern JS_PUBLIC_API(void)
+ExposeScriptToDebugger(JSContext* cx, HandleScript script);
+
 } /* namespace JS */
 
 extern JS_PUBLIC_API(JSString*)
@@ -4438,6 +4456,21 @@ GetModuleResolveHook(JSRuntime* rt);
 extern JS_PUBLIC_API(void)
 SetModuleResolveHook(JSRuntime* rt, ModuleResolveHook func);
 
+using ModuleMetadataHook = bool (*)(JSContext*, HandleObject, HandleObject);
+
+/**
+ * Get the hook for populating the import.meta metadata object.
+ */
+extern JS_PUBLIC_API(ModuleMetadataHook)
+GetModuleMetadataHook(JSRuntime* rt);
+
+/**
+ * Set the hook for populating the import.meta metadata object to the given
+ * function.
+ */
+extern JS_PUBLIC_API(void)
+SetModuleMetadataHook(JSRuntime* rt, ModuleMetadataHook func);
+
 /**
  * Parse the given source buffer as a module in the scope of the current global
  * of cx and return a source text module record.
@@ -4507,6 +4540,9 @@ GetRequestedModuleSpecifier(JSContext* cx, JS::HandleValue requestedModuleObject
 extern JS_PUBLIC_API(void)
 GetRequestedModuleSourcePos(JSContext* cx, JS::HandleValue requestedModuleObject,
                             uint32_t* lineNumber, uint32_t* columnNumber);
+
+extern JS_PUBLIC_API(JSScript*)
+GetModuleScript(JS::HandleObject moduleRecord);
 
 } /* namespace JS */
 

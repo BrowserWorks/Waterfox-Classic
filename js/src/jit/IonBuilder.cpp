@@ -2340,9 +2340,13 @@ IonBuilder::inspectOpcode(JSOp op)
             pushConstant(UndefinedValue());
             return Ok();
         }
-
-        // Just fall through to the unsupported bytecode case.
-        break;
+        // Fallthrough to IMPLICITTHIS in non-syntactic scope case
+        MOZ_FALLTHROUGH;
+      case JSOP_IMPLICITTHIS:
+      {
+        PropertyName* name = info().getAtom(pc)->asPropertyName();
+        return jsop_implicitthis(name);
+      }
 
       case JSOP_NEWTARGET:
         return jsop_newtarget();
@@ -2380,6 +2384,9 @@ IonBuilder::inspectOpcode(JSOp op)
         pushConstant(BooleanValue(false));
         return Ok();
       }
+
+      case JSOP_IMPORTMETA:
+        return jsop_importmeta();
 
       // ===== NOT Yet Implemented =====
       // Read below!
@@ -2443,7 +2450,6 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_FINALLY:
       case JSOP_GETRVAL:
       case JSOP_GOSUB:
-      case JSOP_IMPLICITTHIS:
       case JSOP_RETSUB:
       case JSOP_SETINTRINSIC:
       case JSOP_THROWMSG:
@@ -12728,6 +12734,43 @@ IonBuilder::jsop_debugger()
     // cx->compartment()->isDebuggee(). Resume in-place and have baseline
     // handle the details.
     return resumeAt(debugger, pc);
+}
+
+AbortReasonOr<Ok>
+IonBuilder::jsop_implicitthis(PropertyName* name)
+{
+    MOZ_ASSERT(usesEnvironmentChain());
+
+    MImplicitThis* implicitThis = MImplicitThis::New(alloc(), current->environmentChain(), name);
+    current->add(implicitThis);
+    current->push(implicitThis);
+
+    return resumeAfter(implicitThis);
+}
+
+AbortReasonOr<Ok>
+IonBuilder::jsop_importmeta()
+{
+    if (info().analysisMode() == Analysis_ArgumentsUsage) {
+        // The meta object may not have been created yet. Just push a dummy
+        // value, it does not affect the arguments analysis.
+        MUnknownValue* unknown = MUnknownValue::New(alloc());
+        current->add(unknown);
+        current->push(unknown);
+        return Ok();
+    }
+
+    ModuleObject* module = GetModuleObjectForScript(script());
+    MOZ_ASSERT(module);
+
+    // If we get there then the meta object must already have been created, at
+    // the latest when we compiled for baseline.
+    JSObject* metaObject = module->metaObject();
+    MOZ_ASSERT(metaObject);
+
+    pushConstant(ObjectValue(*metaObject));
+
+    return Ok();
 }
 
 MInstruction*

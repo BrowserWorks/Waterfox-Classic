@@ -1398,21 +1398,6 @@ JSScript::hasScriptName()
 }
 
 void
-ScriptSourceObject::trace(JSTracer* trc, JSObject* obj)
-{
-    ScriptSourceObject* sso = static_cast<ScriptSourceObject*>(obj);
-
-    // Don't trip over the poison 'not yet initialized' values.
-    if (!sso->getReservedSlot(INTRODUCTION_SCRIPT_SLOT).isMagic(JS_GENERIC_MAGIC)) {
-        JSScript* script = sso->introductionScript();
-        if (script) {
-            TraceManuallyBarrieredEdge(trc, &script, "ScriptSourceObject introductionScript");
-            sso->setReservedSlot(INTRODUCTION_SCRIPT_SLOT, PrivateValue(script));
-        }
-    }
-}
-
-void
 ScriptSourceObject::finalize(FreeOp* fop, JSObject* obj)
 {
     MOZ_ASSERT(fop->onMainThread());
@@ -1434,7 +1419,7 @@ static const ClassOps ScriptSourceObjectClassOps = {
     nullptr, /* call */
     nullptr, /* hasInstance */
     nullptr, /* construct */
-    ScriptSourceObject::trace
+    nullptr  /* trace */
 };
 
 const Class ScriptSourceObject::class_ = {
@@ -1474,32 +1459,43 @@ ScriptSourceObject::initFromOptions(JSContext* cx, HandleScriptSource source,
     MOZ_ASSERT(source->getReservedSlot(ELEMENT_PROPERTY_SLOT).isMagic(JS_GENERIC_MAGIC));
     MOZ_ASSERT(source->getReservedSlot(INTRODUCTION_SCRIPT_SLOT).isMagic(JS_GENERIC_MAGIC));
 
-    RootedValue element(cx, ObjectOrNullValue(options.element()));
-    if (!cx->compartment()->wrap(cx, &element))
+    RootedObject element(cx, options.element());
+    RootedString elementAttributeName(cx, options.elementAttributeName());
+    if (!initElementProperties(cx, source, element, elementAttributeName))
         return false;
-    source->setReservedSlot(ELEMENT_SLOT, element);
-
-    RootedValue elementAttributeName(cx);
-    if (options.elementAttributeName())
-        elementAttributeName = StringValue(options.elementAttributeName());
-    else
-        elementAttributeName = UndefinedValue();
-    if (!cx->compartment()->wrap(cx, &elementAttributeName))
-        return false;
-    source->setReservedSlot(ELEMENT_PROPERTY_SLOT, elementAttributeName);
 
     // There is no equivalent of cross-compartment wrappers for scripts. If the
     // introduction script and ScriptSourceObject are in different compartments,
     // we would be creating a cross-compartment script reference, which is
     // forbidden. In that case, simply don't bother to retain the introduction
     // script.
+    Value introductionScript = UndefinedValue();
     if (options.introductionScript() &&
         options.introductionScript()->compartment() == cx->compartment())
     {
-        source->setReservedSlot(INTRODUCTION_SCRIPT_SLOT, PrivateValue(options.introductionScript()));
-    } else {
-        source->setReservedSlot(INTRODUCTION_SCRIPT_SLOT, UndefinedValue());
+        introductionScript.setPrivateGCThing(options.introductionScript());
     }
+    source->setReservedSlot(INTRODUCTION_SCRIPT_SLOT, introductionScript);
+
+    return true;
+}
+
+/* static */ bool
+ScriptSourceObject::initElementProperties(JSContext* cx, HandleScriptSource source,
+                                          HandleObject element, HandleString elementAttrName)
+{
+    RootedValue elementValue(cx, ObjectOrNullValue(element));
+    if (!cx->compartment()->wrap(cx, &elementValue))
+        return false;
+
+    RootedValue nameValue(cx);
+    if (elementAttrName)
+        nameValue = StringValue(elementAttrName);
+    if (!cx->compartment()->wrap(cx, &nameValue))
+        return false;
+
+    source->setReservedSlot(ELEMENT_SLOT, elementValue);
+    source->setReservedSlot(ELEMENT_PROPERTY_SLOT, nameValue);
 
     return true;
 }
@@ -2722,6 +2718,8 @@ JSScript::Create(JSContext* cx, const ReadOnlyCompileOptions& options,
     script->toStringStart_ = toStringStart;
     script->toStringEnd_ = toStringEnd;
 
+    script->hideScriptFromDebugger_ = options.hideScriptFromDebugger;
+
 #ifdef MOZ_VTUNE
     script->vtuneMethodId_ = vtune::GenerateUniqueMethodID();
 #endif
@@ -3632,6 +3630,7 @@ js::detail::CopyScript(JSContext* cx, HandleScript src, HandleScript dst,
     dst->isAsync_ = src->asyncKind() == AsyncFunction;
     dst->hasRest_ = src->hasRest_;
     dst->isExprBody_ = src->isExprBody_;
+    dst->hideScriptFromDebugger_ = src->hideScriptFromDebugger_;
 
     if (nconsts != 0) {
         GCPtrValue* vector = Rebase<GCPtrValue>(dst, src, src->consts()->vector);
@@ -4366,7 +4365,8 @@ LazyScript::Create(JSContext* cx, HandleFunction fun,
                    Handle<GCVector<JSFunction*, 8>> innerFunctions,
                    JSVersion version,
                    uint32_t begin, uint32_t end,
-                   uint32_t toStringStart, uint32_t lineno, uint32_t column)
+                   uint32_t toStringStart, uint32_t lineno, uint32_t column,
+                   frontend::ParseGoal parseGoal)
 {
     union {
         PackedView p;
@@ -4389,6 +4389,7 @@ LazyScript::Create(JSContext* cx, HandleFunction fun,
     p.isLikelyConstructorWrapper = false;
     p.isDerivedClassConstructor = false;
     p.needsHomeObject = false;
+    p.parseGoal = uint32_t(parseGoal);
 
     LazyScript* res = LazyScript::CreateRaw(cx, fun, packedFields, begin, end, toStringStart,
                                             lineno, column);

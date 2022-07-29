@@ -104,6 +104,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitSetArgumentsObjectArg(MSetArgumentsObjectArg* ins);
     void visitReturnFromCtor(MReturnFromCtor* ins);
     void visitComputeThis(MComputeThis* ins);
+    void visitImplicitThis(MImplicitThis* ins);
     void visitCall(MCall* call);
     void visitApplyArgs(MApplyArgs* apply);
     void visitApplyArray(MApplyArray* apply);

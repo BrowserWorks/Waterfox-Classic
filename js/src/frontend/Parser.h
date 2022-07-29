@@ -157,14 +157,20 @@ class ParserBase : public StrictModeGetter
 
     /* AwaitHandling */ uint8_t awaitHandling_:2;
 
+    /* ParseGoal */ uint8_t parseGoal_:1;
+
   public:
     bool awaitIsKeyword() const {
       return awaitHandling_ != AwaitIsName;
     }
 
+    ParseGoal parseGoal() const {
+        return ParseGoal(parseGoal_);
+    }
+
     ParserBase(JSContext* cx, LifoAlloc& alloc, const ReadOnlyCompileOptions& options,
                const char16_t* chars, size_t length, bool foldConstants,
-               UsedNameTracker& usedNames);
+               UsedNameTracker& usedNames, ParseGoal parseGoal);
     ~ParserBase();
 
     const char* getFilename() const { return anyChars.getFilename(); }
@@ -447,7 +453,7 @@ class Parser final
   public:
     Parser(JSContext* cx, LifoAlloc& alloc, const ReadOnlyCompileOptions& options,
            const CharT* chars, size_t length, bool foldConstants, UsedNameTracker& usedNames,
-           SyntaxParser* syntaxParser, LazyScript* lazyOuterFunction);
+           SyntaxParser* syntaxParser, LazyScript* lazyOuterFunction, ParseGoal parseGoal);
     ~Parser();
 
     friend class AutoAwaitIsKeyword<Parser>;
@@ -661,6 +667,7 @@ class Parser final
     Node lexicalDeclaration(YieldHandling yieldHandling, DeclarationKind kind);
 
     Node importDeclaration();
+    Node importDeclarationOrImportMeta(YieldHandling yieldHandling);
 
     bool processExport(Node node);
     bool processExportFrom(Node node);
@@ -767,6 +774,8 @@ class Parser final
     bool tryNewTarget(Node& newTarget);
     bool checkAndMarkSuperScope();
 
+    Node importMeta();
+
     Node methodDefinition(uint32_t toStringStart, PropertyType propType, HandleAtom funName);
 
     /*
@@ -809,7 +818,10 @@ class Parser final
 
     bool namedImportsOrNamespaceImport(TokenKind tt, Node importSpecSet);
     bool checkExportedName(JSAtom* exportName);
+    bool checkExportedNamesForArrayBinding(Node node);
+    bool checkExportedNamesForObjectBinding(Node node);
     bool checkExportedNamesForDeclaration(Node node);
+    bool checkExportedNamesForDeclarationList(Node node);
     bool checkExportedNameForClause(Node node);
     bool checkExportedNameForFunction(Node node);
     bool checkExportedNameForClass(Node node);
@@ -1044,6 +1056,17 @@ class MOZ_STACK_CLASS AutoAwaitIsKeyword
         parser_->setAwaitHandling(oldAwaitHandling_);
     }
 };
+
+// Waterfox note: Likely due to us not having bug 1424420 and possibly related
+// refactorings, we need to break a circular template specialization instantiation
+// dependency using these forward declarations.
+template<>
+bool
+Parser<FullParseHandler, char16_t>::checkExportedNamesForDeclaration(ParseNode* node);
+
+template<>
+bool
+Parser<SyntaxParseHandler, char16_t>::checkExportedNamesForDeclaration(Node node);
 
 } /* namespace frontend */
 } /* namespace js */

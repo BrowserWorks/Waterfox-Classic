@@ -726,6 +726,9 @@ class ScriptSourceObject : public NativeObject
     static bool initFromOptions(JSContext* cx, HandleScriptSource source,
                                 const ReadOnlyCompileOptions& options);
 
+    static bool initElementProperties(JSContext* cx, HandleScriptSource source,
+                                      HandleObject element, HandleString elementAttrName);
+
     ScriptSource* source() const {
         return static_cast<ScriptSource*>(getReservedSlot(SOURCE_SLOT).toPrivate());
     }
@@ -737,11 +740,10 @@ class ScriptSourceObject : public NativeObject
         return getReservedSlot(ELEMENT_PROPERTY_SLOT);
     }
     JSScript* introductionScript() const {
-        if (getReservedSlot(INTRODUCTION_SCRIPT_SLOT).isUndefined())
+        Value value = getReservedSlot(INTRODUCTION_SCRIPT_SLOT);
+        if (value.isUndefined())
             return nullptr;
-        void* untyped = getReservedSlot(INTRODUCTION_SCRIPT_SLOT).toPrivate();
-        MOZ_ASSERT(untyped);
-        return static_cast<JSScript*>(untyped);
+        return value.toGCThing()->as<JSScript>();
     }
 
   private:
@@ -1153,6 +1155,9 @@ class JSScript : public js::gc::TenuredCell
     bool hasRest_:1;
     bool isExprBody_:1;
 
+    // True if the debugger's onNewScript hook has not yet been called.
+    bool hideScriptFromDebugger_:1;
+
     // Add padding so JSScript is gc::Cell aligned. Make padding protected
     // instead of private to suppress -Wunused-private-field compiler warnings.
   protected:
@@ -1477,6 +1482,13 @@ class JSScript : public js::gc::TenuredCell
     }
     void setIsExprBody() {
         isExprBody_ = true;
+    }
+
+    bool hideScriptFromDebugger() const {
+        return hideScriptFromDebugger_;
+    }
+    void clearHideScriptFromDebugger() {
+        hideScriptFromDebugger_ = false;
     }
 
     void setNeedsHomeObject() {
@@ -2113,7 +2125,7 @@ class LazyScript : public gc::TenuredCell
 
   private:
     static const uint32_t NumClosedOverBindingsBits = 20;
-    static const uint32_t NumInnerFunctionsBits = 20;
+    static const uint32_t NumInnerFunctionsBits = 19;
 
     struct PackedView {
         // Assorted bits that should really be in ScriptSourceObject.
@@ -2145,11 +2157,14 @@ class LazyScript : public gc::TenuredCell
         uint32_t isDerivedClassConstructor : 1;
         uint32_t needsHomeObject : 1;
         uint32_t hasRest : 1;
+        uint32_t parseGoal : 1;
     };
 
     union {
         PackedView p_;
         uint64_t packedFields_;
+        static_assert(sizeof(p_) <= sizeof(packedFields_),
+            "PackedView must fit into uint64_t");
     };
 
     // Source location for the script.
@@ -2184,7 +2199,8 @@ class LazyScript : public gc::TenuredCell
                               const frontend::AtomVector& closedOverBindings,
                               Handle<GCVector<JSFunction*, 8>> innerFunctions,
                               JSVersion version, uint32_t begin, uint32_t end,
-                              uint32_t toStringStart, uint32_t lineno, uint32_t column);
+                              uint32_t toStringStart, uint32_t lineno, uint32_t column,
+                              frontend::ParseGoal parseGoal);
 
     // Create a LazyScript and initialize the closedOverBindings and the
     // innerFunctions with dummy values to be replaced in a later initialization
@@ -2292,6 +2308,10 @@ class LazyScript : public gc::TenuredCell
     }
     void setIsExprBody() {
         p_.isExprBody = true;
+    }
+
+    frontend::ParseGoal parseGoal() const {
+        return frontend::ParseGoal(p_.parseGoal);
     }
 
     bool strict() const {

@@ -258,6 +258,7 @@ class ModuleObject : public NativeObject
         NamespaceSlot,
         StatusSlot,
         EvaluationErrorSlot,
+        MetaObjectSlot,
         HostDefinedSlot,
         RequestedModulesSlot,
         ImportEntriesSlot,
@@ -308,6 +309,7 @@ class ModuleObject : public NativeObject
     ModuleStatus status() const;
     bool hadEvaluationError() const;
     Value evaluationError() const;
+    JSObject* metaObject() const;
     Value hostDefinedField() const;
     ArrayObject& requestedModules() const;
     ArrayObject& importEntries() const;
@@ -318,6 +320,8 @@ class ModuleObject : public NativeObject
 
     static bool Instantiate(JSContext* cx, HandleModuleObject self);
     static bool Evaluate(JSContext* cx, HandleModuleObject self);
+
+    void setMetaObject(JSObject* obj);
 
     void setHostDefinedField(const JS::Value& value);
 
@@ -369,40 +373,50 @@ class MOZ_STACK_CLASS ModuleBuilder
     bool initModule();
 
   private:
-    using AtomVector = GCVector<JSAtom*>;
-    using ImportEntryVector = GCVector<ImportEntryObject*>;
     using RequestedModuleVector = GCVector<RequestedModuleObject*>;
     using AtomSet = JS::GCHashSet<JSAtom*>;
-    using RootedAtomVector = JS::Rooted<AtomVector>;
-    using RootedImportEntryVector = JS::Rooted<ImportEntryVector>;
+    using ImportEntryMap = GCHashMap<JSAtom*, ImportEntryObject*>;
     using RootedExportEntryVector = JS::Rooted<ExportEntryVector>;
     using RootedRequestedModuleVector = JS::Rooted<RequestedModuleVector>;
     using RootedAtomSet = JS::Rooted<AtomSet>;
+    using RootedImportEntryMap = JS::Rooted<ImportEntryMap>;
 
     JSContext* cx_;
     RootedModuleObject module_;
     const frontend::TokenStreamAnyChars& tokenStream_;
     RootedAtomSet requestedModuleSpecifiers_;
     RootedRequestedModuleVector requestedModules_;
-    RootedAtomVector importedBoundNames_;
-    RootedImportEntryVector importEntries_;
+    RootedImportEntryMap importEntries_;
     RootedExportEntryVector exportEntries_;
+    RootedAtomSet exportNames_;
     RootedExportEntryVector localExportEntries_;
     RootedExportEntryVector indirectExportEntries_;
     RootedExportEntryVector starExportEntries_;
 
     ImportEntryObject* importEntryFor(JSAtom* localName) const;
 
+    bool processExportBinding(frontend::ParseNode* pn);
+    bool processExportArrayBinding(frontend::ParseNode* pn);
+    bool processExportObjectBinding(frontend::ParseNode* pn);
+
+    bool appendImportEntryObject(HandleImportEntryObject importEntry);
+
     bool appendExportEntry(HandleAtom exportName, HandleAtom localName,
                            frontend::ParseNode* node = nullptr);
     bool appendExportFromEntry(HandleAtom exportName, HandleAtom moduleRequest,
                                HandleAtom importName, frontend::ParseNode* node);
+    bool appendExportEntryObject(HandleExportEntryObject exportEntry);
 
     bool maybeAppendRequestedModule(HandleAtom specifier, frontend::ParseNode* node);
 
     template <typename T>
     ArrayObject* createArray(const JS::Rooted<GCVector<T>>& vector);
+    template <typename K, typename V>
+    ArrayObject* createArray(const JS::Rooted<GCHashMap<K, V>>& map);
 };
+
+JSObject*
+GetOrCreateModuleMetaObject(JSContext* cx, HandleObject module);
 
 } // namespace js
 

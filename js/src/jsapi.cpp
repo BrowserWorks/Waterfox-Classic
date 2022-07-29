@@ -3579,9 +3579,6 @@ CreateNonSyntacticEnvironmentChain(JSContext* cx, AutoObjectVector& envChain,
 static bool
 IsFunctionCloneable(HandleFunction fun)
 {
-    if (!fun->isInterpreted())
-        return true;
-
     // If a function was compiled with non-global syntactic environments on
     // the environment chain, we could have baked in EnvironmentCoordinates
     // into the script. We cannot clone it without breaking the compiler's
@@ -3619,28 +3616,18 @@ CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject env, Handle
             return nullptr;
     }
 
+    // Only allow cloning normal, interpreted functions.
+    if (fun->isNative() ||
+        fun->isBoundFunction() ||
+        fun->kind() != JSFunction::NormalFunction ||
+        fun->isExtended())
+    {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
+        return nullptr;
+    }
+
     if (!IsFunctionCloneable(fun)) {
         JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BAD_CLONE_FUNOBJ_SCOPE);
-        return nullptr;
-    }
-
-    if (fun->isBoundFunction()) {
-        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
-        return nullptr;
-    }
-
-    if (IsAsmJSModule(fun)) {
-        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
-        return nullptr;
-    }
-
-    if (IsWrappedAsyncFunction(fun)) {
-        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
-        return nullptr;
-    }
-
-    if (IsWrappedAsyncGenerator(fun)) {
-        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
         return nullptr;
     }
 
@@ -3897,6 +3884,7 @@ JS::TransitiveCompileOptions::copyPODTransitiveOptions(const TransitiveCompileOp
     introductionOffset = rhs.introductionOffset;
     hasIntroductionInfo = rhs.hasIntroductionInfo;
     isProbablySystemOrAddonCode = rhs.isProbablySystemOrAddonCode;
+    hideScriptFromDebugger = rhs.hideScriptFromDebugger;
 };
 
 void
@@ -4350,7 +4338,8 @@ JS_BufferIsCompilableUnit(JSContext* cx, HandleObject obj, const char* utf8, siz
     frontend::Parser<frontend::FullParseHandler, char16_t> parser(cx, cx->tempLifoAlloc(),
                                                                   options, chars, length,
                                                                   /* foldConstants = */ true,
-                                                                  usedNames, nullptr, nullptr);
+                                                                  usedNames, nullptr, nullptr,
+                                                                  frontend::ParseGoal::Script);
     JS::WarningReporter older = JS::SetWarningReporter(cx, nullptr);
     if (!parser.checkOptions() || !parser.parse()) {
         // We ran into an error. If it was because we ran out of source, we
@@ -4559,6 +4548,28 @@ JS::CompileFunction(JSContext* cx, AutoObjectVector& envChain,
 
     return CompileFunction(cx, envChain, options, name, nargs, argnames,
                            chars.get(), length, fun);
+}
+
+JS_PUBLIC_API(bool)
+JS::InitScriptSourceElement(JSContext* cx, HandleScript script,
+                            HandleObject element, HandleString elementAttrName)
+{
+    MOZ_ASSERT(cx);
+    MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
+
+    RootedScriptSource sso(cx, &script->sourceObject()->as<ScriptSourceObject>());
+    return ScriptSourceObject::initElementProperties(cx, sso, element, elementAttrName);
+}
+
+JS_PUBLIC_API(void)
+JS::ExposeScriptToDebugger(JSContext* cx, HandleScript script)
+{
+    MOZ_ASSERT(cx);
+    MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
+
+    MOZ_ASSERT(script->hideScriptFromDebugger());
+    script->clearHideScriptFromDebugger();
+    Debugger::onNewScript(cx, script);
 }
 
 JS_PUBLIC_API(JSString*)
@@ -4811,6 +4822,20 @@ JS::SetModuleResolveHook(JSRuntime* rt, JS::ModuleResolveHook func)
     rt->moduleResolveHook = func;
 }
 
+JS_PUBLIC_API(JS::ModuleMetadataHook)
+JS::GetModuleMetadataHook(JSRuntime* rt)
+{
+    AssertHeapIsIdle();
+    return rt->moduleMetadataHook;
+}
+
+JS_PUBLIC_API(void)
+JS::SetModuleMetadataHook(JSRuntime* rt, JS::ModuleMetadataHook func)
+{
+    AssertHeapIsIdle();
+    rt->moduleMetadataHook = func;
+}
+
 JS_PUBLIC_API(bool)
 JS::CompileModule(JSContext* cx, const ReadOnlyCompileOptions& options,
                   SourceBufferHolder& srcBuf, JS::MutableHandleObject module)
@@ -4884,6 +4909,13 @@ JS::GetRequestedModuleSourcePos(JSContext* cx, JS::HandleValue value,
     auto& requested = value.toObject().as<RequestedModuleObject>();
     *lineNumber = requested.lineNumber();
     *columnNumber = requested.columnNumber();
+}
+
+JS_PUBLIC_API(JSScript*)
+JS::GetModuleScript(JS::HandleObject moduleRecord)
+{
+    AssertHeapIsIdle();
+    return moduleRecord->as<ModuleObject>().script();
 }
 
 JS_PUBLIC_API(JSObject*)

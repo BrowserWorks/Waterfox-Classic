@@ -67,6 +67,7 @@
     macro(from, from, TokenKind::From) \
     macro(get, get, TokenKind::Get) \
     macro(let, let, TokenKind::Let) \
+    macro(meta, meta, TokenKind::Meta) \
     macro(of, of, TokenKind::Of) \
     macro(set, set, TokenKind::Set) \
     macro(static, static_, TokenKind::Static) \

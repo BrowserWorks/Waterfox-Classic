@@ -342,6 +342,16 @@ public:
    */
   void LoadEventFired();
 
+  /**
+   * Destroy and prevent the ScriptLoader or the ScriptLoadRequests from owning
+   * any references to the JSScript or to the Request which might be used for
+   * caching the encoded bytecode.
+   */
+  void Destroy()
+  {
+    GiveUpBytecodeEncoding();
+  }
+
   /*
    * Clear the map of loaded modules. Called when a Document object is reused
    * for a different global.
@@ -354,6 +364,7 @@ public:
   ScriptLoadRequest* CreateLoadRequest(ScriptKind aKind,
                                        nsIURI* aURI,
                                        nsIScriptElement* aElement,
+                                       nsIPrincipal* aTriggeringPrincipal,
                                        uint32_t aVersion,
                                        mozilla::CORSMode aCORSMode,
                                        const SRIMetadata& aIntegrity,
@@ -371,11 +382,13 @@ public:
 
   bool ProcessExternalScript(nsIScriptElement* aElement,
                              ScriptKind aScriptKind,
+                             uint32_t aVersion,
                              nsAutoString aTypeAttr,
                              nsIContent* aScriptContent);
 
   bool ProcessInlineScript(nsIScriptElement* aElement,
-                           ScriptKind aScriptKind);
+                           ScriptKind aScriptKind,
+                           uint32_t aVersion);
 
   ScriptLoadRequest* LookupPreloadRequest(nsIScriptElement* aElement,
                                           ScriptKind aScriptKind);
@@ -533,6 +546,9 @@ public:
   RefPtr<mozilla::GenericPromise>
   StartFetchingModuleAndDependencies(ModuleLoadRequest* aParent, nsIURI* aURI);
 
+  nsresult AssociateSourceElementsForModuleTree(JSContext* aCx,
+                                                ModuleLoadRequest* aRequest);
+
   nsIDocument* mDocument;                   // [WEAK]
   nsCOMArray<nsIScriptLoaderObserver> mObservers;
   ScriptLoadRequestList mNonAsyncExternalScriptInsertedRequests;
@@ -586,6 +602,7 @@ public:
   bool mDocumentParsingDone;
   bool mBlockingDOMContentLoaded;
   bool mLoadEventFired;
+  bool mGiveUpEncoding;
 
   // Module map
   nsRefPtrHashtable<nsURIHashKey, mozilla::GenericPromise::Private> mFetchingModules;

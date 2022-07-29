@@ -3590,7 +3590,7 @@ BaselineCompiler::emit_JSOP_OPTIMIZE_SPREADCALL()
 
 typedef bool (*ImplicitThisFn)(JSContext*, HandleObject, HandlePropertyName,
                                MutableHandleValue);
-static const VMFunction ImplicitThisInfo =
+const VMFunction jit::ImplicitThisInfo =
     FunctionInfo<ImplicitThisFn>(ImplicitThisOperation, "ImplicitThisOperation");
 
 bool
@@ -5147,5 +5147,19 @@ BaselineCompiler::emit_JSOP_DERIVEDCONSTRUCTOR()
 
     masm.tagValue(JSVAL_TYPE_OBJECT, ReturnReg, R0);
     frame.push(R0);
+    return true;
+}
+
+bool
+BaselineCompiler::emit_JSOP_IMPORTMETA()
+{
+    RootedModuleObject module(cx, GetModuleObjectForScript(script));
+    MOZ_ASSERT(module);
+
+    JSObject* metaObject = GetOrCreateModuleMetaObject(cx, module);
+    if (!metaObject)
+        return false;
+
+    frame.push(ObjectValue(*metaObject));
     return true;
 }

@@ -269,6 +269,7 @@ MSG_DEF(JSMSG_FROM_AFTER_EXPORT_STAR,  0, JSEXN_SYNTAXERR, "missing keyword 'fro
 MSG_DEF(JSMSG_GARBAGE_AFTER_INPUT,     2, JSEXN_SYNTAXERR, "unexpected garbage after {0}, starting with {1}")
 MSG_DEF(JSMSG_IDSTART_AFTER_NUMBER,    0, JSEXN_SYNTAXERR, "identifier starts immediately after numeric literal")
 MSG_DEF(JSMSG_ILLEGAL_CHARACTER,       0, JSEXN_SYNTAXERR, "illegal character")
+MSG_DEF(JSMSG_IMPORT_OUTSIDE_MODULE,   0, JSEXN_SYNTAXERR, "the import keyword may only appear in a module")
 MSG_DEF(JSMSG_IMPORT_DECL_AT_TOP_LEVEL, 0, JSEXN_SYNTAXERR, "import declarations may only appear at top level of a module")
 MSG_DEF(JSMSG_OF_AFTER_FOR_LOOP_DECL,  0, JSEXN_SYNTAXERR, "a declaration in the head of a for-of loop can't have an initializer")
 MSG_DEF(JSMSG_IN_AFTER_LEXICAL_FOR_DECL,0,JSEXN_SYNTAXERR, "a lexical declaration in the head of a for-in loop can't have an initializer")
@@ -479,6 +480,9 @@ MSG_DEF(JSMSG_DEBUG_PROMISE_NOT_RESOLVED, 0, JSEXN_TYPEERR, "Promise hasn't been
 MSG_DEF(JSMSG_DEBUG_PROMISE_NOT_FULFILLED, 0, JSEXN_TYPEERR, "Promise hasn't been fulfilled")
 MSG_DEF(JSMSG_DEBUG_PROMISE_NOT_REJECTED, 0, JSEXN_TYPEERR, "Promise hasn't been rejected")
 MSG_DEF(JSMSG_DEBUG_NO_BINARY_SOURCE,  0, JSEXN_ERR, "WebAssembly binary source is not available")
+
+// Testing functions
+MSG_DEF(JSMSG_TESTING_SCRIPTS_ONLY, 0, JSEXN_TYPEERR, "only works on scripts")
 
 // Tracelogger
 MSG_DEF(JSMSG_TRACELOGGER_ENABLE_FAIL, 1, JSEXN_ERR, "enabling tracelogger failed: {0}")
