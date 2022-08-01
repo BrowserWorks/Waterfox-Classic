@@ -22,6 +22,7 @@
 #include "nsIIPCSerializableURI.h"
 #include "nsISensitiveInfoHiddenURI.h"
 #include "RustURL.h"
+#include "nsIURIMutator.h"
 
 #ifdef NS_BUILD_REFCNT_LOGGING
 #define DEBUG_DUMP_URLS_AT_SHUTDOWN
@@ -35,6 +36,7 @@ class nsIFile;
 class nsIURLParser;
 
 namespace mozilla {
+class Encoding;
 namespace net {
 
 //-----------------------------------------------------------------------------
@@ -122,7 +124,7 @@ public: /* internal -- HPUX compiler can't handle this being private */
     class nsSegmentEncoder
     {
     public:
-        explicit nsSegmentEncoder(const char *charset);
+        explicit nsSegmentEncoder(const Encoding* encoding = nullptr);
 
         // Encode the given segment if necessary, and return the length of
         // the encoded segment.  The encoded segment is appended to |buf|
@@ -198,7 +200,8 @@ private:
                                 bool useEsc = false, int32_t* diff = nullptr);
     uint32_t AppendToBuf(char *, uint32_t, const char *, uint32_t);
 
-    nsresult BuildNormalizedSpec(const char *spec);
+    nsresult BuildNormalizedSpec(const char* spec, const Encoding* encoding);
+    nsresult SetSpecWithEncoding(const nsACString &input, const Encoding* encoding);
 
     bool     SegmentIs(const URLSegment &s1, const char *val, bool ignoreCase = false);
     bool     SegmentIs(const char* spec, const URLSegment &s1, const char *val, bool ignoreCase = false);
@@ -274,7 +277,6 @@ private:
     URLSegment mQuery;
     URLSegment mRef;
 
-    nsCString              mOriginCharset;
     nsCOMPtr<nsIURLParser> mParser;
 
     // mFile is protected so subclasses can access it directly
@@ -315,6 +317,22 @@ public:
     static Atomic<bool>                gRustEnabled;
     RefPtr<RustURL>                    mRustURL;
 #endif
+
+public:
+    class Mutator
+        : public nsIURIMutator
+        , public BaseURIMutator<nsStandardURL>
+    {
+        NS_DECL_ISUPPORTS
+        NS_FORWARD_SAFE_NSIURISETTERS_RET(mURI)
+        NS_DEFINE_NSIMUTATOR_COMMON
+
+        explicit Mutator() { }
+    private:
+        virtual ~Mutator() { }
+
+        friend class nsStandardURL;
+    };
 };
 
 #define NS_THIS_STANDARDURL_IMPL_CID                 \

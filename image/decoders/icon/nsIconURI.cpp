@@ -136,10 +136,30 @@ nsMozIconURI::GetDisplayHost(nsACString& aUnicodeHost)
 }
 
 NS_IMETHODIMP
+nsMozIconURI::GetDisplayPrePath(nsACString& aPrePath)
+{
+  return GetPrePath(aPrePath);
+}
+
+NS_IMETHODIMP
 nsMozIconURI::GetHasRef(bool* result)
 {
   *result = false;
   return NS_OK;
+}
+
+NS_IMPL_ISUPPORTS(nsMozIconURI::Mutator, nsIURISetters, nsIURIMutator)
+
+NS_IMETHODIMP
+nsMozIconURI::Mutate(nsIURIMutator** aMutator)
+{
+    RefPtr<nsMozIconURI::Mutator> mutator = new nsMozIconURI::Mutator();
+    nsresult rv = mutator->InitFromURI(this);
+    if (NS_FAILED(rv)) {
+        return rv;
+    }
+    mutator.forget(aMutator);
+    return NS_OK;
 }
 
 // takes a string like ?size=32&contentType=text/html and returns a new string
@@ -424,6 +444,13 @@ nsMozIconURI::SetQuery(const nsACString& aQuery)
 }
 
 NS_IMETHODIMP
+nsMozIconURI::SetQueryWithEncoding(const nsACString& aQuery,
+                                   const Encoding* aEncoding)
+{
+  return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP
 nsMozIconURI::GetRef(nsACString& aRef)
 {
   aRef.Truncate();
@@ -547,13 +574,6 @@ NS_IMETHODIMP
 nsMozIconURI::GetAsciiHost(nsACString& aHostA)
 {
   return GetHost(aHostA);
-}
-
-NS_IMETHODIMP
-nsMozIconURI::GetOriginCharset(nsACString& result)
-{
-  result.Truncate();
-  return NS_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

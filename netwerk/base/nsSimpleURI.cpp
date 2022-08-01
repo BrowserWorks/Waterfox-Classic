@@ -21,6 +21,7 @@
 #include "nsIIPCSerializableURI.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/ipc/URIUtils.h"
+#include "nsIURIMutator.h"
 
 using namespace mozilla::ipc;
 
@@ -271,6 +272,12 @@ NS_IMETHODIMP
 nsSimpleURI::GetDisplayHost(nsACString &aUnicodeHost)
 {
     return GetHost(aUnicodeHost);
+}
+
+NS_IMETHODIMP
+nsSimpleURI::GetDisplayPrePath(nsACString &aPrePath)
+{
+    return GetPrePath(aPrePath);
 }
 
 NS_IMETHODIMP
@@ -711,13 +718,6 @@ nsSimpleURI::GetAsciiHost(nsACString &result)
     return NS_OK;
 }
 
-NS_IMETHODIMP
-nsSimpleURI::GetOriginCharset(nsACString &result)
-{
-    result.Truncate();
-    return NS_OK;
-}
-
 //----------------------------------------------------------------------------
 // nsSimpleURI::nsIClassInfo
 //----------------------------------------------------------------------------
@@ -867,6 +867,28 @@ nsSimpleURI::SetQuery(const nsACString& aQuery)
         mQuery = query;
     }
 
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsSimpleURI::SetQueryWithEncoding(const nsACString& aQuery,
+                                  const Encoding* aEncoding)
+{
+    return SetQuery(aQuery);
+}
+
+NS_IMPL_ISUPPORTS(nsSimpleURI::Mutator, nsIURISetters, nsIURIMutator)
+
+
+NS_IMETHODIMP
+nsSimpleURI::Mutate(nsIURIMutator** aMutator)
+{
+    RefPtr<nsSimpleURI::Mutator> mutator = new nsSimpleURI::Mutator();
+    nsresult rv = mutator->InitFromURI(this);
+    if (NS_FAILED(rv)) {
+        return rv;
+    }
+    mutator.forget(aMutator);
     return NS_OK;
 }
 

@@ -241,6 +241,12 @@ nsJARURI::GetDisplayHostPort(nsACString &aUnicodeHostPort)
 }
 
 NS_IMETHODIMP
+nsJARURI::GetDisplayPrePath(nsACString &aPrePath)
+{
+    return GetPrePath(aPrePath);
+}
+
+NS_IMETHODIMP
 nsJARURI::GetDisplayHost(nsACString &aUnicodeHost)
 {
     return GetHost(aUnicodeHost);
@@ -256,6 +262,20 @@ NS_IMETHODIMP
 nsJARURI::SetSpec(const nsACString& aSpec)
 {
     return SetSpecWithBase(aSpec, nullptr);
+}
+
+NS_IMPL_ISUPPORTS(nsJARURI::Mutator, nsIURISetters, nsIURIMutator)
+
+NS_IMETHODIMP
+nsJARURI::Mutate(nsIURIMutator** aMutator)
+{
+    RefPtr<nsJARURI::Mutator> mutator = new nsJARURI::Mutator();
+    nsresult rv = mutator->InitFromURI(this);
+    if (NS_FAILED(rv)) {
+        return rv;
+    }
+    mutator.forget(aMutator);
+    return NS_OK;
 }
 
 nsresult
@@ -476,13 +496,6 @@ nsJARURI::GetAsciiHost(nsACString &aHost)
 }
 
 NS_IMETHODIMP
-nsJARURI::GetOriginCharset(nsACString &aOriginCharset)
-{
-    aOriginCharset = mCharsetHint;
-    return NS_OK;
-}
-
-NS_IMETHODIMP
 nsJARURI::Equals(nsIURI *other, bool *result)
 {
     return EqualsInternal(other, eHonorRef, result);
@@ -626,6 +639,13 @@ nsJARURI::SetQuery(const nsACString& query)
 }
 
 NS_IMETHODIMP
+nsJARURI::SetQueryWithEncoding(const nsACString& query,
+                               const Encoding* encoding)
+{
+    return mJAREntry->SetQueryWithEncoding(query, encoding);
+}
+
+NS_IMETHODIMP
 nsJARURI::GetRef(nsACString& ref)
 {
     return mJAREntry->GetRef(ref);
@@ -728,12 +748,8 @@ nsJARURI::GetCommonBaseSpec(nsIURI* uriToCompare, nsACString& commonSpec)
     rv = otherJARURI->GetJAREntry(otherEntry);
     if (NS_FAILED(rv)) return rv;
 
-    nsAutoCString otherCharset;
-    rv = uriToCompare->GetOriginCharset(otherCharset);
-    if (NS_FAILED(rv)) return rv;
-
     nsCOMPtr<nsIURL> url;
-    rv = CreateEntryURL(otherEntry, otherCharset.get(), getter_AddRefs(url));
+    rv = CreateEntryURL(otherEntry, nullptr, getter_AddRefs(url));
     if (NS_FAILED(rv)) return rv;
 
     nsAutoCString common;
@@ -775,12 +791,8 @@ nsJARURI::GetRelativeSpec(nsIURI* uriToCompare, nsACString& relativeSpec)
     rv = otherJARURI->GetJAREntry(otherEntry);
     if (NS_FAILED(rv)) return rv;
 
-    nsAutoCString otherCharset;
-    rv = uriToCompare->GetOriginCharset(otherCharset);
-    if (NS_FAILED(rv)) return rv;
-
     nsCOMPtr<nsIURL> url;
-    rv = CreateEntryURL(otherEntry, otherCharset.get(), getter_AddRefs(url));
+    rv = CreateEntryURL(otherEntry, nullptr, getter_AddRefs(url));
     if (NS_FAILED(rv)) return rv;
 
     nsAutoCString relativeEntrySpec;

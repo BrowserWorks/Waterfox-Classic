@@ -20,6 +20,7 @@
 #include "nsIScriptSecurityManager.h"
 #include "nsIPrincipal.h"
 #include "nsIFileURL.h"
+#include "nsIURIMutator.h"
 
 #include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/Preferences.h"
@@ -74,12 +75,18 @@ public:
         , mJarEntry(jarEntry)
         , mContentLength(-1)
     {
-        if (fullJarURI) {
-#ifdef DEBUG
-            nsresult rv =
-#endif
-                fullJarURI->GetAsciiSpec(mJarDirSpec);
-            NS_ASSERTION(NS_SUCCEEDED(rv), "this shouldn't fail");
+    if (ENTRY_IS_DIRECTORY(mJarEntry) && fullJarURI) {
+      nsCOMPtr<nsIURI> urlWithoutQueryRef;
+      nsresult rv = NS_MutateURI(fullJarURI)
+                        .SetQuery(NS_LITERAL_CSTRING(""))
+                        .SetRef(NS_LITERAL_CSTRING(""))
+                        .Finalize(urlWithoutQueryRef);
+      if (NS_SUCCEEDED(rv) && urlWithoutQueryRef) {
+        rv = urlWithoutQueryRef->GetAsciiSpec(mJarDirSpec);
+        MOZ_ASSERT(NS_SUCCEEDED(rv), "Finding a jar dir spec shouldn't fail.");
+      } else {
+        MOZ_CRASH("Shouldn't fail to strip query and ref off jar URI.");
+      }
         }
     }
 

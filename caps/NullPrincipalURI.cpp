@@ -136,13 +136,6 @@ NullPrincipalURI::SetHostAndPort(const nsACString& aHost)
 }
 
 NS_IMETHODIMP
-NullPrincipalURI::GetOriginCharset(nsACString& _charset)
-{
-  _charset.Truncate();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 NullPrincipalURI::GetPassword(nsACString& _password)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
@@ -189,6 +182,13 @@ NullPrincipalURI::GetQuery(nsACString& aQuery)
 
 NS_IMETHODIMP
 NullPrincipalURI::SetQuery(const nsACString& aQuery)
+{
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP
+NullPrincipalURI::SetQueryWithEncoding(const nsACString& aQuery,
+                                       const Encoding* aEncoding)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -313,6 +313,20 @@ NullPrincipalURI::CloneWithNewRef(const nsACString& newRef, nsIURI** _newURI)
   return Clone(_newURI);
 }
 
+NS_IMPL_ISUPPORTS(NullPrincipalURI::Mutator, nsIURISetters, nsIURIMutator)
+
+NS_IMETHODIMP
+NullPrincipalURI::Mutate(nsIURIMutator** aMutator)
+{
+    RefPtr<NullPrincipalURI::Mutator> mutator = new NullPrincipalURI::Mutator();
+    nsresult rv = mutator->InitFromURI(this);
+    if (NS_FAILED(rv)) {
+        return rv;
+    }
+    mutator.forget(aMutator);
+    return NS_OK;
+}
+
 NS_IMETHODIMP
 NullPrincipalURI::Equals(nsIURI* aOther, bool* _equals)
 {
@@ -365,6 +379,12 @@ NS_IMETHODIMP
 NullPrincipalURI::GetDisplayHost(nsACString &aUnicodeHost)
 {
   return GetHost(aUnicodeHost);
+}
+
+NS_IMETHODIMP
+NullPrincipalURI::GetDisplayPrePath(nsACString &aPrePath)
+{
+    return GetPrePath(aPrePath);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
