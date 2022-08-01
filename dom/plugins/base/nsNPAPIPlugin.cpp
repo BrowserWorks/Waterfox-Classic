@@ -1245,8 +1245,8 @@ _evaluate(NPP npp, NPObject* npobj, NPString *script, NPVariant *result)
   {
     nsJSUtils::ExecutionContext exec(cx, obj);
     exec.SetScopeChain(scopeChain);
-    exec.CompileAndExec(options, utf16script);
-    rv = exec.ExtractReturnValue(&rval);
+    exec.Compile(options, utf16script);
+    rv = exec.ExecScript(&rval);
   }
 
   if (!JS_WrapValue(cx, &rval)) {

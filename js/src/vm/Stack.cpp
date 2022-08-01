@@ -155,8 +155,8 @@ AssertScopeMatchesEnvironment(Scope* scope, JSObject* originalEnv)
                 break;
 
               case ScopeKind::Module:
-                MOZ_ASSERT(env->as<ModuleEnvironmentObject>().module().script() ==
-                           si.scope()->as<ModuleScope>().script());
+                MOZ_ASSERT(&env->as<ModuleEnvironmentObject>().module() ==
+                           si.scope()->as<ModuleScope>().module());
                 env = &env->as<ModuleEnvironmentObject>().enclosingEnvironment();
                 break;
 

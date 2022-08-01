@@ -8649,6 +8649,59 @@ class MClassConstructor : public MNullaryInstruction
 
 };
 
+class MModuleMetadata : public MNullaryInstruction
+{
+    CompilerObject module_;
+
+    explicit MModuleMetadata(JSObject* module)
+      : MNullaryInstruction(classOpcode),
+        module_(module)
+    {
+        setResultType(MIRType::Object);
+    }
+
+  public:
+    INSTRUCTION_HEADER(ModuleMetadata)
+    TRIVIAL_NEW_WRAPPERS
+
+    JSObject* module() const {
+      return module_;
+    }
+
+    AliasSet getAliasSet() const override {
+        return AliasSet::None();
+    }
+
+    bool appendRoots(MRootList& roots) const override {
+        return roots.append(module_);
+    }
+};
+
+class MDynamicImport : public MUnaryInstruction,
+                       public BoxInputsPolicy::Data
+{
+    CompilerObject referencingScriptSource_;
+
+    explicit MDynamicImport(JSObject* referencingScriptSource,
+                            MDefinition* specifier)
+        : MUnaryInstruction(classOpcode, specifier),
+          referencingScriptSource_(referencingScriptSource)
+    {
+        setResultType(MIRType::Object);
+    }
+
+  public:
+    INSTRUCTION_HEADER(DynamicImport)
+    TRIVIAL_NEW_WRAPPERS
+    NAMED_OPERANDS((0, specifier))
+
+    JSObject* referencingScriptSource() const { return referencingScriptSource_; }
+
+    bool appendRoots(MRootList& roots) const override {
+        return roots.append(referencingScriptSource_);
+    }
+};
+
 struct LambdaFunctionInfo
 {
     // The functions used in lambdas are the canonical original function in

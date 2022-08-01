@@ -1782,7 +1782,8 @@ CreateDynamicFunction(JSContext* cx, const CallArgs& args, GeneratorKind generat
     options.setMutedErrors(mutedErrors)
            .setFileAndLine(filename, 1)
            .setNoScriptRval(false)
-           .setIntroductionInfo(introducerFilename, introductionType, lineno, maybeScript, pcOffset);
+           .setIntroductionInfo(introducerFilename, introductionType, lineno, maybeScript, pcOffset)
+           .setScriptOrModule(maybeScript);
 
     StringBuffer sb(cx);
 
@@ -2232,7 +2233,8 @@ js::CloneFunctionReuseScript(JSContext* cx, HandleFunction fun, HandleObject enc
 
 JSFunction*
 js::CloneFunctionAndScript(JSContext* cx, HandleFunction fun, HandleObject enclosingEnv,
-                           HandleScope newScope, gc::AllocKind allocKind /* = FUNCTION */,
+                           HandleScope newScope, Handle<ScriptSourceObject*> sourceObject,
+                           gc::AllocKind allocKind /* = FUNCTION */,
                            HandleObject proto /* = nullptr */)
 {
     MOZ_ASSERT(NewFunctionEnvironmentIsWellFormed(cx, enclosingEnv));
@@ -2270,9 +2272,11 @@ js::CloneFunctionAndScript(JSContext* cx, HandleFunction fun, HandleObject enclo
     MOZ_ASSERT(cx->compartment() == clone->compartment(),
                "Otherwise we could relazify clone below!");
 
-    RootedScript clonedScript(cx, CloneScriptIntoFunction(cx, newScope, clone, script));
-    if (!clonedScript)
+    RootedScript clonedScript(
+        cx, CloneScriptIntoFunction(cx, newScope, clone, script, sourceObject));
+    if (!clonedScript) {
         return nullptr;
+    }
     Debugger::onNewScript(cx, clonedScript);
 
     return clone;

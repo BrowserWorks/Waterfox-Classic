@@ -3886,6 +3886,15 @@ class JS_FRIEND_API(TransitiveCompileOptions)
     virtual JSString* elementAttributeName() const = 0;
     virtual JSScript* introductionScript() const = 0;
 
+    // For some compilations the spec requires the ScriptOrModule field of the
+    // resulting script to be set to the currently executing script. This can be
+    // achieved by setting this option with setScriptOrModule() below.
+    //
+    // Note that this field doesn't explicitly exist in our implementation;
+    // instead the ScriptSourceObject's private value is set to that associated
+    // with the specified script.
+    virtual JSScript* scriptOrModule() const = 0;
+
     // POD options.
     JSVersion version;
     bool versionSet;
@@ -3948,9 +3957,10 @@ class JS_FRIEND_API(ReadOnlyCompileOptions) : public TransitiveCompileOptions
     const char* filename() const { return filename_; }
     const char* introducerFilename() const { return introducerFilename_; }
     const char16_t* sourceMapURL() const { return sourceMapURL_; }
-    virtual JSObject* element() const = 0;
-    virtual JSString* elementAttributeName() const = 0;
-    virtual JSScript* introductionScript() const = 0;
+    JSObject* element() const override = 0;
+    JSString* elementAttributeName() const override = 0;
+    JSScript* introductionScript() const override = 0;
+    JSScript* scriptOrModule() const override = 0;
 
     // POD options.
     unsigned lineno;
@@ -3993,6 +4003,7 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     PersistentRootedObject elementRoot;
     PersistentRootedString elementAttributeNameRoot;
     PersistentRootedScript introductionScriptRoot;
+    PersistentRootedScript scriptOrModuleRoot;
 
   public:
     // A minimal constructor, for use with OwningCompileOptions::copy. This
@@ -4005,6 +4016,7 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     JSObject* element() const override { return elementRoot; }
     JSString* elementAttributeName() const override { return elementAttributeNameRoot; }
     JSScript* introductionScript() const override { return introductionScriptRoot; }
+    JSScript* scriptOrModule() const override { return scriptOrModuleRoot; }
 
     // Set this to a copy of |rhs|. Return false on OOM.
     bool copy(JSContext* cx, const ReadOnlyCompileOptions& rhs);
@@ -4027,6 +4039,10 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     }
     OwningCompileOptions& setIntroductionScript(JSScript* s) {
         introductionScriptRoot = s;
+        return *this;
+    }
+    OwningCompileOptions& setScriptOrModule(JSScript* s) {
+        scriptOrModuleRoot = s;
         return *this;
     }
     OwningCompileOptions& setMutedErrors(bool mute) {
@@ -4076,12 +4092,13 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) final : public ReadOnlyCompi
     RootedObject elementRoot;
     RootedString elementAttributeNameRoot;
     RootedScript introductionScriptRoot;
+    RootedScript scriptOrModuleRoot;
 
   public:
     explicit CompileOptions(JSContext* cx, JSVersion version = JSVERSION_UNKNOWN);
     CompileOptions(JSContext* cx, const ReadOnlyCompileOptions& rhs)
       : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
-        introductionScriptRoot(cx)
+        introductionScriptRoot(cx), scriptOrModuleRoot(cx)
     {
         copyPODOptions(rhs);
 
@@ -4091,11 +4108,12 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) final : public ReadOnlyCompi
         elementRoot = rhs.element();
         elementAttributeNameRoot = rhs.elementAttributeName();
         introductionScriptRoot = rhs.introductionScript();
+        scriptOrModuleRoot = rhs.scriptOrModule();
     }
 
     CompileOptions(JSContext* cx, const TransitiveCompileOptions& rhs)
       : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
-        introductionScriptRoot(cx)
+        introductionScriptRoot(cx), scriptOrModuleRoot(cx)
     {
         copyPODTransitiveOptions(rhs);
 
@@ -4105,11 +4123,13 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) final : public ReadOnlyCompi
         elementRoot = rhs.element();
         elementAttributeNameRoot = rhs.elementAttributeName();
         introductionScriptRoot = rhs.introductionScript();
+        scriptOrModuleRoot = rhs.scriptOrModule();
     }
 
     JSObject* element() const override { return elementRoot; }
     JSString* elementAttributeName() const override { return elementAttributeNameRoot; }
     JSScript* introductionScript() const override { return introductionScriptRoot; }
+    JSScript* scriptOrModule() const override { return scriptOrModuleRoot; }
 
     CompileOptions& setFile(const char* f) { filename_ = f; return *this; }
     CompileOptions& setLine(unsigned l) { lineno = l; return *this; }
@@ -4124,6 +4144,10 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) final : public ReadOnlyCompi
     }
     CompileOptions& setIntroductionScript(JSScript* s) {
         introductionScriptRoot = s;
+        return *this;
+    }
+    CompileOptions& setScriptOrModule(JSScript* s) {
+        scriptOrModuleRoot = s;
         return *this;
     }
     CompileOptions& setMutedErrors(bool mute) {
@@ -4442,7 +4466,7 @@ extern JS_PUBLIC_API(bool)
 Evaluate(JSContext* cx, const ReadOnlyCompileOptions& options,
          const char* filename, JS::MutableHandleValue rval);
 
-using ModuleResolveHook = JSObject* (*)(JSContext*, HandleObject, HandleString);
+using ModuleResolveHook = JSObject* (*)(JSContext*, HandleValue, HandleString);
 
 /**
  * Get the HostResolveImportedModule hook for the runtime.
@@ -4456,7 +4480,7 @@ GetModuleResolveHook(JSRuntime* rt);
 extern JS_PUBLIC_API(void)
 SetModuleResolveHook(JSRuntime* rt, ModuleResolveHook func);
 
-using ModuleMetadataHook = bool (*)(JSContext*, HandleObject, HandleObject);
+using ModuleMetadataHook = bool (*)(JSContext*, HandleValue, HandleObject);
 
 /**
  * Get the hook for populating the import.meta metadata object.
@@ -4471,6 +4495,29 @@ GetModuleMetadataHook(JSRuntime* rt);
 extern JS_PUBLIC_API(void)
 SetModuleMetadataHook(JSRuntime* rt, ModuleMetadataHook func);
 
+using ModuleDynamicImportHook = bool (*)(JSContext* cx, HandleValue referencingPrivate,
+                                         HandleString specifier, HandleObject promise);
+
+/**
+ * Get the HostImportModuleDynamically hook for the runtime.
+ */
+extern JS_PUBLIC_API(ModuleDynamicImportHook)
+GetModuleDynamicImportHook(JSRuntime* rt);
+
+/**
+ * Set the HostImportModuleDynamically hook for the runtime to the given
+ * function.
+ *
+ * If this hook is not set (or set to nullptr) then the JS engine will throw an
+ * exception if dynamic module import is attempted.
+ */
+extern JS_PUBLIC_API(void)
+SetModuleDynamicImportHook(JSRuntime* rt, ModuleDynamicImportHook func);
+
+extern JS_PUBLIC_API(bool)
+FinishDynamicModuleImport(JSContext* cx, HandleValue referencingPrivate, HandleString specifier,
+                          HandleObject promise);
+
 /**
  * Parse the given source buffer as a module in the scope of the current global
  * of cx and return a source text module record.
@@ -4480,17 +4527,53 @@ CompileModule(JSContext* cx, const ReadOnlyCompileOptions& options,
               SourceBufferHolder& srcBuf, JS::MutableHandleObject moduleRecord);
 
 /**
- * Set the [[HostDefined]] field of a source text module record to the given
- * value.
+ * Set a private value associated with a source text module record.
  */
 extern JS_PUBLIC_API(void)
-SetModuleHostDefinedField(JSObject* module, const JS::Value& value);
+SetModulePrivate(JSObject* module, const JS::Value& value);
 
 /**
- * Get the [[HostDefined]] field of a source text module record.
+ * Get the private value associated with a source text module record.
  */
 extern JS_PUBLIC_API(JS::Value)
-GetModuleHostDefinedField(JSObject* module);
+GetModulePrivate(JSObject* module);
+
+/**
+ * Set a private value associated with a script. Note that this value is shared
+ * by all nested scripts compiled from a single source file.
+ */
+extern JS_PUBLIC_API(void)
+SetScriptPrivate(JSScript* script, const JS::Value& value);
+
+/**
+ * Get the private value associated with a script. Note that this value is
+ * shared by all nested scripts compiled from a single source file.
+ */
+extern JS_PUBLIC_API(JS::Value)
+GetScriptPrivate(JSScript* script);
+
+/*
+ * Return the private value associated with currently executing script or
+ * module, or undefined if there is no such script.
+ */
+extern JS_PUBLIC_API(JS::Value)
+GetScriptedCallerPrivate(JSContext* cx);
+
+/**
+ * Hooks called when references to a script private value are created or
+ * destroyed. This allows use of a reference counted object as the
+ * script private.
+ */
+using ScriptPrivateReferenceHook = void (*)(const JS::Value&);
+
+/**
+ * Set the script private finalize hook for the runtime to the given function.
+ */
+extern JS_PUBLIC_API(void)
+SetScriptPrivateReferenceHooks(
+  JSRuntime* rt,
+  ScriptPrivateReferenceHook addRefHook,
+  ScriptPrivateReferenceHook releaseHook);
 
 /*
  * Perform the ModuleInstantiate operation on the given source text module
@@ -4541,6 +4624,9 @@ extern JS_PUBLIC_API(void)
 GetRequestedModuleSourcePos(JSContext* cx, JS::HandleValue requestedModuleObject,
                             uint32_t* lineNumber, uint32_t* columnNumber);
 
+/*
+ * Get the top-level script for a module which has not yet been executed.
+ */
 extern JS_PUBLIC_API(JSScript*)
 GetModuleScript(JS::HandleObject moduleRecord);
 

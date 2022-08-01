@@ -1563,3 +1563,13 @@ js::SystemZoneAvailable(JSContext* cx)
 {
     return true;
 }
+
+JS_FRIEND_API(JS::Value)
+js::MaybeGetScriptPrivate(JSObject* object)
+{
+    if (!object->is<ScriptSourceObject>()) {
+        return UndefinedValue();
+    }
+
+    return object->as<ScriptSourceObject>().canonicalPrivate();
+}

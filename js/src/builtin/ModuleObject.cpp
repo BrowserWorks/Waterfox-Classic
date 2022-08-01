@@ -7,7 +7,9 @@
 #include "builtin/ModuleObject.h"
 
 #include "mozilla/EnumSet.h"
+#include "mozilla/ScopeExit.h"
 
+#include "builtin/Promise.h"
 #include "builtin/SelfHostingDefines.h"
 #include "frontend/ParseNode.h"
 #include "frontend/SharedContext.h"
@@ -397,12 +399,13 @@ ModuleNamespaceObject::create(JSContext* cx, HandleModuleObject module, HandleOb
     ProxyOptions options;
     options.setLazyProto(true);
     options.setSingleton(true);
+    Rooted<UniquePtr<IndirectBindingMap>> rootedBindings(cx, std::move(bindings));
     RootedObject object(cx, NewProxyObject(cx, &proxyHandler, priv, nullptr, options));
     if (!object)
         return nullptr;
 
     SetProxyReservedSlot(object, ExportsSlot, ObjectValue(*exports));
-    SetProxyReservedSlot(object, BindingsSlot, PrivateValue(bindings.release()));
+    SetProxyReservedSlot(object, BindingsSlot, PrivateValue(rootedBindings.release()));
 
     return &object->as<ModuleNamespaceObject>();
 }
@@ -840,6 +843,12 @@ ModuleObject::namespace_()
     return &value.toObject().as<ModuleNamespaceObject>();
 }
 
+ScriptSourceObject*
+ModuleObject::scriptSourceObject() const
+{
+    return &getReservedSlot(ScriptSourceObjectSlot).toObject().as<ScriptSourceObject>();
+}
+
 FunctionDeclarationVector*
 ModuleObject::functionDeclarations()
 {
@@ -853,8 +862,10 @@ ModuleObject::functionDeclarations()
 void
 ModuleObject::init(HandleScript script)
 {
+    MOZ_ASSERT(script);
     initReservedSlot(ScriptSlot, PrivateGCThingValue(script));
     initReservedSlot(StatusSlot, Int32Value(MODULE_STATUS_UNINSTANTIATED));
+    initReservedSlot(ScriptSourceObjectSlot, ObjectValue(*script->sourceObject()));
 }
 
 void
@@ -953,18 +964,22 @@ ModuleObject::fixEnvironmentsAfterCompartmentMerge()
     AssertModuleScopesMatch(this);
 }
 
-bool
-ModuleObject::hasScript() const
+JSScript*
+ModuleObject::maybeScript() const
 {
-    // When modules are parsed via the Reflect.parse() API, the module object
-    // doesn't have a script.
-    return !getReservedSlot(ScriptSlot).isUndefined();
+    Value value = getReservedSlot(ScriptSlot);
+    if (value.isUndefined())
+        return nullptr;
+
+    return value.toGCThing()->as<JSScript>();
 }
 
 JSScript*
 ModuleObject::script() const
 {
-    return getReservedSlot(ScriptSlot).toGCThing()->as<JSScript>();
+    JSScript* ptr = maybeScript();
+    MOZ_RELEASE_ASSERT(ptr);
+    return ptr;
 }
 
 static inline void
@@ -1012,18 +1027,6 @@ ModuleObject::setMetaObject(JSObject* obj)
     MOZ_ASSERT(obj);
     MOZ_ASSERT(!metaObject());
     setReservedSlot(MetaObjectSlot, ObjectValue(*obj));
-}
-
-Value
-ModuleObject::hostDefinedField() const
-{
-    return getReservedSlot(HostDefinedSlot);
-}
-
-void
-ModuleObject::setHostDefinedField(const JS::Value& value)
-{
-    setReservedSlot(HostDefinedSlot, value);
 }
 
 Scope*
@@ -1113,6 +1116,14 @@ ModuleObject::execute(JSContext* cx, HandleModuleObject self, MutableHandleValue
 #endif
 
     RootedScript script(cx, self->script());
+
+    // The top-level script if a module is only ever executed once. Clear the
+    // reference at exit to prevent us keeping this alive unnecessarily. This is
+    // kept while executing so it is available to the debugger.
+    auto guardA = mozilla::MakeScopeExit([&] {
+        self->setReservedSlot(ScriptSlot, UndefinedValue());
+      });
+
     RootedModuleEnvironmentObject scope(cx, self->environment());
     if (!scope) {
         JS_ReportErrorASCII(cx, "Module declarations have not yet been instantiated");
@@ -1164,6 +1175,22 @@ ModuleObject::Instantiate(JSContext* cx, HandleModuleObject self)
 ModuleObject::Evaluate(JSContext* cx, HandleModuleObject self)
 {
     return InvokeSelfHostedMethod(cx, self, cx->names().ModuleEvaluate);
+}
+
+/* static */ ModuleNamespaceObject*
+ModuleObject::GetOrCreateModuleNamespace(JSContext* cx, HandleModuleObject self)
+{
+    FixedInvokeArgs<1> args(cx);
+    args[0].setObject(*self);
+
+    RootedValue result(cx);
+    if (!CallSelfHostedFunction(cx, cx->names().GetModuleNamespace, UndefinedHandleValue, args,
+                                &result))
+    {
+        return nullptr;
+    }
+
+    return &result.toObject().as<ModuleNamespaceObject>();
 }
 
 DEFINE_GETTER_FUNCTIONS(ModuleObject, namespace_, NamespaceSlot)
@@ -1663,10 +1690,128 @@ js::GetOrCreateModuleMetaObject(JSContext* cx, HandleObject moduleArg)
         return nullptr;
     }
 
-    if (!func(cx, module, metaObject))
+    RootedValue modulePrivate(cx, JS::GetModulePrivate(module));
+    if (!func(cx, modulePrivate, metaObject)) {
         return nullptr;
+    }
 
     module->setMetaObject(metaObject);
 
     return metaObject;
+}
+
+JSObject*
+js::CallModuleResolveHook(JSContext* cx, HandleValue referencingPrivate, HandleString specifier)
+{
+    JS::ModuleResolveHook moduleResolveHook = cx->runtime()->moduleResolveHook;
+    if (!moduleResolveHook) {
+        JS_ReportErrorASCII(cx, "Module resolve hook not set");
+        return nullptr;
+    }
+
+    RootedObject result(cx, moduleResolveHook(cx, referencingPrivate, specifier));
+    if (!result) {
+        return nullptr;
+    }
+
+    if (!result->is<ModuleObject>()) {
+        JS_ReportErrorASCII(cx, "Module resolve hook did not return Module object");
+        return nullptr;
+    }
+
+    return result;
+}
+
+JSObject*
+js::StartDynamicModuleImport(JSContext* cx,
+                             HandleObject referencingScriptSource,
+                             HandleValue specifierArg)
+{
+    RootedObject promiseConstructor(cx, JS::GetPromiseConstructor(cx));
+    if (!promiseConstructor) {
+        return nullptr;
+    }
+
+    RootedObject promiseObject(cx, JS::NewPromiseObject(cx, nullptr));
+    if (!promiseObject) {
+        return nullptr;
+    }
+
+    Handle<PromiseObject*> promise = promiseObject.as<PromiseObject>();
+
+    JS::ModuleDynamicImportHook importHook = cx->runtime()->moduleDynamicImportHook;
+    if (!importHook) {
+        // Dynamic import can be disabled by a pref and is not supported in all
+        // contexts (e.g. web workers).
+        JS_ReportErrorASCII(
+            cx,
+            "Dynamic module import is disabled or not supported in this context");
+        if (!RejectPromiseWithPendingError(cx, promise)) {
+            return nullptr;
+        }
+        return promise;
+    }
+
+    RootedString specifier(cx, ToString(cx, specifierArg));
+    if (!specifier) {
+        if (!RejectPromiseWithPendingError(cx, promise)) {
+            return nullptr;
+        }
+        return promise;
+    }
+
+    RootedValue referencingPrivate(cx);
+    if (referencingScriptSource) {
+        ScriptSourceObject* sso =
+            &UncheckedUnwrap(referencingScriptSource)->as<ScriptSourceObject>();
+        referencingPrivate = sso->canonicalPrivate();
+    }
+    cx->runtime()->addRefScriptPrivate(referencingPrivate);
+
+    if (!importHook(cx, referencingPrivate, specifier, promise)) {
+        cx->runtime()->releaseScriptPrivate(referencingPrivate);
+
+        // If there's no exception pending then the script is terminating
+        // anyway, so just return nullptr.
+        if (!cx->isExceptionPending() || !RejectPromiseWithPendingError(cx, promise)) {
+            return nullptr;
+        }
+        return promise;
+    }
+
+    return promise;
+}
+
+bool
+js::FinishDynamicModuleImport(JSContext* cx, HandleValue referencingPrivate, HandleString specifier,
+                              HandleObject promiseArg)
+{
+    Handle<PromiseObject*> promise = promiseArg.as<PromiseObject>();
+
+    auto releasePrivate = mozilla::MakeScopeExit([&] {
+        cx->runtime()->releaseScriptPrivate(referencingPrivate);
+    });
+
+    if (cx->isExceptionPending()) {
+        return RejectPromiseWithPendingError(cx, promise);
+    }
+
+    RootedObject result(cx, CallModuleResolveHook(cx, referencingPrivate, specifier));
+    if (!result) {
+        return RejectPromiseWithPendingError(cx, promise);
+    }
+
+    RootedModuleObject module(cx, &result->as<ModuleObject>());
+    if (module->status() != MODULE_STATUS_EVALUATED) {
+        JS_ReportErrorASCII(cx, "Unevaluated or errored module returned by module resolve hook");
+        return RejectPromiseWithPendingError(cx, promise);
+    }
+
+    RootedObject ns(cx, ModuleObject::GetOrCreateModuleNamespace(cx, module));
+    if (!ns) {
+        return RejectPromiseWithPendingError(cx, promise);
+    }
+
+    RootedValue value(cx, ObjectValue(*ns));
+    return PromiseObject::resolve(cx, promise, value);
 }

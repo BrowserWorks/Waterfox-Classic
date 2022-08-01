@@ -2359,6 +2359,16 @@
      */ \
     macro(JSOP_IMPORTMETA,    232, "importmeta", NULL,      1,  0,  1,  JOF_BYTE)\
     /*
+     * Dynamic import of the module specified by the string value on the top of
+     * the stack.
+     *
+     *   Category: Variables and Scopes
+     *   Type: Modules
+     *   Operands:
+     *   Stack: arg => rval
+     */ \
+    macro(JSOP_DYNAMIC_IMPORT, 233, "call-import", NULL,      1,  1,  1,  JOF_BYTE)\
+    /*
      * If the value on top of the stack is not null or undefined, jumps to a 32-bit offset from the
      * current bytecode.
      *
@@ -2367,14 +2377,13 @@
      *   Operands: int32_t offset
      *   Stack: cond => cond
      */ \
-    macro(JSOP_COALESCE, 233, "coalesce", NULL, 5, 1, 1, JOF_JUMP|JOF_DETECTING)
+    macro(JSOP_COALESCE, 234, "coalesce", NULL, 5, 1, 1, JOF_JUMP|JOF_DETECTING)
 
 /*
  * In certain circumstances it may be useful to "pad out" the opcode space to
  * a power of two.  Use this macro to do so.
  */
 #define FOR_EACH_TRAILING_UNUSED_OPCODE(macro) \
-    macro(234) \
     macro(235) \
     macro(236) \
     macro(237) \

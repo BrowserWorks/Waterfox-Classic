@@ -2630,6 +2630,22 @@ js::OriginalPromiseThen(JSContext* cx, Handle<PromiseObject*> promise,
     return true;
 }
 
+MOZ_MUST_USE bool
+js::RejectPromiseWithPendingError(JSContext* cx, Handle<PromiseObject*> promise)
+{
+    if (!cx->isExceptionPending()) {
+        // Reject the promise, but also propagate this uncatchable error.
+        mozilla::Unused << PromiseObject::reject(cx, promise, UndefinedHandleValue);
+        return false;
+    }
+
+    RootedValue exn(cx);
+    if (!GetAndClearException(cx, &exn)) {
+        return false;
+    }
+    return PromiseObject::reject(cx, promise, exn);
+}
+
 static MOZ_MUST_USE bool PerformPromiseThenWithReaction(JSContext* cx,
                                                         Handle<PromiseObject*> promise,
                                                         Handle<PromiseReactionRecord*> reaction);

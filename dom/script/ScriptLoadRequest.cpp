@@ -4,10 +4,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "ModuleLoadRequest.h"
-#include "mozilla/HoldDropJSObjects.h"
-#include "nsICacheInfoChannel.h"
 #include "ScriptLoadRequest.h"
+
+#include "mozilla/HoldDropJSObjects.h"
+
+#include "nsICacheInfoChannel.h"
 #include "ScriptSettings.h"
 
 namespace mozilla {
@@ -30,6 +31,7 @@ ScriptFetchOptions::ScriptFetchOptions(mozilla::CORSMode aCORSMode,
                                        nsIPrincipal* aTriggeringPrincipal)
   : mCORSMode(aCORSMode)
   , mReferrerPolicy(aReferrerPolicy)
+  , mIsPreload(false)
   , mElement(aElement)
   , mTriggeringPrincipal(aTriggeringPrincipal)
 {
@@ -52,14 +54,13 @@ NS_IMPL_CYCLE_COLLECTING_RELEASE(ScriptLoadRequest)
 NS_IMPL_CYCLE_COLLECTION_CLASS(ScriptLoadRequest)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(ScriptLoadRequest)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFetchOptions)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mCacheInfo)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFetchOptions, mCacheInfo)
+  tmp->mScript = nullptr;
   tmp->DropBytecodeCacheReferences();
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ScriptLoadRequest)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFetchOptions)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCacheInfo)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFetchOptions, mCacheInfo)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(ScriptLoadRequest)
@@ -112,6 +113,8 @@ ScriptLoadRequest::~ScriptLoadRequest()
   if (mScript) {
     DropBytecodeCacheReferences();
   }
+
+  DropJSObjects(this);
 }
 
 void
@@ -175,6 +178,12 @@ ScriptLoadRequest::SetScriptMode(bool aDeferAttr, bool aAsyncAttr)
   } else {
     mScriptMode = ScriptMode::eBlocking;
   }
+}
+
+void ScriptLoadRequest::SetScript(JSScript* aScript) {
+  MOZ_ASSERT(!mScript);
+  mScript = aScript;
+  HoldJSObjects(this);
 }
 
 //////////////////////////////////////////////////////////////

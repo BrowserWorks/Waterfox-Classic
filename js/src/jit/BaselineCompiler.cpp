@@ -5150,16 +5150,51 @@ BaselineCompiler::emit_JSOP_DERIVEDCONSTRUCTOR()
     return true;
 }
 
+typedef JSObject* (*GetOrCreateModuleMetaObjectFn)(JSContext*, HandleObject);
+static const VMFunction GetOrCreateModuleMetaObjectInfo =
+    FunctionInfo<GetOrCreateModuleMetaObjectFn>(js::GetOrCreateModuleMetaObject,
+                                                "GetOrCreateModuleMetaObject");
+
 bool
 BaselineCompiler::emit_JSOP_IMPORTMETA()
 {
     RootedModuleObject module(cx, GetModuleObjectForScript(script));
     MOZ_ASSERT(module);
 
-    JSObject* metaObject = GetOrCreateModuleMetaObject(cx, module);
-    if (!metaObject)
-        return false;
+    frame.syncStack(0);
 
-    frame.push(ObjectValue(*metaObject));
+    prepareVMCall();
+    pushArg(ImmGCPtr(module));
+    if (!callVM(GetOrCreateModuleMetaObjectInfo)) {
+        return false;
+    }
+
+    masm.tagValue(JSVAL_TYPE_OBJECT, ReturnReg, R0);
+    frame.push(R0);
+    return true;
+}
+
+typedef JSObject* (*StartDynamicModuleImportFn)(JSContext*, HandleObject, HandleValue);
+static const VMFunction StartDynamicModuleImportInfo =
+    FunctionInfo<StartDynamicModuleImportFn>(js::StartDynamicModuleImport,
+                                                "StartDynamicModuleImport");
+
+bool
+BaselineCompiler::emit_JSOP_DYNAMIC_IMPORT()
+{
+    RootedObject referencingScriptSource(cx, script->sourceObject());
+
+    // Put specifier value in R0.
+    frame.popRegsAndSync(1);
+
+    prepareVMCall();
+    pushArg(R0);
+    pushArg(ImmGCPtr(referencingScriptSource));
+    if (!callVM(StartDynamicModuleImportInfo)) {
+        return false;
+    }
+
+    masm.tagValue(JSVAL_TYPE_OBJECT, ReturnReg, R0);
+    frame.push(R0);
     return true;
 }

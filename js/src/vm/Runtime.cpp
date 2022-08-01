@@ -178,7 +178,10 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     stackFormat_(parentRuntime ? js::StackFormat::Default
                                : js::StackFormat::SpiderMonkey),
     moduleResolveHook(),
-    moduleMetadataHook()
+    moduleMetadataHook(),
+    moduleDynamicImportHook(),
+    scriptPrivateAddRefHook(),
+    scriptPrivateReleaseHook()
 {
     liveRuntimesCount++;
 

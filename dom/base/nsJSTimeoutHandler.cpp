@@ -10,6 +10,7 @@
 #include "mozilla/Likely.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/dom/FunctionBinding.h"
+#include "mozilla/dom/LoadedScript.h"
 #include "nsCOMPtr.h"
 #include "nsContentUtils.h"
 #include "nsError.h"
@@ -43,6 +44,7 @@ public:
                            nsTArray<JS::Heap<JS::Value>>&& aArguments,
                            ErrorResult& aError);
   nsJSScriptTimeoutHandler(JSContext* aCx, nsGlobalWindow* aWindow,
+                           LoadedScript* aInitiatingScript,
                            const nsAString& aExpression, bool* aAllowEval,
                            ErrorResult& aError);
   nsJSScriptTimeoutHandler(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
@@ -76,6 +78,10 @@ public:
     *aColumn = mColumn;
   }
 
+  virtual LoadedScript* GetInitiatingScript() override {
+    return mInitiatingScript;
+  }
+
   virtual void MarkForCC() override
   {
     if (mFunction) {
@@ -103,6 +109,9 @@ private:
   // it should be used, else use mExpr.
   nsString mExpr;
   RefPtr<Function> mFunction;
+
+  // Initiating script for use when evaluating mExpr on the main thread.
+  RefPtr<LoadedScript> mInitiatingScript;
 };
 
 
@@ -111,8 +120,11 @@ private:
 NS_IMPL_CYCLE_COLLECTION_CLASS(nsJSScriptTimeoutHandler)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsJSScriptTimeoutHandler)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFunction)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mInitiatingScript)
   tmp->ReleaseJSObjects();
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsJSScriptTimeoutHandler)
   if (MOZ_UNLIKELY(cb.WantDebugInfo())) {
     nsAutoCString name("nsJSScriptTimeoutHandler");
@@ -149,6 +161,9 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsJSScriptTimeoutHandler)
 
   if (tmp->mFunction) {
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFunction)
+  }
+  if (tmp->mInitiatingScript) {
+    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mInitiatingScript)
   }
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -242,6 +257,7 @@ nsJSScriptTimeoutHandler::nsJSScriptTimeoutHandler(JSContext* aCx,
 
 nsJSScriptTimeoutHandler::nsJSScriptTimeoutHandler(JSContext* aCx,
                                                    nsGlobalWindow *aWindow,
+                                                   LoadedScript* aInitiatingScript,
                                                    const nsAString& aExpression,
                                                    bool* aAllowEval,
                                                    ErrorResult& aError)
@@ -351,9 +367,11 @@ already_AddRefed<nsIScriptTimeoutHandler>
 NS_CreateJSTimeoutHandler(JSContext* aCx, nsGlobalWindow *aWindow,
                           const nsAString& aExpression, ErrorResult& aError)
 {
+  LoadedScript* script = ScriptLoader::GetActiveScript(aCx);
+
   bool allowEval = false;
   RefPtr<nsJSScriptTimeoutHandler> handler =
-    new nsJSScriptTimeoutHandler(aCx, aWindow, aExpression, &allowEval, aError);
+    new nsJSScriptTimeoutHandler(aCx, aWindow, script, aExpression, &allowEval, aError);
   if (aError.Failed() || !allowEval) {
     return nullptr;
   }

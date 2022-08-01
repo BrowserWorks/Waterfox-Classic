@@ -21,6 +21,7 @@
 #include "jit/Lowering.h"
 #include "jit/MIRGraph.h"
 #include "vm/ArgumentsObject.h"
+#include "vm/EnvironmentObject.h"
 #include "vm/Opcodes.h"
 #include "vm/RegExpStatics.h"
 #include "vm/TraceLogging.h"
@@ -2387,6 +2388,9 @@ IonBuilder::inspectOpcode(JSOp op)
 
       case JSOP_IMPORTMETA:
         return jsop_importmeta();
+
+      case JSOP_DYNAMIC_IMPORT:
+        return jsop_dynamic_import();
 
       // ===== NOT Yet Implemented =====
       // Read below!
@@ -12763,14 +12767,23 @@ IonBuilder::jsop_importmeta()
     ModuleObject* module = GetModuleObjectForScript(script());
     MOZ_ASSERT(module);
 
-    // If we get there then the meta object must already have been created, at
-    // the latest when we compiled for baseline.
-    JSObject* metaObject = module->metaObject();
-    MOZ_ASSERT(metaObject);
+    MModuleMetadata* meta = MModuleMetadata::New(alloc(), module);
+    current->add(meta);
+    current->push(meta);
+    return resumeAfter(meta);
+}
 
-    pushConstant(ObjectValue(*metaObject));
+AbortReasonOr<Ok>
+IonBuilder::jsop_dynamic_import()
+{
+    JSObject* referencingScriptSource = script()->sourceObject();
 
-    return Ok();
+    MDefinition* specifier = current->pop();
+
+    MDynamicImport* ins = MDynamicImport::New(alloc(), referencingScriptSource, specifier);
+    current->add(ins);
+    current->push(ins);
+    return resumeAfter(ins);
 }
 
 MInstruction*

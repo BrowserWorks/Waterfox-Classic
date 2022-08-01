@@ -120,6 +120,23 @@ JS_NewDeadWrapper(JSContext* cx, JSObject* origObject = nullptr);
 extern JS_FRIEND_API(bool)
 JS_IsScriptSourceObject(JSObject* obj);
 
+namespace js {
+
+/**
+ * Get the script private value associated with an object, if any.
+ *
+ * The private value is set with SetScriptPrivate() or SetModulePrivate() and is
+ * internally stored on the relevant ScriptSourceObject.
+ *
+ * This is used by the cycle collector to trace through
+ * ScriptSourceObjects. This allows private values to contain an nsISupports
+ * pointer and hence support references to cycle collected C++ objects.
+ */
+JS_FRIEND_API(JS::Value)
+MaybeGetScriptPrivate(JSObject* object);
+
+}  // namespace js
+
 /*
  * Used by the cycle collector to trace through a shape or object group and
  * all cycle-participating data it reaches, using bounded stack space.

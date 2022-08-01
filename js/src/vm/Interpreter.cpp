@@ -1067,10 +1067,14 @@ PopEnvironment(JSContext* cx, EnvironmentIter& ei)
         if (ei.scope().hasEnvironment())
             ei.initialFrame().popOffEnvironmentChain<VarEnvironmentObject>();
         break;
+      case ScopeKind::Module:
+        if (MOZ_UNLIKELY(cx->compartment()->isDebuggee())) {
+            DebugEnvironments::onPopModule(cx, ei);
+        }
+        break;
       case ScopeKind::Eval:
       case ScopeKind::Global:
       case ScopeKind::NonSyntactic:
-      case ScopeKind::Module:
         break;
       case ScopeKind::WasmInstance:
       case ScopeKind::WasmFunction:
@@ -4241,7 +4245,24 @@ CASE(JSOP_IMPORTMETA)
 
     PUSH_OBJECT(*metaObject);
 }
-END_CASE(JSOP_NEWTARGET)
+END_CASE(JSOP_IMPORTMETA)
+
+CASE(JSOP_DYNAMIC_IMPORT)
+{
+    ReservedRooted<JSObject*> referencingScriptSource(&rootObject0);
+    referencingScriptSource = script->sourceObject();
+
+    ReservedRooted<Value> specifier(&rootValue1);
+    POP_COPY_TO(specifier);
+
+    JSObject* promise =
+        StartDynamicModuleImport(cx, referencingScriptSource, specifier);
+    if (!promise)
+        goto error;
+
+    PUSH_OBJECT(*promise);
+}
+END_CASE(JSOP_DYNAMIC_IMPORT)
 
 CASE(JSOP_SUPERFUN)
 {

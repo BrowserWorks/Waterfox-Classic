@@ -3609,22 +3609,22 @@ CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject env, Handle
         return nullptr;
     }
 
+    // Only allow cloning normal, interpreted functions.
     RootedFunction fun(cx, &funobj->as<JSFunction>());
+    if (fun->isNative() || fun->isBoundFunction() ||
+        fun->kind() != JSFunction::NormalFunction || fun->isExtended() ||
+        fun->isSelfHostedBuiltin()) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                                  JSMSG_CANT_CLONE_OBJECT);
+        return nullptr;
+    }
+
     if (fun->isInterpretedLazy()) {
         AutoCompartment ac(cx, funobj);
         if (!JSFunction::getOrCreateScript(cx, fun))
             return nullptr;
     }
-
-    // Only allow cloning normal, interpreted functions.
-    if (fun->isNative() ||
-        fun->isBoundFunction() ||
-        fun->kind() != JSFunction::NormalFunction ||
-        fun->isExtended())
-    {
-        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_CANT_CLONE_OBJECT);
-        return nullptr;
-    }
+    RootedScript script(cx, fun->nonLazyScript());
 
     if (!IsFunctionCloneable(fun)) {
         JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BAD_CLONE_FUNOBJ_SCOPE);
@@ -3632,22 +3632,19 @@ CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject env, Handle
     }
 
     if (CanReuseScriptForClone(cx->compartment(), fun, env)) {
-        // If the script is to be reused, either the script can already handle
-        // non-syntactic scopes, or there is only the standard global lexical
-        // scope.
-#ifdef DEBUG
-        // Fail here if we OOM during debug asserting.
-        // CloneFunctionReuseScript will delazify the script anyways, so we
-        // are not creating an extra failure condition for DEBUG builds.
-        if (!JSFunction::getOrCreateScript(cx, fun))
-            return nullptr;
-        MOZ_ASSERT(scope->as<GlobalScope>().isSyntactic() ||
-                   fun->nonLazyScript()->hasNonSyntacticScope());
-#endif
         return CloneFunctionReuseScript(cx, fun, env, fun->getAllocKind());
     }
 
-    JSFunction* clone = CloneFunctionAndScript(cx, fun, env, scope, fun->getAllocKind());
+    Rooted<ScriptSourceObject*> sourceObject(cx, script->sourceObject());
+    if (cx->compartment() != sourceObject->compartment()) {
+        sourceObject = ScriptSourceObject::clone(cx, sourceObject);
+        if (!sourceObject) {
+            return nullptr;
+        }
+    }
+
+    JSFunction* clone = CloneFunctionAndScript(cx, fun, env, scope, sourceObject,
+                                               fun->getAllocKind());
 
 #ifdef DEBUG
     // The cloned function should itself be cloneable.
@@ -3902,7 +3899,8 @@ JS::OwningCompileOptions::OwningCompileOptions(JSContext* cx)
     : ReadOnlyCompileOptions(),
       elementRoot(cx),
       elementAttributeNameRoot(cx),
-      introductionScriptRoot(cx)
+      introductionScriptRoot(cx),
+      scriptOrModuleRoot(cx)
 {
 }
 
@@ -3922,6 +3920,7 @@ JS::OwningCompileOptions::copy(JSContext* cx, const ReadOnlyCompileOptions& rhs)
     setElement(rhs.element());
     setElementAttributeName(rhs.elementAttributeName());
     setIntroductionScript(rhs.introductionScript());
+    setScriptOrModule(rhs.scriptOrModule());
 
     return setFileAndLine(cx, rhs.filename(), rhs.lineno) &&
            setSourceMapURL(cx, rhs.sourceMapURL()) &&
@@ -3991,7 +3990,7 @@ JS::OwningCompileOptions::setIntroducerFilename(JSContext* cx, const char* s)
 
 JS::CompileOptions::CompileOptions(JSContext* cx, JSVersion version)
     : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
-      introductionScriptRoot(cx)
+      introductionScriptRoot(cx), scriptOrModuleRoot(cx)
 {
     this->version = (version != JSVERSION_UNKNOWN) ? version : cx->findVersion();
 
@@ -4836,6 +4835,31 @@ JS::SetModuleMetadataHook(JSRuntime* rt, JS::ModuleMetadataHook func)
     rt->moduleMetadataHook = func;
 }
 
+JS_PUBLIC_API(JS::ModuleDynamicImportHook)
+JS::GetModuleDynamicImportHook(JSRuntime* rt)
+{
+    AssertHeapIsIdle();
+    return rt->moduleDynamicImportHook;
+}
+
+JS_PUBLIC_API(void)
+JS::SetModuleDynamicImportHook(JSRuntime* rt, JS::ModuleDynamicImportHook func)
+{
+    AssertHeapIsIdle();
+    rt->moduleDynamicImportHook = func;
+}
+
+JS_PUBLIC_API(bool)
+JS::FinishDynamicModuleImport(JSContext* cx, HandleValue referencingPrivate, HandleString specifier,
+                              HandleObject promise)
+{
+    AssertHeapIsIdle();
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, referencingPrivate, promise);
+
+    return js::FinishDynamicModuleImport(cx, referencingPrivate, specifier, promise);
+}
+
 JS_PUBLIC_API(bool)
 JS::CompileModule(JSContext* cx, const ReadOnlyCompileOptions& options,
                   SourceBufferHolder& srcBuf, JS::MutableHandleObject module)
@@ -4849,15 +4873,52 @@ JS::CompileModule(JSContext* cx, const ReadOnlyCompileOptions& options,
 }
 
 JS_PUBLIC_API(void)
-JS::SetModuleHostDefinedField(JSObject* module, const JS::Value& value)
+JS::SetModulePrivate(JSObject* module, const JS::Value& value)
 {
-    module->as<ModuleObject>().setHostDefinedField(value);
+    JSRuntime* rt = module->zone()->runtimeFromMainThread();
+    module->as<ModuleObject>().scriptSourceObject()->setPrivate(rt, value);
 }
 
 JS_PUBLIC_API(JS::Value)
-JS::GetModuleHostDefinedField(JSObject* module)
+JS::GetModulePrivate(JSObject* module)
 {
-    return module->as<ModuleObject>().hostDefinedField();
+    return module->as<ModuleObject>().scriptSourceObject()->canonicalPrivate();
+}
+
+JS_PUBLIC_API(void)
+JS::SetScriptPrivate(JSScript* script, const JS::Value& value)
+{
+    JSRuntime* rt = script->zone()->runtimeFromMainThread();
+    script->sourceObject()->setPrivate(rt, value);
+}
+
+JS_PUBLIC_API(JS::Value)
+JS::GetScriptPrivate(JSScript* script)
+{
+    return script->sourceObject()->canonicalPrivate();
+}
+
+JS_PUBLIC_API(JS::Value)
+JS::GetScriptedCallerPrivate(JSContext* cx) {
+  AssertHeapIsIdle();
+  CHECK_REQUEST(cx);
+
+  NonBuiltinFrameIter iter(cx, cx->compartment()->principals());
+  if (iter.done() || !iter.hasScript()) {
+    return UndefinedValue();
+  }
+
+  return iter.script()->sourceObject()->canonicalPrivate();
+}
+
+JS_PUBLIC_API(void)
+JS::SetScriptPrivateReferenceHooks(
+  JSRuntime* rt,
+  JS::ScriptPrivateReferenceHook addRefHook,
+  JS::ScriptPrivateReferenceHook releaseHook) {
+  AssertHeapIsIdle();
+  rt->scriptPrivateAddRefHook = addRefHook;
+  rt->scriptPrivateReleaseHook = releaseHook;
 }
 
 JS_PUBLIC_API(bool)

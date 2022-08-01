@@ -5036,6 +5036,33 @@ class LClassConstructor : public LCallInstructionHelper<1, 0, 0>
     }
 };
 
+class LModuleMetadata : public LCallInstructionHelper<1, 0, 0>
+{
+  public:
+    LIR_HEADER(ModuleMetadata)
+
+    const MModuleMetadata* mir() const {
+        return mir_->toModuleMetadata();
+    }
+};
+
+class LDynamicImport : public LCallInstructionHelper<1, BOX_PIECES, 0>
+{
+  public:
+    LIR_HEADER(DynamicImport)
+
+    static const size_t SpecifierIndex = 0;
+
+    explicit LDynamicImport(const LBoxAllocation& specifier)
+    {
+        setBoxOperand(SpecifierIndex, specifier);
+    }
+
+    const MDynamicImport* mir() const {
+        return mir_->toDynamicImport();
+    }
+};
+
 class LLambdaForSingleton : public LCallInstructionHelper<1, 1, 0>
 {
   public:

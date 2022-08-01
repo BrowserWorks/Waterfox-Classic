@@ -478,13 +478,13 @@ ModuleEnvironmentObject::create(JSContext* cx, HandleModuleObject module)
 }
 
 ModuleObject&
-ModuleEnvironmentObject::module()
+ModuleEnvironmentObject::module() const
 {
     return getReservedSlot(MODULE_SLOT).toObject().as<ModuleObject>();
 }
 
 IndirectBindingMap&
-ModuleEnvironmentObject::importBindings()
+ModuleEnvironmentObject::importBindings() const
 {
     return module().importBindings();
 }
@@ -1495,19 +1495,25 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
         *accessResult = ACCESS_GENERIC;
         LiveEnvironmentVal* maybeLiveEnv = DebugEnvironments::hasLiveEnvironment(*env);
 
-        if (env->is<ModuleEnvironmentObject>()) {
-            /* Everything is aliased and stored in the environment object. */
-            return true;
-        }
-
-        /* Handle unaliased formals, vars, lets, and consts at function scope. */
-        if (env->is<CallObject>()) {
-            CallObject& callobj = env->as<CallObject>();
-            RootedFunction fun(cx, &callobj.callee());
-            RootedScript script(cx, JSFunction::getOrCreateScript(cx, fun));
-            AutoKeepTypeScripts keepTypes(cx);
-            if (!script->ensureHasTypes(cx, keepTypes) || !script->ensureHasAnalyzedArgsUsage(cx))
-                return false;
+        // Handle unaliased formals, vars, lets, and consts at function or module
+        // scope.
+        if (env->is<CallObject>() || env->is<ModuleEnvironmentObject>()) {
+            RootedScript script(cx);
+            if (env->is<CallObject>()) {
+                CallObject& callobj = env->as<CallObject>();
+                RootedFunction fun(cx, &callobj.callee());
+                script = JSFunction::getOrCreateScript(cx, fun);
+                AutoKeepTypeScripts keepTypes(cx);
+                if (!script->ensureHasTypes(cx, keepTypes) ||
+                    !script->ensureHasAnalyzedArgsUsage(cx)) {
+                    return false;
+                }
+          } else {
+              script = env->as<ModuleEnvironmentObject>().module().maybeScript();
+              if (!script) {
+                  return true;
+              }
+          }
 
             BindingIter bi(script);
             while (bi && NameToId(bi.name()->asPropertyName()) != id)
@@ -1765,6 +1771,10 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
     {
         if (isFunctionEnvironment(env))
             return env.as<CallObject>().callee().nonLazyScript()->bodyScope();
+        if (env.is<ModuleEnvironmentObject>()) {
+            JSScript* script = env.as<ModuleEnvironmentObject>().module().maybeScript();
+            return script ? script->bodyScope() : nullptr;
+        }
         if (isNonExtensibleLexicalEnvironment(env))
             return &env.as<LexicalEnvironmentObject>().scope();
         if (env.is<VarEnvironmentObject>())
@@ -2644,10 +2654,11 @@ DebugEnvironments::takeFrameSnapshot(JSContext* cx, Handle<DebugEnvironmentProxy
      * invariants since DebugEnvironmentProxy::maybeSnapshot can already be nullptr.
      */
 
+    JSScript* script = frame.script();
+
     // Act like no snapshot was taken if we run OOM while taking the snapshot.
     Rooted<GCVector<Value>> vec(cx, GCVector<Value>(cx));
     if (debugEnv->environment().is<CallObject>()) {
-        JSScript* script = frame.script();
 
         FunctionScope* scope = &script->bodyScope()->as<FunctionScope>();
         uint32_t frameSlotCount = scope->nextFrameSlot();
@@ -2683,7 +2694,7 @@ DebugEnvironments::takeFrameSnapshot(JSContext* cx, Handle<DebugEnvironmentProxy
             LexicalScope* scope = &debugEnv->environment().as<LexicalEnvironmentObject>().scope();
             frameSlotStart = scope->firstFrameSlot();
             frameSlotEnd = scope->nextFrameSlot();
-        } else {
+        } else if (debugEnv->environment().is<VarEnvironmentObject>()) {
             VarEnvironmentObject* env = &debugEnv->environment().as<VarEnvironmentObject>();
             if (frame.isFunctionFrame()) {
                 VarScope* scope = &env->scope().as<VarScope>();
@@ -2691,14 +2702,20 @@ DebugEnvironments::takeFrameSnapshot(JSContext* cx, Handle<DebugEnvironmentProxy
                 frameSlotEnd = scope->nextFrameSlot();
             } else {
                 EvalScope* scope = &env->scope().as<EvalScope>();
-                MOZ_ASSERT(scope == frame.script()->bodyScope());
+                MOZ_ASSERT(scope == script->bodyScope());
                 frameSlotStart = 0;
                 frameSlotEnd = scope->nextFrameSlot();
             }
+        } else {
+            MOZ_ASSERT(&debugEnv->environment().as<ModuleEnvironmentObject>() ==
+                       script->module()->environment());
+            ModuleScope* scope = &script->bodyScope()->as<ModuleScope>();
+            frameSlotStart = 0;
+            frameSlotEnd = scope->nextFrameSlot();
         }
 
         uint32_t frameSlotCount = frameSlotEnd - frameSlotStart;
-        MOZ_ASSERT(frameSlotCount <= frame.script()->nfixed());
+        MOZ_ASSERT(frameSlotCount <= script->nfixed());
 
         if (!vec.resize(frameSlotCount)) {
             cx->recoverFromOutOfMemory();
@@ -2844,6 +2861,12 @@ DebugEnvironments::onPopWith(AbstractFramePtr frame)
 {
     if (DebugEnvironments* envs = frame.compartment()->debugEnvs)
         envs->liveEnvs.remove(&frame.environmentChain()->as<WithEnvironmentObject>());
+}
+
+void
+DebugEnvironments::onPopModule(JSContext* cx, const EnvironmentIter& ei)
+{
+    onPopGeneric<ModuleEnvironmentObject, ModuleScope>(cx, ei);
 }
 
 void

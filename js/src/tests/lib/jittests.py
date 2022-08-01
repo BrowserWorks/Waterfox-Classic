@@ -318,8 +318,8 @@ class JitTest:
             cmd += ['-e', expr]
         for inc in self.other_includes:
             cmd += ['-f', libdir + inc]
+        cmd += ['--module-load-path', moduledir]
         if self.is_module:
-            cmd += ['--module-load-path', moduledir]
             cmd += ['--module', path]
         elif self.test_reflect_stringify is None:
             cmd += ['-f', path]

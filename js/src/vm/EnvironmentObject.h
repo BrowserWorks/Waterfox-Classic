@@ -395,8 +395,8 @@ class ModuleEnvironmentObject : public EnvironmentObject
     static const uint32_t RESERVED_SLOTS = 2;
 
     static ModuleEnvironmentObject* create(JSContext* cx, HandleModuleObject module);
-    ModuleObject& module();
-    IndirectBindingMap& importBindings();
+    ModuleObject& module() const;
+    IndirectBindingMap& importBindings() const;
 
     bool createImportBinding(JSContext* cx, HandleAtom importName, HandleModuleObject module,
                              HandleAtom exportName);
@@ -1028,6 +1028,7 @@ class DebugEnvironments
     static void onPopLexical(JSContext* cx, const EnvironmentIter& ei);
     static void onPopLexical(JSContext* cx, AbstractFramePtr frame, jsbytecode* pc);
     static void onPopWith(AbstractFramePtr frame);
+    static void onPopModule(JSContext* cx, const EnvironmentIter& ei);
     static void onCompartmentUnsetIsDebuggee(JSCompartment* c);
 };
 
@@ -1141,7 +1142,8 @@ CreateObjectsForEnvironmentChain(JSContext* cx, AutoObjectVector& chain,
                                  HandleObject terminatingEnv,
                                  MutableHandleObject envObj);
 
-ModuleObject* GetModuleObjectForScript(JSScript* script);
+ModuleObject*
+GetModuleObjectForScript(JSScript* script);
 
 ModuleEnvironmentObject* GetModuleEnvironmentForScript(JSScript* script);
 

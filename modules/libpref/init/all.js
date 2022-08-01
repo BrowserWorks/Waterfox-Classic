@@ -1500,6 +1500,9 @@ pref("javascript.options.dump_stack_on_debuggee_would_run", false);
 // Streams API
 pref("javascript.options.streams", false);
 
+// Dynamic module import.
+pref("javascript.options.dynamicImport", true);
+
 // advanced prefs
 pref("advanced.mailftp",                    false);
 pref("image.animation_mode",                "normal");

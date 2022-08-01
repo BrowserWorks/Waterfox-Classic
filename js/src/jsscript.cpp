@@ -261,7 +261,7 @@ XDRRelazificationInfo(XDRState<mode>* xdr, HandleFunction fun, HandleScript scri
             return false;
 
         if (mode == XDR_DECODE) {
-            RootedScriptSource sourceObject(cx, &script->scriptSourceUnwrap());
+            RootedScriptSource sourceObject(cx, script->sourceObject());
             lazy.set(LazyScript::Create(cx, fun, script, enclosingScope, sourceObject,
                                         packedFields, begin, end, toStringStart, lineno, column));
             if (!lazy)
@@ -561,9 +561,7 @@ js::XDRScript(XDRState<mode>* xdr, HandleScope scriptEnclosingScope,
         if (fun)
             fun->initScript(script);
     } else {
-        // When encoding, we do not mutate any of the JSScript or LazyScript, so
-        // we can safely unwrap it here.
-        sourceObject = &script->scriptSourceUnwrap();
+        sourceObject = script->sourceObject();
     }
 
     if (mode == XDR_DECODE) {
@@ -1055,14 +1053,15 @@ js::XDRLazyScript(XDRState<XDR_DECODE>*, HandleScope, HandleScriptSource,
                   HandleFunction, MutableHandle<LazyScript*>);
 
 void
-JSScript::setSourceObject(JSObject* object)
+JSScript::setSourceObject(js::ScriptSourceObject* object)
 {
     MOZ_ASSERT(compartment() == object->compartment());
     sourceObject_ = object;
 }
 
 void
-JSScript::setDefaultClassConstructorSpan(JSObject* sourceObject, uint32_t start, uint32_t end)
+JSScript::setDefaultClassConstructorSpan(js::ScriptSourceObject* sourceObject,
+                                         uint32_t start, uint32_t end)
 {
     MOZ_ASSERT(isDefaultClassConstructor());
     setSourceObject(sourceObject);
@@ -1070,16 +1069,9 @@ JSScript::setDefaultClassConstructorSpan(JSObject* sourceObject, uint32_t start,
     toStringEnd_ = end;
 }
 
-js::ScriptSourceObject&
-JSScript::scriptSourceUnwrap() const {
-    // This may be called off the main thread. It's OK not to expose the source
-    // object here as it doesn't escape.
-    return UncheckedUnwrapWithoutExpose(sourceObject())->as<ScriptSourceObject>();
-}
-
 js::ScriptSource*
 JSScript::scriptSource() const {
-    return scriptSourceUnwrap().source();
+    return sourceObject()->source();
 }
 
 js::ScriptSource*
@@ -1404,6 +1396,9 @@ ScriptSourceObject::finalize(FreeOp* fop, JSObject* obj)
     ScriptSourceObject* sso = &obj->as<ScriptSourceObject>();
     sso->source()->decref();
     sso->setReservedSlot(SOURCE_SLOT, PrivateValue(nullptr));
+
+    // Clear the private value, calling the release hook if necessary.
+    sso->setPrivate(fop->runtime(), UndefinedValue());
 }
 
 static const ClassOps ScriptSourceObjectClassOps = {
@@ -1430,24 +1425,57 @@ const Class ScriptSourceObject::class_ = {
     &ScriptSourceObjectClassOps
 };
 
-ScriptSourceObject*
-ScriptSourceObject::create(JSContext* cx, ScriptSource* source)
-{
-    RootedObject object(cx, NewObjectWithGivenProto(cx, &class_, nullptr));
-    if (!object)
-        return nullptr;
-    RootedScriptSource sourceObject(cx, &object->as<ScriptSourceObject>());
+ScriptSourceObject* ScriptSourceObject::createInternal(JSContext* cx,
+                                                       ScriptSource* source,
+                                                       HandleObject canonical) {
+  ScriptSourceObject* obj =
+      NewObjectWithGivenProto<ScriptSourceObject>(cx, nullptr);
+  if (!obj) {
+    return nullptr;
+  }
 
-    source->incref();    // The matching decref is in ScriptSourceObject::finalize.
-    sourceObject->initReservedSlot(SOURCE_SLOT, PrivateValue(source));
+  source->incref();  // The matching decref is in ScriptSourceObject::finalize.
 
-    // The remaining slots should eventually be populated by a call to
-    // initFromOptions. Poison them until that point.
-    sourceObject->initReservedSlot(ELEMENT_SLOT, MagicValue(JS_GENERIC_MAGIC));
-    sourceObject->initReservedSlot(ELEMENT_PROPERTY_SLOT, MagicValue(JS_GENERIC_MAGIC));
-    sourceObject->initReservedSlot(INTRODUCTION_SCRIPT_SLOT, MagicValue(JS_GENERIC_MAGIC));
+  obj->initReservedSlot(SOURCE_SLOT, PrivateValue(source));
 
-    return sourceObject;
+  if (canonical) {
+    obj->initReservedSlot(CANONICAL_SLOT, ObjectValue(*canonical));
+  } else {
+    obj->initReservedSlot(CANONICAL_SLOT, ObjectValue(*obj));
+  }
+
+  // The slots below should either be populated by a call to initFromOptions or,
+  // if this is a non-canonical ScriptSourceObject, they are unused. Poison
+  // them.
+  obj->initReservedSlot(ELEMENT_SLOT, MagicValue(JS_GENERIC_MAGIC));
+  obj->initReservedSlot(ELEMENT_PROPERTY_SLOT, MagicValue(JS_GENERIC_MAGIC));
+  obj->initReservedSlot(INTRODUCTION_SCRIPT_SLOT, MagicValue(JS_GENERIC_MAGIC));
+
+  return obj;
+}
+
+ScriptSourceObject* ScriptSourceObject::create(JSContext* cx,
+                                               ScriptSource* source) {
+  return createInternal(cx, source, nullptr);
+}
+
+ScriptSourceObject* ScriptSourceObject::clone(JSContext* cx,
+                                              HandleScriptSource sso) {
+  MOZ_ASSERT(cx->compartment() != sso->compartment());
+
+  RootedObject wrapped(cx, sso);
+  if (!cx->compartment()->wrap(cx, &wrapped)) {
+    return nullptr;
+  }
+
+  return createInternal(cx, sso->source(), wrapped);
+}
+
+ScriptSourceObject* ScriptSourceObject::unwrappedCanonical() const {
+  MOZ_ASSERT(CurrentThreadCanAccessRuntime(runtimeFromAnyThread()));
+
+  JSObject* obj = &getReservedSlot(CANONICAL_SLOT).toObject();
+  return &UncheckedUnwrap(obj)->as<ScriptSourceObject>();
 }
 
 /* static */ bool
@@ -1455,6 +1483,7 @@ ScriptSourceObject::initFromOptions(JSContext* cx, HandleScriptSource source,
                                     const ReadOnlyCompileOptions& options)
 {
     releaseAssertSameCompartment(cx, source);
+    MOZ_ASSERT(source->isCanonical());
     MOZ_ASSERT(source->getReservedSlot(ELEMENT_SLOT).isMagic(JS_GENERIC_MAGIC));
     MOZ_ASSERT(source->getReservedSlot(ELEMENT_PROPERTY_SLOT).isMagic(JS_GENERIC_MAGIC));
     MOZ_ASSERT(source->getReservedSlot(INTRODUCTION_SCRIPT_SLOT).isMagic(JS_GENERIC_MAGIC));
@@ -1467,15 +1496,25 @@ ScriptSourceObject::initFromOptions(JSContext* cx, HandleScriptSource source,
     // There is no equivalent of cross-compartment wrappers for scripts. If the
     // introduction script and ScriptSourceObject are in different compartments,
     // we would be creating a cross-compartment script reference, which is
-    // forbidden. In that case, simply don't bother to retain the introduction
-    // script.
-    Value introductionScript = UndefinedValue();
-    if (options.introductionScript() &&
-        options.introductionScript()->compartment() == cx->compartment())
-    {
-        introductionScript.setPrivateGCThing(options.introductionScript());
+    // forbidden. We can still store a CCW to the script source object though.
+    RootedValue introductionScript(cx);
+    if (JSScript* script = options.introductionScript()) {
+        if (script->compartment() == cx->compartment()) {
+            introductionScript.setPrivateGCThing(options.introductionScript());
+        }
     }
     source->setReservedSlot(INTRODUCTION_SCRIPT_SLOT, introductionScript);
+
+    // Set the private value to that of the script or module that this source is
+    // part of, if any.
+    RootedValue privateValue(cx);
+    if (JSScript* script = options.scriptOrModule()) {
+        privateValue = script->sourceObject()->canonicalPrivate();
+        if (!JS_WrapValue(cx, &privateValue)) {
+            return false;
+        }
+    }
+    source->setPrivate(cx->runtime(), privateValue);
 
     return true;
 }
@@ -1484,6 +1523,8 @@ ScriptSourceObject::initFromOptions(JSContext* cx, HandleScriptSource source,
 ScriptSourceObject::initElementProperties(JSContext* cx, HandleScriptSource source,
                                           HandleObject element, HandleString elementAttrName)
 {
+    MOZ_ASSERT(source->isCanonical());
+
     RootedValue elementValue(cx, ObjectOrNullValue(element));
     if (!cx->compartment()->wrap(cx, &elementValue))
         return false;
@@ -1498,6 +1539,17 @@ ScriptSourceObject::initElementProperties(JSContext* cx, HandleScriptSource sour
     source->setReservedSlot(ELEMENT_PROPERTY_SLOT, nameValue);
 
     return true;
+}
+
+void ScriptSourceObject::setPrivate(JSRuntime* rt, const Value& value) {
+  // Update the private value, calling addRef/release hooks if necessary
+  // to allow the embedding to maintain a reference count for the
+  // private data.
+  JS::AutoSuppressGCAnalysis nogc;
+  Value prevValue = getReservedSlot(PRIVATE_SLOT);
+  rt->releaseScriptPrivate(prevValue);
+  setReservedSlot(PRIVATE_SLOT, value);
+  rt->addRefScriptPrivate(value);
 }
 
 /* static */ bool
@@ -2684,7 +2736,7 @@ JSScript::initCompartment(JSContext* cx)
 
 /* static */ JSScript*
 JSScript::Create(JSContext* cx, const ReadOnlyCompileOptions& options,
-                 HandleObject sourceObject, uint32_t bufStart, uint32_t bufEnd,
+                 HandleScriptSource sourceObject, uint32_t bufStart, uint32_t bufEnd,
                  uint32_t toStringStart, uint32_t toStringEnd)
 {
     // bufStart and bufEnd specify the range of characters parsed by the
@@ -3450,7 +3502,8 @@ Rebase(JSScript* dst, JSScript* src, T* srcp)
 }
 
 static JSObject*
-CloneInnerInterpretedFunction(JSContext* cx, HandleScope enclosingScope, HandleFunction srcFun)
+CloneInnerInterpretedFunction(JSContext* cx, HandleScope enclosingScope,
+                              HandleFunction srcFun, Handle<ScriptSourceObject*> sourceObject)
 {
     /* NB: Keep this in sync with XDRInterpretedFunction. */
     RootedObject cloneProto(cx);
@@ -3481,7 +3534,8 @@ CloneInnerInterpretedFunction(JSContext* cx, HandleScope enclosingScope, HandleF
     JSScript::AutoDelazify srcScript(cx, srcFun);
     if (!srcScript)
         return nullptr;
-    JSScript* cloneScript = CloneScriptIntoFunction(cx, enclosingScope, clone, srcScript);
+    JSScript* cloneScript = CloneScriptIntoFunction(cx, enclosingScope, clone,
+                                                    srcScript, sourceObject);
     if (!cloneScript)
         return nullptr;
 
@@ -3548,6 +3602,7 @@ js::detail::CopyScript(JSContext* cx, HandleScript src, HandleScript dst,
         GCPtrObject* vector = src->objects()->vector;
         RootedObject obj(cx);
         RootedObject clone(cx);
+        Rooted<ScriptSourceObject*> sourceObject(cx, dst->sourceObject());
         for (unsigned i = 0; i < nobjects; i++) {
             obj = vector[i];
             clone = nullptr;
@@ -3571,7 +3626,8 @@ js::detail::CopyScript(JSContext* cx, HandleScript src, HandleScript dst,
 
                     Scope* enclosing = innerFun->nonLazyScript()->enclosingScope();
                     RootedScope enclosingClone(cx, scopes[FindScopeIndex(src, *enclosing)]);
-                    clone = CloneInnerInterpretedFunction(cx, enclosingClone, innerFun);
+                    clone = CloneInnerInterpretedFunction(cx, enclosingClone, innerFun,
+                                                          sourceObject);
                 }
             } else {
                 clone = DeepCloneObjectLiteral(cx, obj, TenuredObject);
@@ -3680,30 +3736,12 @@ js::detail::CopyScript(JSContext* cx, HandleScript src, HandleScript dst,
 }
 
 static JSScript*
-CreateEmptyScriptForClone(JSContext* cx, HandleScript src)
+CreateEmptyScriptForClone(JSContext* cx, HandleScript src,
+                          Handle<ScriptSourceObject*> sourceObject)
 {
-    /*
-     * Wrap the script source object as needed. Self-hosted scripts may be
-     * in another runtime, so lazily create a new script source object to
-     * use for them.
-     */
-    RootedObject sourceObject(cx);
-    if (cx->runtime()->isSelfHostingCompartment(src->compartment())) {
-        if (!cx->compartment()->selfHostingScriptSource) {
-            CompileOptions options(cx);
-            FillSelfHostingCompileOptions(options);
-
-            ScriptSourceObject* obj = frontend::CreateScriptSourceObject(cx, options);
-            if (!obj)
-                return nullptr;
-            cx->compartment()->selfHostingScriptSource.set(obj);
-        }
-        sourceObject = cx->compartment()->selfHostingScriptSource;
-    } else {
-        sourceObject = src->sourceObject();
-        if (!cx->compartment()->wrap(cx, &sourceObject))
-            return nullptr;
-    }
+    MOZ_ASSERT(cx->compartment() == sourceObject->compartment());
+    MOZ_ASSERT_IF(cx->runtime()->isSelfHostingCompartment(src->compartment()),
+                  sourceObject == cx->compartment()->selfHostingScriptSource);
 
     CompileOptions options(cx);
     options.setMutedErrors(src->mutedErrors())
@@ -3720,7 +3758,15 @@ js::CloneGlobalScript(JSContext* cx, ScopeKind scopeKind, HandleScript src)
 {
     MOZ_ASSERT(scopeKind == ScopeKind::Global || scopeKind == ScopeKind::NonSyntactic);
 
-    RootedScript dst(cx, CreateEmptyScriptForClone(cx, src));
+    Rooted<ScriptSourceObject*> sourceObject(cx, src->sourceObject());
+    if (cx->compartment() != sourceObject->compartment()) {
+        sourceObject = ScriptSourceObject::clone(cx, sourceObject);
+        if (!sourceObject) {
+            return nullptr;
+        }
+    }
+
+    RootedScript dst(cx, CreateEmptyScriptForClone(cx, src, sourceObject));
     if (!dst)
         return nullptr;
 
@@ -3739,12 +3785,12 @@ js::CloneGlobalScript(JSContext* cx, ScopeKind scopeKind, HandleScript src)
 
 JSScript*
 js::CloneScriptIntoFunction(JSContext* cx, HandleScope enclosingScope, HandleFunction fun,
-                            HandleScript src)
+                            HandleScript src, Handle<ScriptSourceObject*> sourceObject)
 {
     MOZ_ASSERT(fun->isInterpreted());
     MOZ_ASSERT(!fun->hasScript() || fun->hasUncompiledScript());
 
-    RootedScript dst(cx, CreateEmptyScriptForClone(cx, src));
+    RootedScript dst(cx, CreateEmptyScriptForClone(cx, src, sourceObject));
     if (!dst)
         return nullptr;
 
