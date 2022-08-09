@@ -26,11 +26,15 @@
 /* Define to 1 if you have the `accept4' function. */
 #define EVENT__HAVE_ACCEPT4 1
 
+#ifdef HAVE_ARC4RANDOM
 /* Define to 1 if you have the `arc4random' function. */
-/* #undef EVENT__HAVE_ARC4RANDOM */
+#define EVENT__HAVE_ARC4RANDOM 1
+#endif
 
+#ifdef HAVE_ARC4RANDOM_BUF
 /* Define to 1 if you have the `arc4random_buf' function. */
-/* #undef EVENT__HAVE_ARC4RANDOM_BUF */
+#define EVENT__HAVE_ARC4RANDOM_BUF 1
+#endif
 
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #define EVENT__HAVE_ARPA_INET_H 1
