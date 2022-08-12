@@ -5,7 +5,7 @@ replace-with = 'vendored-sources'
 [source."https://github.com/rust-lang-nursery/packed_simd"]
 git = "https://github.com/hsivonen/packed_simd"
 replace-with = "vendored-sources"
-rev = "8b4bd7d8229660a749dbe419a57ea01df9de5453"
+rev = "90eebb82a107cbec1c8e406d9223819417e96de1"
 
 [source.vendored-sources]
 directory = '@top_srcdir@/third_party/rust'
