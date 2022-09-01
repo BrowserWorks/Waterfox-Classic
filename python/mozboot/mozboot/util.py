@@ -4,6 +4,7 @@
 
 import os
 
+MINIMUM_RUST_VERSION = '1.56.0'
 
 def get_state_dir():
     """Obtain path to a directory to hold state.

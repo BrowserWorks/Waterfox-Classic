@@ -14,6 +14,7 @@ import urllib2
 
 from distutils.version import LooseVersion
 from mozboot import rust
+from mozboot.util import MINIMUM_RUST_VERSION
 
 NO_MERCURIAL = '''
 Could not find Mercurial (hg) in the current shell's path. Try starting a new
@@ -151,7 +152,7 @@ MODERN_MERCURIAL_VERSION = LooseVersion('3.7.3')
 MODERN_PYTHON_VERSION = LooseVersion('2.7.3')
 
 # Upgrade rust older than this.
-MODERN_RUST_VERSION = LooseVersion('1.32.0')
+MODERN_RUST_VERSION = LooseVersion(MINIMUM_RUST_VERSION)
 
 class BaseBootstrapper(object):
     """Base class for system bootstrappers."""

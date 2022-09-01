@@ -6,7 +6,7 @@ on:
 
 env:
   ENABLE_ARTIFACTS_MODE: "true"
-  RUST_VER: "1.56.1"
+  RUST_VER: "1.63.0"
   SHELL: "/bin/bash"
 
 jobs:

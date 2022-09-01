@@ -48,4 +48,4 @@ debug-assertions = false
 panic = "abort"
 
 [patch.crates-io]
-packed_simd = { git = "https://github.com/hsivonen/packed_simd", rev="8b4bd7d8229660a749dbe419a57ea01df9de5453" }
+packed_simd = { package = "packed_simd_2", git = "https://github.com/hsivonen/packed_simd", rev="90eebb82a107cbec1c8e406d9223819417e96de1" }
