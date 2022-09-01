@@ -2333,6 +2333,17 @@ Parser<FullParseHandler, char16_t>::moduleBody(ModuleSharedContext* modulesc)
         p->value()->setClosedOver();
     }
 
+    // Reserve an environment slot for a "*namespace*" psuedo-binding and mark as
+    // closed-over. We do not know until module linking if this will be used.
+    if (!noteDeclaredName(context->names().starNamespaceStar, DeclarationKind::Const,
+                          pos())) {
+        return nullptr;
+    }
+    modulepc.varScope()
+        .lookupDeclaredName(context->names().starNamespaceStar)
+        ->value()
+        ->setClosedOver();
+
     if (!FoldConstants(context, &pn, this))
         return null();
 
@@ -5578,13 +5589,44 @@ Parser<ParseHandler, CharT>::exportBatch(uint32_t begin)
     if (!kid)
         return null();
 
-    // Handle the form |export *| by adding a special export batch
-    // specifier to the list.
-    Node exportSpec = handler.newExportBatchSpec(pos());
-    if (!exportSpec)
-        return null();
+    bool foundAs;
+    if (!tokenStream.matchToken(&foundAs, TokenKind::As)) {
+      return null();
+    }
 
-    handler.addList(kid, exportSpec);
+    if (foundAs) {
+        MUST_MATCH_TOKEN_FUNC(TokenKindIsPossibleIdentifierName, JSMSG_NO_EXPORT_NAME);
+
+        Node exportName = newName(anyChars.currentName());
+        if (!exportName) {
+            return null();
+        }
+
+        if (!checkExportedNameForClause(exportName)) {
+            return null();
+        }
+
+        Node importName = newName(context->names().star);
+        if (!importName) {
+            return null();
+        }
+
+        Node exportSpec = handler.newExportSpec(importName, exportName);
+        if (!exportSpec) {
+            return null();
+        }
+
+        handler.addList(kid, exportSpec);
+    } else {
+        // Handle the form |export *| by adding a special export batch
+        // specifier to the list.
+        Node exportSpec = handler.newExportBatchSpec(pos());
+        if (!exportSpec) {
+            return null();
+        }
+
+        handler.addList(kid, exportSpec);
+    }
 
     MUST_MATCH_TOKEN(TokenKind::From, JSMSG_FROM_AFTER_EXPORT_STAR);
 

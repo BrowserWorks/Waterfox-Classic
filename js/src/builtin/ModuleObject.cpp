@@ -25,9 +25,9 @@
 using namespace js;
 using namespace js::frontend;
 
-static_assert(MODULE_STATUS_UNINSTANTIATED < MODULE_STATUS_INSTANTIATING &&
-              MODULE_STATUS_INSTANTIATING < MODULE_STATUS_INSTANTIATED &&
-              MODULE_STATUS_INSTANTIATED < MODULE_STATUS_EVALUATED &&
+static_assert(MODULE_STATUS_UNLINKED < MODULE_STATUS_LINKING &&
+              MODULE_STATUS_LINKING < MODULE_STATUS_LINKED &&
+              MODULE_STATUS_LINKED < MODULE_STATUS_EVALUATED &&
               MODULE_STATUS_EVALUATED < MODULE_STATUS_EVALUATED_ERROR,
               "Module statuses are ordered incorrectly");
 
@@ -815,7 +815,7 @@ ModuleObject::environment() const
 
     // According to the spec the environment record is created during
     // instantiation, but we create it earlier than that.
-    if (status() < MODULE_STATUS_INSTANTIATED)
+    if (status() < MODULE_STATUS_LINKED)
         return nullptr;
 
     return &initialEnvironment();
@@ -864,7 +864,7 @@ ModuleObject::init(HandleScript script)
 {
     MOZ_ASSERT(script);
     initReservedSlot(ScriptSlot, PrivateGCThingValue(script));
-    initReservedSlot(StatusSlot, Int32Value(MODULE_STATUS_UNINSTANTIATED));
+    initReservedSlot(StatusSlot, Int32Value(MODULE_STATUS_UNLINKED));
     initReservedSlot(ScriptSourceObjectSlot, ObjectValue(*script->sourceObject()));
 }
 
@@ -886,7 +886,7 @@ ModuleObject::initImportExportData(HandleArrayObject requestedModules,
     initReservedSlot(LocalExportEntriesSlot, ObjectValue(*localExportEntries));
     initReservedSlot(IndirectExportEntriesSlot, ObjectValue(*indirectExportEntries));
     initReservedSlot(StarExportEntriesSlot, ObjectValue(*starExportEntries));
-    setReservedSlot(StatusSlot, Int32Value(MODULE_STATUS_UNINSTANTIATED));
+    setReservedSlot(StatusSlot, Int32Value(MODULE_STATUS_UNLINKED));
 }
 
 static bool
@@ -985,7 +985,7 @@ ModuleObject::script() const
 static inline void
 AssertValidModuleStatus(ModuleStatus status)
 {
-    MOZ_ASSERT(status >= MODULE_STATUS_UNINSTANTIATED &&
+    MOZ_ASSERT(status >= MODULE_STATUS_UNLINKED &&
                status <= MODULE_STATUS_EVALUATED_ERROR);
 }
 
@@ -1063,7 +1063,7 @@ ModuleObject::noteFunctionDeclaration(JSContext* cx, HandleAtom name, HandleFunc
 ModuleObject::instantiateFunctionDeclarations(JSContext* cx, HandleModuleObject self)
 {
 #ifdef DEBUG
-    MOZ_ASSERT(self->status() == MODULE_STATUS_INSTANTIATING);
+    MOZ_ASSERT(self->status() == MODULE_STATUS_LINKING);
     if (!AssertFrozen(cx, self))
         return false;
 #endif
@@ -1300,7 +1300,7 @@ ModuleBuilder::buildTables()
                         return false;
                 }
             }
-        } else if (exp->importName() == cx_->names().star) {
+        } else if (exp->importName() == cx_->names().star && !exp->exportName()) {
             if (!starExportEntries_.append(exp))
                 return false;
         } else {

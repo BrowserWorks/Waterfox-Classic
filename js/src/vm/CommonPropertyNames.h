@@ -380,6 +380,7 @@
     macro(StarGeneratorNext, StarGeneratorNext, "StarGeneratorNext") \
     macro(StarGeneratorReturn, StarGeneratorReturn, "StarGeneratorReturn") \
     macro(StarGeneratorThrow, StarGeneratorThrow, "StarGeneratorThrow") \
+    macro(starNamespaceStar, starNamespaceStar, "*namespace*") \
     macro(start, start, "start") \
     macro(startTimestamp, startTimestamp, "startTimestamp") \
     macro(state, state, "state") \
