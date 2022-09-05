@@ -21,9 +21,9 @@ jobs:
       image: ghcr.io/waterfoxco/waterfox-classic_docker_img:latest
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Cache for Linux
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.ccache
@@ -39,20 +39,20 @@ jobs:
           mv ./objdir-*/dist/waterfox*.tar.bz2 ./dist/
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Linux_${{ github.run_id }}
           path: ./dist/waterfox*.tar.bz2
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
   build-mac:
-    runs-on: macos-10.15
+    runs-on: macos-11
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "11.2.1"
+          xcode-version: "11.7"
       - name: Install depends
         run: |
           brew update
@@ -63,7 +63,7 @@ jobs:
           wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX10.12.sdk.tar.xz
           tar -xvf MacOSX10.12.sdk.tar.xz -C ../
       - name: Cache for macOS
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/Library/Caches/ccache
@@ -78,7 +78,7 @@ jobs:
           mv ./objdir-*/dist/waterfox*.dmg ./dist/
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_macOS_${{ github.run_id }}
           path: ./dist/waterfox*.dmg
@@ -87,7 +87,7 @@ jobs:
     runs-on: windows-2019
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set build directory
         run: |
           $pattern = '[\\]'
@@ -106,7 +106,7 @@ jobs:
         shell: bash
         run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims;C:\\ProgramData\\scoop\\apps\\llvm\\current\\bin/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
       - name: Cache for Windows
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/AppData/Local/Mozilla/sccache/cache
@@ -117,7 +117,7 @@ jobs:
         run: C:\\ProgramData\\scoop\\apps\\mozilla-build\\current\\start-shell.bat "$Env:G_WORKSPACE/build/github-actions/packageZip.sh"
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Windows_${{ github.run_id }}
           path: ./dist/waterfox*.zip
@@ -127,7 +127,7 @@ jobs:
     needs: [build-linux, build-mac, build-windows]
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ./dist
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
@@ -141,7 +141,7 @@ jobs:
           sha256sum waterfox*.zip | tee -a "$checksumFile"
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Checksum_${{ github.run_id }}
           path: ./dist/waterfox*.sha256

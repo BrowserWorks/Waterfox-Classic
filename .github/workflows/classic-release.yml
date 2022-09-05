@@ -18,7 +18,7 @@ jobs:
       JSIGN_PATH: /c/ProgramData/scoop/shims/jsign-4.0.jar
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set build directory
         run: |
           $pattern = '[\\]'
@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims;C:\\ProgramData\\scoop\\apps\\llvm\\current\\bin/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
       - name: Cache for Windows
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/AppData/Local/Mozilla/sccache/cache
@@ -92,7 +92,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Windows_${{ github.run_id }}
           path: |
@@ -106,9 +106,9 @@ jobs:
       image: ghcr.io/waterfoxco/waterfox-classic_docker_img:latest
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Cache for Linux
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.ccache
           key: ${{ runner.os }}-${{ hashFiles('**/browser/config/version_display.txt') }}
@@ -132,7 +132,7 @@ jobs:
           tag: ${{ steps.previoustag.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Linux_${{ github.run_id }}
           path: |
@@ -142,14 +142,14 @@ jobs:
 
   build-mac:
     name: 🍏 Build for macOS
-    runs-on: macos-10.15
+    runs-on: macos-11
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "11.2.1"
+          xcode-version: "11.7"
       - name: Install depends
         run: |
           brew update
@@ -160,7 +160,7 @@ jobs:
           wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX10.12.sdk.tar.xz
           tar -xvf MacOSX10.12.sdk.tar.xz -C ../
       - name: Cache for macOS
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/Library/Caches/ccache
@@ -244,35 +244,35 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload macOS DMG
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_macOS_${{ github.run_id }}
           path: ./objdir-*/dist/waterfox-classic/*.dmg
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
 
       - name: Upload macOS .app
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_macOS_${{ github.run_id }}
           path: ./objdir-*/dist/waterfox-classic/Waterfox\ Classic.app
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
 
       - name: Upload macOS MAR
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_macOS_${{ github.run_id }}
           path: ./objdir-*/dist/update/*.mar
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
 
       - name: Upload macOS XML
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_macOS_${{ github.run_id }}
           path: ./objdir-*/dist/update/update.xml
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
 
       - name: Upload MAR binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_macOS_${{ github.run_id }}
           path: ./objdir-*/dist/host/bin/mar
@@ -283,10 +283,10 @@ jobs:
     runs-on: windows-2019
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: Artifact_Classic_Windows_${{ github.run_id }}
 
@@ -320,13 +320,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload update.xml
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Windows_${{ github.run_id }}
           path: ./objdir-*/dist/update/update.xml
 
       - name: Upload .mar
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Windows_${{ github.run_id }}
           path: ./objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
@@ -339,10 +339,10 @@ jobs:
       image: ghcr.io/waterfoxco/waterfox-classic_docker_img:latest
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download Linux artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: Artifact_Classic_Linux_${{ github.run_id }}
 
@@ -366,13 +366,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload update.xml
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Linux_${{ github.run_id }}
           path: ./objdir-*/dist/update/update.xml
 
       - name: Upload .mar
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Linux_${{ github.run_id }}
           path: ./objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
@@ -380,15 +380,15 @@ jobs:
   # generate-mac-update:
   #     needs: [build]
   #     name: Generate macOS Update Files
-  #     runs-on: macos-10.15
+  #     runs-on: macos-11
   #     strategy:
   #         fail-fast: false
   #     steps:
   #       - name: Checkout branch
-  #         uses: actions/checkout@v2
+  #         uses: actions/checkout@v3
 
   #       - name: Download macOS artifacts
-  #         uses: actions/download-artifact@v2
+  #         uses: actions/download-artifact@v3
   #         with:
   #           name: Artifact_Classic_macOS_${{ github.run_id }}
 
@@ -399,13 +399,13 @@ jobs:
   #           ./build/github-actions/update.sh
 
   #       - name: Upload update.xml
-  #         uses: actions/upload-artifact@v2
+  #         uses: actions/upload-artifact@v3
   #         with:
   #           name: Artifact_Classic_macOS_${{ github.run_id }}
   #           path: ./objdir-*/dist/update/update.xml
 
   #       - name: Upload .mar
-  #         uses: actions/upload-artifact@v2
+  #         uses: actions/upload-artifact@v3
   #         with:
   #           name: Artifact_Classic_macOS_${{ github.run_id }}
   #           path: ./objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
@@ -418,9 +418,9 @@ jobs:
     needs: [build-linux, build-mac, build-windows]
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ./objdir-*/dist
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
@@ -447,7 +447,7 @@ jobs:
           tag: ${{ steps.previoustag.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Artifact_Classic_Checksum_${{ github.run_id }}
           path: ./dist/waterfox*.sha256
@@ -462,10 +462,10 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ./objdir-*/dist
         if: env.ENABLE_ARTIFACTS_MODE == 'true'
