@@ -14,16 +14,23 @@
 /// is the only call that returns the unadjusted values.
 class nsCocoaFeatures {
 public:
-  static int32_t OSXVersion();
-  static int32_t OSXVersionMajor();
-  static int32_t OSXVersionMinor();
-  static int32_t OSXVersionBugFix();
+  static int32_t macOSVersion();
+  static int32_t macOSVersionMajor();
+  static int32_t macOSVersionMinor();
+  static int32_t macOSVersionBugFix();
   static bool OnYosemiteOrLater();
   static bool OnElCapitanOrLater();
   static bool OnSierraOrLater();
+  static bool OnHighSierraOrLater();
   static bool OnMojaveOrLater();
+  static bool OnCatalinaOrLater();
+  static bool OnBigSurOrLater();
+  static bool OnMontereyOrLater();
+  static bool OnVenturaOrLater();
 
   static bool IsAtLeastVersion(int32_t aMajor, int32_t aMinor, int32_t aBugFix=0);
+
+  static bool ProcessIsRosettaTranslated();
 
   // These are utilities that do not change or depend on the value of mOSXVersion
   // and instead just encapsulate the encoding algorithm.  Note that GetVersion
@@ -38,7 +45,7 @@ public:
 private:
   static void InitializeVersionNumbers();
 
-  static int32_t mOSXVersion;
+  static int32_t mOSVersion;
 };
 
 // C-callable helper for cairo-quartz-font.c

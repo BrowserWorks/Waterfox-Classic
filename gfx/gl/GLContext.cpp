@@ -880,8 +880,8 @@ GLContext::InitWithPrefixImpl(const char* prefix, bool trygl)
 
 #ifdef XP_MACOSX
     if (mWorkAroundDriverBugs &&
-        nsCocoaFeatures::OSXVersionMajor() == 10 &&
-        nsCocoaFeatures::OSXVersionMinor() < 12)
+        nsCocoaFeatures::macOSVersionMajor() == 10 &&
+        nsCocoaFeatures::macOSVersionMinor() < 12)
     {
         if (mVendor == GLVendor::Intel) {
             // see bug 737182 for 2D textures, bug 684882 for cube map textures.
@@ -1725,8 +1725,8 @@ GLContext::InitExtensions()
         // textures with glCompressedTexSubImage2D. Works on Intel HD 4000
         // and Intel HD 5000/Iris that I tested.
         // Bug 1124996: Appears to be the same on OSX Yosemite (10.10)
-        if (nsCocoaFeatures::OSXVersionMajor() == 10 &&
-            nsCocoaFeatures::OSXVersionMinor() >= 9 &&
+        if (nsCocoaFeatures::macOSVersionMajor() == 10 &&
+            nsCocoaFeatures::macOSVersionMinor() >= 9 &&
             Renderer() == GLRenderer::IntelHD3000)
         {
             MarkExtensionUnsupported(EXT_texture_compression_s3tc);
