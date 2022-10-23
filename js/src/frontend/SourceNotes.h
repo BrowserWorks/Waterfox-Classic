@@ -50,6 +50,7 @@ namespace js {
     M(SRC_BREAK,        "break",       0)  /* JSOP_GOTO is a break. */                             \
     M(SRC_BREAK2LABEL,  "break2label", 0)  /* JSOP_GOTO for 'break label'. */                      \
     M(SRC_SWITCHBREAK,  "switchbreak", 0)  /* JSOP_GOTO is a break in a switch. */                 \
+    M(SRC_LOGICASSIGN,  "logicassign", 0)  /* JSOP_GOTO is for logical assignment operator. */     \
     M(SRC_TABLESWITCH,  "tableswitch", 1)  /* JSOP_TABLESWITCH; offset points to end of switch. */ \
     M(SRC_CONDSWITCH,   "condswitch",  2)  /* JSOP_CONDSWITCH; 1st offset points to end of switch, \
                                               2nd points to first JSOP_CASE. */                    \
@@ -64,7 +65,6 @@ namespace js {
     M(SRC_COLSPAN,      "colspan",     1)  /* Number of columns this opcode spans. */              \
     M(SRC_NEWLINE,      "newline",     0)  /* Bytecode follows a source newline. */                \
     M(SRC_SETLINE,      "setline",     1)  /* A file-absolute source line number note. */          \
-    M(SRC_UNUSED21,     "unused21",    0)  /* Unused. */                                           \
     M(SRC_UNUSED22,     "unused22",    0)  /* Unused. */                                           \
     M(SRC_UNUSED23,     "unused23",    0)  /* Unused. */                                           \
     M(SRC_XDELTA,       "xdelta",      0)  /* 24-31 are for extended delta notes. */

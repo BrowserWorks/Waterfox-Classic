@@ -296,6 +296,10 @@ ControlFlowGenerator::snoopControlFlow(JSOp op)
             // while (cond) { }
             return processWhileOrForInLoop(sn);
 
+          case SRC_LOGICASSIGN:
+            // Not implemented yet.
+            return ControlStatus::Abort;
+
           default:
             // Hard assert for now - make an error later.
             MOZ_CRASH("unknown goto case");
