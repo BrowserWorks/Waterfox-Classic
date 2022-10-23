@@ -22,7 +22,7 @@ TEST(TestURIMutator, Mutator)
   rv = NS_MutateURI(uri)
          .SetScheme(NS_LITERAL_CSTRING("ftp"))
          .SetHost(NS_LITERAL_CSTRING("mozilla.org"))
-         .SetPathQueryRef(NS_LITERAL_CSTRING("/path?query#ref"))
+         .SetPath(NS_LITERAL_CSTRING("/path?query#ref"))
          .Finalize(uri);
   ASSERT_EQ(rv, NS_OK);
   ASSERT_EQ(uri->GetSpec(out), NS_OK);
