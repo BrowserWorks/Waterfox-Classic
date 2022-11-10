@@ -38,27 +38,50 @@ GfxInfo::GfxInfo() : mOSXVersion{0}
 static OperatingSystem
 OSXVersionToOperatingSystem(uint32_t aOSXVersion)
 {
-  if (nsCocoaFeatures::ExtractMajorVersion(aOSXVersion) == 10) {
-    switch (nsCocoaFeatures::ExtractMinorVersion(aOSXVersion)) {
-      case 6:
-        return OperatingSystem::OSX10_6;
-      case 7:
-        return OperatingSystem::OSX10_7;
-      case 8:
-        return OperatingSystem::OSX10_8;
-      case 9:
-        return OperatingSystem::OSX10_9;
-      case 10:
-        return OperatingSystem::OSX10_10;
-      case 11:
-        return OperatingSystem::OSX10_11;
-      case 12:
-        return OperatingSystem::OSX10_12;
-    }
+  switch (nsCocoaFeatures::ExtractMajorVersion(aOSXVersion)) {
+    case 10:
+      switch (nsCocoaFeatures::ExtractMinorVersion(aOSXVersion)) {
+        case 6:
+          return OperatingSystem::OSX10_6;
+        case 7:
+          return OperatingSystem::OSX10_7;
+        case 8:
+          return OperatingSystem::OSX10_8;
+        case 9:
+          return OperatingSystem::OSX10_9;
+        case 10:
+          return OperatingSystem::OSX10_10;
+        case 11:
+          return OperatingSystem::OSX10_11;
+        case 12:
+          return OperatingSystem::OSX10_12;
+        case 13:
+          return OperatingSystem::OSX10_13;
+        case 14:
+          return OperatingSystem::OSX10_14;
+        case 15:
+          return OperatingSystem::OSX10_15;
+        case 16:
+          // Depending on the SDK version, we either get 10.16 or 11.0.
+          // Normalize this to 11.0.
+          return OperatingSystem::OSX11_0;
+        default:
+          break;
+      }
+      break;
+    case 11:
+        return OperatingSystem::OSX11_0;
+    case 12:
+        return OperatingSystem::OSX12_0;
+    case 13:
+        return OperatingSystem::OSX13_0;
+    default:
+        break;
   }
 
   return OperatingSystem::Unknown;
 }
+
 // The following three functions are derived from Chromium code
 static CFTypeRef SearchPortForProperty(io_registry_entry_t dspPort,
                                        CFStringRef propertyName)
@@ -113,7 +136,7 @@ GfxInfo::Init()
 
   AddCrashReportAnnotations();
 
-  mOSXVersion = nsCocoaFeatures::OSXVersion();
+  mOSXVersion = nsCocoaFeatures::macOSVersion();
 
   return rv;
 }

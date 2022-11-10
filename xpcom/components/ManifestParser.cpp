@@ -542,8 +542,8 @@ ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
   }
 #pragma warning(pop)
 #elif defined(MOZ_WIDGET_COCOA)
-  SInt32 majorVersion = nsCocoaFeatures::OSXVersionMajor();
-  SInt32 minorVersion = nsCocoaFeatures::OSXVersionMinor();
+  SInt32 majorVersion = nsCocoaFeatures::macOSVersionMajor();
+  SInt32 minorVersion = nsCocoaFeatures::macOSVersionMinor();
   nsTextFormatter::ssprintf(osVersion, u"%ld.%ld",
                             majorVersion,
                             minorVersion);
