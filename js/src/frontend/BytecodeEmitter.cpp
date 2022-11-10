@@ -4470,6 +4470,10 @@ bool BytecodeEmitter::emitShortCircuitAssignment(ParseNode* pn) {
 
   // Join with the short-circuit jump and pop anything left on the stack.
   if (numPushed > 0) {
+    if (!newSrcNote(SRC_LOGICASSIGN)) {
+      return false;
+    }
+
     JumpList jumpAroundPop;
     if (!emitJump(JSOP_GOTO, &jumpAroundPop)) {
       //            [stack] RHS
