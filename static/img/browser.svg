@@ -53,8 +53,7 @@
             <g id="Group-2" transform="translate(55.000000, 11.000000)">
                 <rect id="Rectangle-5" fill="#D4D4D4" x="40" y="0" width="1" height="16"></rect>
                 <text id="Search-or-enter-addr" opacity="0.800000012" font-family="HelveticaNeue, Helvetica Neue" font-size="12" font-weight="normal" letter-spacing="0.349999994" fill="#777777">
-                    <tspan x="46" y="13">Search or enter addres</tspan>
-                    <tspan x="176.388" y="13">s</tspan>
+                    <tspan x="46" y="13">Search or enter address</tspan>
                 </text>
                 <text id="Waterfox" opacity="0.800000012" font-family="HelveticaNeue, Helvetica Neue" font-size="9" font-weight="normal" letter-spacing="0.163636366" fill="#008FD4">
                     <tspan x="0" y="12">Waterfox</tspan>
