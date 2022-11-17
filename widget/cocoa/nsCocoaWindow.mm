@@ -2916,6 +2916,9 @@ nsCocoaWindow::GetEditCommands(NativeKeyBindingsType aType,
 
 - (BOOL)FrameView__wantsFloatingTitlebar
 {
+  if(nsCocoaFeatures::OnBigSurOrLater()) {
+    return [super FrameView__wantsFloatingTitlebar];
+  }
   return NO;
 }
 
@@ -3042,7 +3045,7 @@ static NSMutableSet *gSwizzledFrameViewClasses = nil;
     IMP _wantsFloatingTitlebar =
       class_getMethodImplementation(frameViewClass,
                                     @selector(_wantsFloatingTitlebar));
-    if (_wantsFloatingTitlebar &&
+    if (!nsCocoaFeatures::OnBigSurOrLater() && _wantsFloatingTitlebar &&
         _wantsFloatingTitlebar != our_wantsFloatingTitlebar) {
       nsToolkit::SwizzleMethods(frameViewClass, @selector(_wantsFloatingTitlebar),
                                 @selector(FrameView__wantsFloatingTitlebar));
