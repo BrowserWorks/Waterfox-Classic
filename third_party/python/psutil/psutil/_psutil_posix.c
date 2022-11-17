@@ -23,6 +23,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <net/if_dl.h>
+#include <sys/ioctl.h>
 #endif
 
 #if defined(__sun)
