@@ -1236,7 +1236,7 @@ static PRInt16 PR_CALLBACK SocketPoll(
 #if defined(_WIN64)
     if (in_flags & PR_POLL_WRITE) {
         if (fd->secret->alreadyConnected) {
-            out_flags = PR_POLL_WRITE;
+            *out_flags = PR_POLL_WRITE;
             return PR_POLL_WRITE;
         }
     }
@@ -1283,7 +1283,7 @@ static PRIOMethods tcpMethods = {
     SocketConnectContinue,
     (PRReservedFN)_PR_InvalidInt, 
     (PRReservedFN)_PR_InvalidInt, 
-    (PRReservedFN)_PR_InvalidInt, 
+    (PRReservedFN)_PR_InvalidInt,
     (PRReservedFN)_PR_InvalidInt
 };
 
