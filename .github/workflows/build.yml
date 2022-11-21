@@ -34,9 +34,7 @@ permissions:
 jobs:
   build-windows:
     name: 🪟 Build for Windows
-    runs-on:
-      group: larger-runners
-      labels: windows-latest-8-cores
+    runs-on: windows-2019
     concurrency:
       group: '${{ github.head_ref }}-windows-x64'
       cancel-in-progress: true
