@@ -1,0 +1,27 @@
+name: Release Pipeline
+on:
+  release:
+    types: [published]
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    secrets:
+      AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+      AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_ACCESS_KEY_SECRET }}'
+      AZURE_CLIENT_ID: '${{ secrets.AZURE_CLIENT_ID }}'
+      AZURE_CRT: '${{ secrets.AZURE_CRT }}'
+      AZURE_SUBSCRIPTION_ID: '${{ secrets.AZURE_SUBSCRIPTION_ID }}'
+      AZURE_TENANT_ID: '${{ secrets.AZURE_TENANT_ID }}'
+      AZURE_VAULT_ID: '${{ secrets.AZURE_VAULT_ID }}'
+      MACOS_ID: '${{ secrets.MACOS_ID }}'
+      MACOS_PWD: '${{ secrets.MACOS_PWD }}'
+      MACOS_CRT: '${{ secrets.MACOS_CRT }}'
+
+  release:
+    name: Release
+    uses: ./.github/workflows/release.yml
+    needs: build
+    secrets:
+      AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+      AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_ACCESS_KEY_SECRET }}'
