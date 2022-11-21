@@ -1,8 +1,7 @@
 name: Build Classic for Release
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 env:
   ENABLE_ARTIFACTS_MODE: "true"

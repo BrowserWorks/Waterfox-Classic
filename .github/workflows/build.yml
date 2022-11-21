@@ -1,0 +1,293 @@
+name: Build
+'on':
+  workflow_call:
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AZURE_CLIENT_ID:
+        required: false
+      AZURE_CRT:
+        required: false
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      AZURE_VAULT_ID:
+        required: false
+      MACOS_CRT:
+        required: false
+      MACOS_ID:
+        required: false
+      MACOS_PWD:
+        required: false
+
+env:
+  RUST_VER: "1.63.0"
+  SHELL: "/bin/bash"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-windows:
+    name: 🪟 Build for Windows
+    runs-on: windows-latest-8-cores
+    env:
+      MOZ_NOSPAM: 1
+      JSIGN_PATH: /c/ProgramData/scoop/shims/jsign-4.0.jar
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v3
+
+      - name: Set build directory
+        run: |
+          $pattern = '[\\]'
+          $BUILD_DIR = $env:GITHUB_WORKSPACE -replace $pattern, '/'
+          echo "G_WORKSPACE=${BUILD_DIR}" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install depends
+        run: |
+          iwr -useb get.scoop.sh -outfile 'install.ps1'
+          .\install.ps1 -RunAsAdmin
+          scoop install wget sccache llvm nasm --global
+          mkdir -p ~\\scoop\\buckets\\my-bucket
+          Copy-Item -Path $env:GITHUB_WORKSPACE\\build\\github-actions\\mozilla-build.json -Destination ~\scoop\buckets\my-bucket
+          scoop install my-bucket/mozilla-build --global
+          rustup default $env:RUST_VER-pc-windows-msvc
+
+      - name: Set system PATH variable
+        shell: bash
+        run: sed -i 's/SET PATH=.*/&;C:\\Rust\\.cargo\\bin;C:\\ProgramData\\scoop\\shims;C:\\ProgramData\\scoop\\apps\\llvm\\current\\bin/g' /c/ProgramData/scoop/apps/mozilla-build/current/start-shell.bat
+
+      - name: Cache for Windows
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/AppData/Local/Mozilla/sccache/cache
+          key: ${{ runner.os }}-${{ hashFiles('**/browser/config/version_display.txt') }}
+
+      - name: Build
+        run: |
+          C:\\ProgramData\\scoop\\apps\\mozilla-build\\current\\start-shell.bat "$Env:G_WORKSPACE/build/github-actions/build.sh"
+
+      - name: mach build installer
+        run: |
+          C:\\ProgramData\\scoop\\apps\\mozilla-build\\current\\start-shell.bat "$Env:G_WORKSPACE/build/github-actions/package.sh"
+
+      - name: Fix JAVA_HOME_8_X64 for shell
+        run: |
+          $pattern = '[\\]'
+          $JAVA_HOME = $env:JAVA_HOME_8_X64 -replace $pattern, '/'
+          echo "JAVA_HOME_8_X64_SHELL=${JAVA_HOME}" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: "\U0001FAAA Azure CLI Login via OIDC"
+        uses: azure/login@v1
+        with:
+          client-id: '${{ secrets.AZURE_CLIENT_ID }}'
+          tenant-id: '${{ secrets.AZURE_TENANT_ID }}'
+          subscription-id: '${{ secrets.AZURE_SUBSCRIPTION_ID }}'
+
+      - name: Sign
+        run: |
+          cd $G_WORKSPACE
+          BROWSER_VERSION=`cat browser/config/version_display.txt`
+          /c/ProgramData/scoop/shims/wget.exe https://github.com/ebourg/jsign/releases/download/4.0/jsign-4.0.jar -P /c/ProgramData/scoop/shims/
+          chmod +x /c/ProgramData/scoop/shims/
+          pushd objdir-classic/dist/install/sea/
+          7z x waterfox-classic-$BROWSER_VERSION.en-US.win64.installer.exe
+          rm -f waterfox-classic-$BROWSER_VERSION.en-US.win64.installer.exe
+          find ./ -type f -name "*.exe" -exec $JAVA_HOME_8_X64_SHELL/bin/java.exe -jar $JSIGN_PATH --storetype AZUREKEYVAULT --keystore ${{ secrets.AZURE_VAULT_ID }} --alias ${{ secrets.AZURE_CRT }} --tsaurl "http://rfc3161timestamp.globalsign.com/advanced" --tsmode RFC3161 --alg SHA-256 --storepass "$(az account get-access-token --resource "https://vault.azure.net" --tenant ${{ secrets.AZURE_TENANT_ID }} | jq -r .accessToken)" {} \;
+          find ./ -type f -name "*.dll" -exec $JAVA_HOME_8_X64_SHELL/bin/java.exe -jar $JSIGN_PATH --storetype AZUREKEYVAULT --keystore ${{ secrets.AZURE_VAULT_ID }} --alias ${{ secrets.AZURE_CRT }} --tsaurl "http://rfc3161timestamp.globalsign.com/advanced" --tsmode RFC3161 --alg SHA-256 --storepass "$(az account get-access-token --resource "https://vault.azure.net" --tenant ${{ secrets.AZURE_TENANT_ID }} | jq -r .accessToken)" {} \;
+          7z a -r -t7z app.7z -mx -m0=BCJ2 -m1=LZMA:d25 -m2=LZMA:d19 -m3=LZMA:d19 -mb0:1 -mb0s1:2 -mb0s2:3
+          cp $G_WORKSPACE/browser/installer/windows/app.tag .
+          cp $G_WORKSPACE/other-licenses/7zstub/firefox/7zSD.sfx .
+          cat 7zSD.sfx app.tag app.7z > "WaterfoxClassic$BROWSER_VERSION.exe"
+          $JAVA_HOME_8_X64_SHELL/bin/java.exe -jar $JSIGN_PATH --storetype AZUREKEYVAULT --keystore ${{ secrets.AZURE_VAULT_ID }} --alias ${{ secrets.AZURE_CRT }} --tsaurl "http://rfc3161timestamp.globalsign.com/advanced" --tsmode RFC3161 --alg SHA-256 --storepass "$(az account get-access-token --resource "https://vault.azure.net" --tenant ${{ secrets.AZURE_TENANT_ID }} | jq -r .accessToken)" "WaterfoxClassic$BROWSER_VERSION.exe"
+          az logout
+          rm -rf core 7zSD.sfx app.tag app.7z setup.exe
+          popd
+        shell: bash
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+
+      - name: Generate update files
+        run: |
+          $pattern = '[\\]'
+          $env:BUILD_DIR = $env:GITHUB_WORKSPACE
+          $env:BUILD_DIR = $env:BUILD_DIR -replace $pattern, '/'
+          Write-Output $env:BUILD_DIR
+          $env:TAG = "${{ steps.previoustag.outputs.tag }}"
+          Write-Output $env:TAG
+          C:\\ProgramData\\scoop\\apps\\mozilla-build\\current\\start-shell.bat "$env:BUILD_DIR/build/github-actions/update.sh"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Artifact_Classic_Windows_${{ github.run_id }}
+          path: |
+            ./objdir-*/dist/install/sea/*.exe
+            ./objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
+            ./objdir-*/dist/update/update.xml
+
+  build-linux:
+    name: 🐧 Build for Linux
+    runs-on: ubuntu-18.04
+    container:
+      image: ghcr.io/waterfoxco/waterfox-classic_docker_img:latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v3
+
+      - name: Cache for Linux
+        uses: actions/cache@v3
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-${{ hashFiles('**/browser/config/version_display.txt') }}
+
+      - name: Build
+        run: |
+          rustup default ${RUST_VER}-x86_64-unknown-linux-gnu
+          ./mach build
+
+      - name: Package
+        run: |
+          ./mach package
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+
+      - name: Generate update files
+        run: |
+          export BUILD_DIR=$GITHUB_WORKSPACE
+          export TAG=${{ steps.previoustag.outputs.tag }}
+          chmod +x ./build/github-actions/update.sh
+          ./build/github-actions/update.sh
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: Artifact_Classic_Linux_${{ github.run_id }}
+          path: |
+            ./objdir-*/dist/waterfox*.tar.bz2
+            ./objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
+            ./objdir-*/dist/update/update.xml
+
+  build-mac:
+    name: 🍏 Build for macOS
+    runs-on: macos-11
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v3
+
+      - name: Set up Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "11.7"
+
+      - name: Install depends
+        run: |
+          brew update
+          brew install autoconf@2.13 ccache make nasm yasm
+          rustup default ${RUST_VER}-x86_64-apple-darwin
+
+      - name: Download SDK
+        run: |
+          wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX10.12.sdk.tar.xz
+          tar -xvf MacOSX10.12.sdk.tar.xz -C ../
+
+      - name: Cache for macOS
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/Library/Caches/ccache
+          key: ${{ runner.os }}-${{ hashFiles('**/browser/config/version_display.txt') }}
+
+      - name: Build
+        run: ./mach build
+
+      - name: Package
+        run: |
+          ./mach package
+
+      - name: Setup keychain
+        uses: apple-actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CRT }}
+          p12-password: ${{ secrets.MACOS_PWD }}
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+
+      - name: Sign .app
+        run: |
+          wget https://hg.mozilla.org/releases/mozilla-esr60/raw-file/tip/security/mac/hardenedruntime/codesign.bash https://hg.mozilla.org/releases/mozilla-esr60/raw-file/tip/security/mac/hardenedruntime/production.entitlements.xml
+          chmod +x ./codesign.bash
+          ./codesign.bash -a objdir-classic/dist/waterfox-classic/Waterfox\ Classic.app -i "${{ secrets.MACOS_ID }}" -e ./production.entitlements.xml
+
+      - name: Create and sign DMG
+        run: |
+          BROWSER_VERSION=`cat browser/config/version_display.txt`
+          chmod +x ./browser/branding/unofficial/create-dmg
+          ./browser/branding/unofficial/create-dmg \
+          --volname "Waterfox Classic Setup" \
+          --volicon "browser/branding/unofficial/disk.icns" \
+          --background "browser/branding/unofficial/background.png" \
+          --window-pos 200 120 \
+          --window-size 520 380 \
+          --no-internet-enable \
+          --icon-size 128 \
+          --icon "Waterfox Classic.app" 100 178 \
+          --hide-extension "Waterfox Classic.app" \
+          --hdiutil-quiet \
+          --format UDBZ \
+          --eula "browser/branding/unofficial/license.txt" \
+          --app-drop-link 400 178 \
+          "objdir-classic/dist/waterfox-classic/Waterfox Classic ${BROWSER_VERSION} Setup.dmg" \
+          "objdir-classic/dist/waterfox-classic/Waterfox Classic.app"
+          codesign -s "${{ secrets.MACOS_ID }}" -fv "objdir-classic/dist/waterfox-classic/Waterfox Classic ${BROWSER_VERSION} Setup.dmg"
+          xcrun altool --notarize-app -f "objdir-classic/dist/waterfox-classic/Waterfox Classic ${BROWSER_VERSION} Setup.dmg" --primary-bundle-id 'org.waterfoxproject.waterfoxclassic' -u ${{ secrets.MACOS_DEV_ID }} -p ${{ secrets.MACOS_DEV_PWD }}
+
+      - name: Create MAR
+        run: |
+          BROWSER_VERSION=$(grep 'DisplayVersion=' ./objdir-classic/dist/waterfox-classic/Waterfox\ Classic.app/Contents/Resources/application.ini | cut -d'=' -f2)
+          mkdir -p ./objdir-classic/dist/update
+          xml=('<?xml version="1.0"?>'
+          '<updates>'
+          '    <update type="major" appVersion="VERSION"  buildID="BUILDID" detailsURL="https://www.waterfox.net/blog/waterfox-BROWSER_VERSION-release" displayVersion="BROWSER_VERSION" extensionVersion="VERSION" platformVersion="VERSION" version="VERSION">'
+          '        <patch type="complete" URL="https://github.com/WaterfoxCo/Waterfox-Classic/releases/download/TAG/waterfox-classic-BROWSER_VERSION.en-US.osx64.complete.xz.mar" hashFunction="SHA512" hashValue="HASH" size="SIZE"/>'
+          '    </update>'
+          '</updates>')
+          for line in "${xml[@]}" ; do echo $line >> ./objdir-classic/dist/update/update.xml ; done
+          chmod +x ./objdir-classic/dist/host/bin/mar
+          MAR=./objdir-classic/dist/host/bin/mar \
+          ./tools/update-packaging/make_full_update.sh \
+          ./objdir-classic/dist/update/waterfox-classic-$BROWSER_VERSION.en-US.osx64.complete.xz.mar \
+          ./objdir-classic/dist/waterfox-classic/Waterfox\ Classic.app
+          VERSION=$(grep '\<Version\>' ./objdir-classic/dist/waterfox-classic/Waterfox\ Classic.app/Contents/Resources/application.ini | cut -d'=' -f2)
+          BUILDID=$(grep 'BuildID=' ./objdir-classic/dist/waterfox-classic/Waterfox\ Classic.app/Contents/Resources/application.ini | cut -d'=' -f2)
+          SHA512=$(shasum -a 512 ./objdir-classic/dist/update/waterfox-classic-$BROWSER_VERSION.en-US.osx64.complete.xz.mar | awk '{print $1}')
+          SIZE=$(ls -l ./objdir-classic/dist/update/waterfox-classic-$BROWSER_VERSION.en-US.osx64.complete.xz.mar | awk '{print $5}')
+          echo "Display Version: $BROWSER_VERSION, Version: $VERSION, Build ID: $BUILDID, File Size: $SIZE, SHA512: $SHA512"
+          sed -i '' -e "s/OPERATING_SYSTEM/$OPERATING_SYSTEM/g" ./objdir-classic/dist/update/update.xml
+          sed -i '' -e "s/BROWSER_VERSION/$BROWSER_VERSION/g" ./objdir-classic/dist/update/update.xml
+          sed -i '' -e "s/VERSION/$VERSION/g" ./objdir-classic/dist/update/update.xml
+          sed -i '' -e "s/BUILDID/$BUILDID/g" ./objdir-classic/dist/update/update.xml
+          sed -i '' -e "s/SIZE/$SIZE/g" ./objdir-classic/dist/update/update.xml
+          sed -i '' -e "s/HASH/"$SHA512"/g" ./objdir-classic/dist/update/update.xml
+          sed -i '' -e "s/TAG/${{ steps.previoustag.outputs.tag }}/g" ./objdir-classic/dist/update/update.xml
+
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v3
+        with:
+          name: Artifact_Classic_macOS_${{ github.run_id }}
+          path: |
+            ./objdir-*/dist/waterfox-classic/*.dmg
+            ./objdir-*/dist/update/*.mar
+            ./objdir-*/dist/update/update.xml
