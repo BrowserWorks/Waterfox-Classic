@@ -9,6 +9,10 @@ env:
   RUST_VER: "1.63.0"
   SHELL: "/bin/bash"
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build-windows:
     name: 🪟 Build for Windows
@@ -56,6 +60,13 @@ jobs:
           $JAVA_HOME = $env:JAVA_HOME_8_X64 -replace $pattern, '/'
           echo "JAVA_HOME_8_X64_SHELL=${JAVA_HOME}" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: "\U0001FAAA Azure CLI Login via OIDC"
+        uses: azure/login@v1
+        with:
+          client-id: '${{ secrets.AZURE_CLIENT_ID }}'
+          tenant-id: '${{ secrets.AZURE_TENANT_ID }}'
+          subscription-id: '${{ secrets.AZURE_SUBSCRIPTION_ID }}'
+
       - name: Sign
         run: |
           cd $G_WORKSPACE
@@ -65,7 +76,6 @@ jobs:
           pushd objdir-classic/dist/install/sea/
           7z x waterfox-classic-$BROWSER_VERSION.en-US.win64.installer.exe
           rm -f waterfox-classic-$BROWSER_VERSION.en-US.win64.installer.exe
-          az login --service-principal --username "${{ secrets.AZURE_USER_ID }}" --password "${{ secrets.AZURE_USER_PWD }}" --tenant "${{ secrets.AZURE_TENANT_ID }}"
           find ./ -type f -name "*.exe" -exec $JAVA_HOME_8_X64_SHELL/bin/java.exe -jar $JSIGN_PATH --storetype AZUREKEYVAULT --keystore ${{ secrets.AZURE_VAULT_ID }} --alias ${{ secrets.AZURE_CRT }} --tsaurl "http://rfc3161timestamp.globalsign.com/advanced" --tsmode RFC3161 --alg SHA-256 --storepass "$(az account get-access-token --resource "https://vault.azure.net" --tenant ${{ secrets.AZURE_TENANT_ID }} | jq -r .accessToken)" {} \;
           find ./ -type f -name "*.dll" -exec $JAVA_HOME_8_X64_SHELL/bin/java.exe -jar $JSIGN_PATH --storetype AZUREKEYVAULT --keystore ${{ secrets.AZURE_VAULT_ID }} --alias ${{ secrets.AZURE_CRT }} --tsaurl "http://rfc3161timestamp.globalsign.com/advanced" --tsmode RFC3161 --alg SHA-256 --storepass "$(az account get-access-token --resource "https://vault.azure.net" --tenant ${{ secrets.AZURE_TENANT_ID }} | jq -r .accessToken)" {} \;
           7z a -r -t7z app.7z -mx -m0=BCJ2 -m1=LZMA:d25 -m2=LZMA:d19 -m3=LZMA:d19 -mb0:1 -mb0s1:2 -mb0s2:3
