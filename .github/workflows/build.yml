@@ -7,21 +7,21 @@ name: Build
       AWS_SECRET_ACCESS_KEY:
         required: true
       AZURE_CLIENT_ID:
-        required: false
+        required: true
       AZURE_CRT:
-        required: false
+        required: true
       AZURE_TENANT_ID:
-        required: false
+        required: true
       AZURE_SUBSCRIPTION_ID:
-        required: false
+        required: true
       AZURE_VAULT_ID:
-        required: false
+        required: true
       MACOS_CRT:
-        required: false
+        required: true
       MACOS_ID:
-        required: false
+        required: true
       MACOS_PWD:
-        required: false
+        required: true
 
 env:
   RUST_VER: "1.63.0"
@@ -34,7 +34,12 @@ permissions:
 jobs:
   build-windows:
     name: 🪟 Build for Windows
-    runs-on: windows-latest-8-cores
+    runs-on:
+      group: larger-runners
+      labels: windows-latest-8-cores
+    concurrency:
+      group: '${{ github.head_ref }}-windows-x64'
+      cancel-in-progress: true
     env:
       MOZ_NOSPAM: 1
       JSIGN_PATH: /c/ProgramData/scoop/shims/jsign-4.0.jar
@@ -137,6 +142,9 @@ jobs:
   build-linux:
     name: 🐧 Build for Linux
     runs-on: ubuntu-18.04
+    concurrency:
+      group: '${{ github.head_ref }}-linux-x64'
+      cancel-in-progress: true
     container:
       image: ghcr.io/waterfoxco/waterfox-classic_docker_img:latest
     steps:
@@ -181,6 +189,9 @@ jobs:
   build-mac:
     name: 🍏 Build for macOS
     runs-on: macos-11
+    concurrency:
+      group: '${{ github.head_ref }}-macos-x64'
+      cancel-in-progress: true
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
