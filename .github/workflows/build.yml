@@ -2,10 +2,6 @@ name: Build
 'on':
   workflow_call:
     secrets:
-      AWS_ACCESS_KEY_ID:
-        required: true
-      AWS_SECRET_ACCESS_KEY:
-        required: true
       AZURE_CLIENT_ID:
         required: true
       AZURE_CRT:
@@ -48,6 +44,12 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Set build directory
         run: |
@@ -118,10 +120,6 @@ jobs:
           popd
         shell: bash
 
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
-
       - name: Generate update files
         run: |
           $pattern = '[\\]'
@@ -152,6 +150,12 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Cache for Linux
         uses: actions/cache@v3
@@ -167,10 +171,6 @@ jobs:
       - name: Package
         run: |
           ./mach package
-
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Generate update files
         run: |
@@ -197,6 +197,12 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Set up Xcode version
         uses: maxim-lobanov/setup-xcode@v1
@@ -233,10 +239,6 @@ jobs:
         with:
           p12-file-base64: ${{ secrets.MACOS_CRT }}
           p12-password: ${{ secrets.MACOS_PWD }}
-
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Sign .app
         run: |

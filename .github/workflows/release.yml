@@ -16,6 +16,12 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Download all artifacts
         uses: actions/download-artifact@v3
@@ -33,10 +39,6 @@ jobs:
           sha256sum waterfox*.tar.bz2 | tee -a "$checksumFile"
           sha256sum Waterfox*.dmg | tee -a "$checksumFile"
           sha256sum Waterfox*.exe | tee -a "$checksumFile"
-
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Upload SHASUM
         uses: ncipollo/release-action@v1
@@ -57,15 +59,17 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Download all artifacts
         uses: actions/download-artifact@v3
         with:
           path: ./objdir-*/dist
-
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: 🪟 Upload Windows Installer
         uses: ncipollo/release-action@v1
@@ -119,15 +123,17 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Download all artifacts
         uses: actions/download-artifact@v3
         with:
           path: ./objdir-*/dist
-
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
 
       - name: Dry run AUS
         run: |
