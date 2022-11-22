@@ -18,6 +18,10 @@ name: Build
         required: true
       MACOS_CRT:
         required: true
+      MACOS_DEV_ID:
+        required: true
+      MACOS_DEV_PWD:
+        required: true
       MACOS_ID:
         required: true
       MACOS_PWD:

@@ -14,6 +14,8 @@ jobs:
       AZURE_TENANT_ID: '${{ secrets.AZURE_TENANT_ID }}'
       AZURE_VAULT_ID: '${{ secrets.AZURE_VAULT_ID }}'
       MACOS_ID: '${{ secrets.MACOS_ID }}'
+      MACOS_DEV_ID: '${{ secrets.MACOS_DEV_ID }}'
+      MACOS_DEV_PWD: '${{ secrets.MACOS_DEV_PWD }}'
       MACOS_PWD: '${{ secrets.MACOS_PWD }}'
       MACOS_CRT: '${{ secrets.MACOS_CRT }}'
 
