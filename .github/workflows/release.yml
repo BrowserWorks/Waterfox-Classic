@@ -71,37 +71,21 @@ jobs:
         with:
           path: ./objdir-*/dist
 
-      - name: 🪟 Upload Windows Installer
+      - name: 🪟 Upload Windows Artifacts
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: ./objdir-*/dist/install/sea/*.exe
+          artifacts: ./objdir-*/dist/Artifact_Classic_*_${{ github.run_id }}/objdir-*/dist/install/sea/*.exe,./objdir-*/dist/Artifact_Classic_*_${{ github.run_id }}/objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
           artifactContentType: application/vnd.microsoft.portable-executable
           tag: ${{ steps.previoustag.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🪟 Upload Windows MAR
+      - name: 🐧 Upload Linux Artifacts
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: ./objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
-          tag: ${{ steps.previoustag.outputs.tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🐧 Upload Linux Installer
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          artifacts: ./objdir-*/dist/waterfox*.tar.bz2
+          artifacts: ./objdir-*/dist/Artifact_Classic_*_${{ github.run_id }}/objdir-*/dist/waterfox*.tar.bz2,./objdir-*/dist/Artifact_Classic_*_${{ github.run_id }}/objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
           artifactContentType: application/zip
-          tag: ${{ steps.previoustag.outputs.tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🐧 Upload Linux MAR
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          artifacts: ./objdir-*/dist/update/waterfox-classic-*.en-US.*.complete.xz.mar
           tag: ${{ steps.previoustag.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -109,7 +93,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: ./objdir-*/dist/waterfox-classic/*.dmg,./objdir-*/dist/update/*.mar
+          artifacts: ./objdir-*/dist/Artifact_Classic_*_${{ github.run_id }}/objdir-*/dist/waterfox-classic/*.dmg,./objdir-*/dist/Artifact_Classic_*_${{ github.run_id }}/objdir-*/dist/update/*.mar
           tag: ${{ steps.previoustag.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
